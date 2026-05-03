@@ -393,16 +393,14 @@ function resolvePlantId(routeId, fallbackId) {
   return normalizeRouteParam(routeId) ?? normalizeRouteParam(fallbackId);
 }
 
-function formatCompactNumber(value, maximumFractionDigits = 2) {
+function formatCompactNumber(value) {
   const number = Number(value);
 
   if (!Number.isFinite(number)) {
     return "0";
   }
 
-  return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits,
-  }).format(number);
+  return String(number);
 }
 
 function formatKwValue(value) {
@@ -1053,7 +1051,7 @@ function buildLatestPowerRequests(plantId, config) {
   return getPowerCategoryAliases(config.category).map(
     (category) => ({
       sourceCategory: config.category,
-      endpoint: `${BASE_URL}/api/data/?plantId=${plantId}&category=${category}&type=${config.types.join(",")}`,
+      endpoint: `${BASE_URL}/api/data/?plantId=${plantId}&category=${category}&type=${config.types.join(",")}&latestBy=inserted`,
     }),
   );
 }
@@ -2182,7 +2180,7 @@ export default function OverviewScreen() {
                 >
                   <Text style={styles.infoBubbleLabel}>PV</Text>
                   <Text style={styles.infoBubbleValue}>
-                    {formatKwValue(plantData.pv)}
+                    {formatKwValue(plantData.production)}
                   </Text>
                 </TouchableOpacity>
 
