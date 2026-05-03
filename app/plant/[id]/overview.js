@@ -149,6 +149,8 @@ const POWER_CHART_Y_RANGE = {
   leftTicks: [8, 6, 4, 2, 0, -2, -4, -6],
 };
 const POWER_CHART_TIME_TICKS = [0, 3, 6, 9, 12, 15, 18, 21, 24];
+const POWER_CHART_HISTORY_MAX_POINTS = 720;
+const POWER_CHART_SAMPLE_MIN_GAP_MS = 60 * 1000;
 // Atur layout section dashboard energi dari sini.
 const DASHBOARD_LAYOUT = {
   sectionMarginTop: 6,
@@ -639,6 +641,9 @@ function getRecordTimestampText(record) {
     record?.time,
     record?.datetime,
     record?.dateTime,
+    record?.date,
+    record?.month,
+    record?.year,
     null,
   );
 }
@@ -912,6 +917,125 @@ function createEmptyChartSeries() {
   }, {});
 }
 
+function hasChartSeriesRows(series) {
+  return POWER_SERIES_CONFIG.some((item) => series?.[item.key]?.length);
+}
+
+function limitChartSeriesRows(series) {
+  return POWER_SERIES_CONFIG.reduce((limited, item) => {
+    const rows = series?.[item.key] ?? [];
+    limited[item.key] = rows.slice(-POWER_CHART_HISTORY_MAX_POINTS);
+    return limited;
+  }, {});
+}
+
+function mergeAndLimitChartSeries(...seriesGroups) {
+  return limitChartSeriesRows(mergeChartSeries(...seriesGroups));
+}
+
+function getLatestChartTimestampValue(series) {
+  const timestamps = POWER_SERIES_CONFIG.map((item) => {
+    const rows = series?.[item.key] ?? [];
+    return rows.length ? getRecordTimestampValue(rows[rows.length - 1]) : null;
+  }).filter((value) => value !== null);
+
+  return timestamps.length ? Math.max(...timestamps) : null;
+}
+
+function shouldAppendRealtimeChartSample(currentSeries, sampleSeries) {
+  if (!hasChartSeriesRows(sampleSeries)) {
+    return false;
+  }
+
+  if (!hasChartSeriesRows(currentSeries)) {
+    return true;
+  }
+
+  const hasChangedValue = POWER_SERIES_CONFIG.some((item) => {
+    const sampleRow = sampleSeries?.[item.key]?.[0];
+    const sampleValue = getApiNumber(sampleRow);
+
+    if (sampleValue === null) {
+      return false;
+    }
+
+    const currentRows = currentSeries?.[item.key] ?? [];
+    const currentValue = getApiNumber(currentRows[currentRows.length - 1]);
+
+    return (
+      currentValue === null || Math.abs(currentValue - sampleValue) > 0.0001
+    );
+  });
+
+  if (hasChangedValue) {
+    return true;
+  }
+
+  const latestTimestamp = getLatestChartTimestampValue(currentSeries);
+
+  return (
+    latestTimestamp === null ||
+    Date.now() - latestTimestamp >= POWER_CHART_SAMPLE_MIN_GAP_MS
+  );
+}
+
+function createRealtimeChartSampleSeries(powerValues, timestamp = new Date()) {
+  const createdAt = timestamp.toISOString();
+  const series = createEmptyChartSeries();
+
+  const addSample = (key, category, type, value) => {
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+      return;
+    }
+
+    series[key] = [
+      {
+        category,
+        type,
+        value: number,
+        createdAt,
+      },
+    ];
+  };
+
+  addSample("production", "pv", "chargePower", powerValues.production);
+  addSample("load", "out", "power", powerValues.load);
+  addSample("upsLoad", "out", "vaPower", powerValues.upsLoad);
+  addSample("grid", "grid", "power", powerValues.grid);
+  addSample("battery", "baterai", "power", powerValues.battery);
+
+  return series;
+}
+
+function buildChartSelectionKey(
+  segment,
+  plantId,
+  selectedDay,
+  selectedMonth,
+  selectedYear,
+) {
+  return [
+    segment,
+    plantId,
+    String(selectedYear),
+    String(selectedMonth).padStart(2, "0"),
+    String(selectedDay).padStart(2, "0"),
+  ].join(":");
+}
+
+function isSelectedCurrentDay(segment, selectedDay, selectedMonth, selectedYear) {
+  const now = new Date();
+
+  return (
+    segment === "day" &&
+    selectedDay === now.getDate() &&
+    selectedMonth === now.getMonth() + 1 &&
+    selectedYear === now.getFullYear()
+  );
+}
+
 function buildFallbackSeries(value, index) {
   const number = Number(value || 0);
   const shape = [0.92, 0.78, 1.04, 1.12, 1.02, 0.82];
@@ -994,6 +1118,12 @@ function getChartPoints(data, minY, maxY, width, height, pad) {
       y: pad.top + ((maxY - number) / (maxY - minY || 1)) * innerHeight,
     };
   });
+}
+
+function getLatestChartPoint(data, minY, maxY, width, height, pad) {
+  const points = getChartPoints(data, minY, maxY, width, height, pad);
+
+  return points.length ? points[points.length - 1] : null;
 }
 
 function buildSmoothLinePath(data, minY, maxY, width, height, pad) {
@@ -1218,24 +1348,28 @@ function DailyOverviewChart({
           />
         ))}
 
-        {activeDatasets.map((item) =>
-          getChartPoints(
+        {activeDatasets.map((item) => {
+          const point = getLatestChartPoint(
             item.data,
             minY,
             maxY,
             chartWidth,
             CHART_HEIGHT,
             pad,
-          ).map((point, index) => (
+          );
+
+          return point ? (
             <SvgCircle
-              key={`${item.key}-point-${index}`}
+              key={`${item.key}-current-point`}
               cx={point.x}
               cy={point.y}
-              r={POWER_CHART_LAYOUT.pointRadius}
+              r={POWER_CHART_LAYOUT.pointRadius + 1}
               fill={item.color}
+              stroke="rgba(248,250,252,0.82)"
+              strokeWidth="1.4"
             />
-          )),
-        )}
+          ) : null;
+        })}
       </Svg>
 
       <View style={styles.chartSwitchRow}>
@@ -1437,140 +1571,178 @@ export default function OverviewScreen() {
             ),
           ),
         );
+        const chartSelectionKey = buildChartSelectionKey(
+          activeSegment,
+          resolvedPlantId,
+          selectedDay,
+          selectedMonth,
+          selectedYear,
+        );
+        const realtimeChartSampleSeries = isSelectedCurrentDay(
+          activeSegment,
+          selectedDay,
+          selectedMonth,
+          selectedYear,
+        )
+          ? createRealtimeChartSampleSeries(apiPowerValues)
+          : createEmptyChartSeries();
 
-        setFetchedData((current) => ({
-          ...current,
-          ...plantInfo,
-          updatedAt: pickValue(
-            plantInfo.updated_at,
-            plantInfo.updatedAt,
-            current?.updatedAt,
-            selectedDevice?.updatedAt,
-            null,
-          ),
-          latitude: pickValue(
-            plantInfo.latitude,
-            googleWeather?.latitude,
-            current?.latitude,
-            selectedDevice?.latitude,
-            null,
-          ),
-          longitude: pickValue(
-            plantInfo.longitude,
-            googleWeather?.longitude,
-            current?.longitude,
-            selectedDevice?.longitude,
-            null,
-          ),
-          weather: pickValue(
-            plantInfo.weather,
-            googleWeather?.temperature !== undefined
-              ? `${Math.round(googleWeather.temperature)}\u00B0C`
-              : null,
-            current?.weather,
-            selectedDevice?.weather,
-            null,
-          ),
-          weatherTemperature: pickFiniteNumber(
-            plantInfo.weatherTemperature,
-            googleWeather?.temperature,
-            current?.weatherTemperature,
-            selectedDevice?.weatherTemperature,
-          ),
-          weatherHigh: pickFiniteNumber(
-            plantInfo.weatherHigh,
-            googleWeather?.high,
-            current?.weatherHigh,
-            selectedDevice?.weatherHigh,
-          ),
-          weatherLow: pickFiniteNumber(
-            plantInfo.weatherLow,
-            googleWeather?.low,
-            current?.weatherLow,
-            selectedDevice?.weatherLow,
-          ),
-          weatherConditionText: pickValue(
-            plantInfo.weatherConditionText,
-            googleWeather?.conditionText,
-            current?.weatherConditionText,
-            selectedDevice?.weatherConditionText,
-            null,
-          ),
-          weatherConditionType: pickValue(
-            plantInfo.weatherConditionType,
-            googleWeather?.conditionType,
-            current?.weatherConditionType,
-            selectedDevice?.weatherConditionType,
-            null,
-          ),
-          weatherIsDaytime: pickValue(
-            plantInfo.weatherIsDaytime,
-            googleWeather?.isDaytime,
-            current?.weatherIsDaytime,
-            selectedDevice?.weatherIsDaytime,
-            null,
-          ),
-          productionToday: pickNumber(
-            apiPowerValues.production,
-            plantInfo.productionToday,
-            plantInfo.production,
-            current?.productionToday,
-            current?.production,
-            selectedDevice?.productionToday,
-            selectedDevice?.production,
-          ),
-          production:
-            apiPowerValues.production ??
-            current?.production ??
-            plantInfo.production ??
-            selectedDevice?.production ??
-            0,
-          pv:
-            apiPowerValues.pv ??
-            current?.pv ??
-            plantInfo.pv ??
-            selectedDevice?.pv ??
-            0,
-          grid:
-            apiPowerValues.grid ??
-            current?.grid ??
-            plantInfo.grid ??
-            selectedDevice?.grid ??
-            0,
-          battery:
-            apiPowerValues.battery ??
-            current?.battery ??
-            plantInfo.battery ??
-            selectedDevice?.battery ??
-            0,
-          upsLoad:
-            apiPowerValues.upsLoad ??
-            current?.upsLoad ??
-            plantInfo.upsLoad ??
-            selectedDevice?.upsLoad ??
-            0,
-          load:
-            apiPowerValues.load ??
-            current?.load ??
-            plantInfo.load ??
-            selectedDevice?.load ??
-            0,
-          status: pickValue(
-            plantInfo.status,
-            current?.status,
-            selectedDevice?.status,
-            "--",
-          ),
-          chartSeries:
-            chartSeries ?? current?.chartSeries ?? createEmptyChartSeries(),
-        }));
+        setFetchedData((current) => {
+          const currentChartSeries =
+            current?.chartSelectionKey === chartSelectionKey
+              ? current?.chartSeries
+              : createEmptyChartSeries();
+          let nextChartSeries = mergeAndLimitChartSeries(
+            currentChartSeries,
+            chartSeries ?? createEmptyChartSeries(),
+          );
+
+          if (
+            shouldAppendRealtimeChartSample(
+              nextChartSeries,
+              realtimeChartSampleSeries,
+            )
+          ) {
+            nextChartSeries = mergeAndLimitChartSeries(
+              nextChartSeries,
+              realtimeChartSampleSeries,
+            );
+          }
+
+          return {
+            ...current,
+            ...plantInfo,
+            updatedAt: pickValue(
+              plantInfo.updated_at,
+              plantInfo.updatedAt,
+              current?.updatedAt,
+              selectedDevice?.updatedAt,
+              null,
+            ),
+            latitude: pickValue(
+              plantInfo.latitude,
+              googleWeather?.latitude,
+              current?.latitude,
+              selectedDevice?.latitude,
+              null,
+            ),
+            longitude: pickValue(
+              plantInfo.longitude,
+              googleWeather?.longitude,
+              current?.longitude,
+              selectedDevice?.longitude,
+              null,
+            ),
+            weather: pickValue(
+              plantInfo.weather,
+              googleWeather?.temperature !== undefined
+                ? `${Math.round(googleWeather.temperature)}\u00B0C`
+                : null,
+              current?.weather,
+              selectedDevice?.weather,
+              null,
+            ),
+            weatherTemperature: pickFiniteNumber(
+              plantInfo.weatherTemperature,
+              googleWeather?.temperature,
+              current?.weatherTemperature,
+              selectedDevice?.weatherTemperature,
+            ),
+            weatherHigh: pickFiniteNumber(
+              plantInfo.weatherHigh,
+              googleWeather?.high,
+              current?.weatherHigh,
+              selectedDevice?.weatherHigh,
+            ),
+            weatherLow: pickFiniteNumber(
+              plantInfo.weatherLow,
+              googleWeather?.low,
+              current?.weatherLow,
+              selectedDevice?.weatherLow,
+            ),
+            weatherConditionText: pickValue(
+              plantInfo.weatherConditionText,
+              googleWeather?.conditionText,
+              current?.weatherConditionText,
+              selectedDevice?.weatherConditionText,
+              null,
+            ),
+            weatherConditionType: pickValue(
+              plantInfo.weatherConditionType,
+              googleWeather?.conditionType,
+              current?.weatherConditionType,
+              selectedDevice?.weatherConditionType,
+              null,
+            ),
+            weatherIsDaytime: pickValue(
+              plantInfo.weatherIsDaytime,
+              googleWeather?.isDaytime,
+              current?.weatherIsDaytime,
+              selectedDevice?.weatherIsDaytime,
+              null,
+            ),
+            productionToday: pickNumber(
+              apiPowerValues.production,
+              plantInfo.productionToday,
+              plantInfo.production,
+              current?.productionToday,
+              current?.production,
+              selectedDevice?.productionToday,
+              selectedDevice?.production,
+            ),
+            production:
+              apiPowerValues.production ??
+              current?.production ??
+              plantInfo.production ??
+              selectedDevice?.production ??
+              0,
+            pv:
+              apiPowerValues.pv ??
+              current?.pv ??
+              plantInfo.pv ??
+              selectedDevice?.pv ??
+              0,
+            grid:
+              apiPowerValues.grid ??
+              current?.grid ??
+              plantInfo.grid ??
+              selectedDevice?.grid ??
+              0,
+            battery:
+              apiPowerValues.battery ??
+              current?.battery ??
+              plantInfo.battery ??
+              selectedDevice?.battery ??
+              0,
+            upsLoad:
+              apiPowerValues.upsLoad ??
+              current?.upsLoad ??
+              plantInfo.upsLoad ??
+              selectedDevice?.upsLoad ??
+              0,
+            load:
+              apiPowerValues.load ??
+              current?.load ??
+              plantInfo.load ??
+              selectedDevice?.load ??
+              0,
+            status: pickValue(
+              plantInfo.status,
+              current?.status,
+              selectedDevice?.status,
+              "--",
+            ),
+            chartSeries: nextChartSeries,
+            chartSelectionKey,
+          };
+        });
     } catch (error) {
       console.error("Error fetching plant data:", error);
     } finally {
-        if (showLoading) {
-          setIsRefreshLoading(false);
-        }
+      if (showLoading) {
+        setIsRefreshLoading(false);
       }
+    }
     },
     [
       activeSegment,
