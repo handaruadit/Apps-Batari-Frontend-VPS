@@ -5,7 +5,7 @@ export default function SolarIcon({ color = '#0EA5E9', size = 24 }) {
     <Svg
       width={size}
       height={size}
-      viewBox="23 29 35 27"
+      viewBox="20 26 42 34"
       fill="none"
     >
       <Path

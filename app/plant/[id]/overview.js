@@ -1,4 +1,5 @@
 import PowerFlowDiagram from "@/components/PowerFlowDiagram";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { clearAuth, getToken, isTokenValid } from "@/auth/token";
 import { BASE_URL, GOOGLE_MAPS_API_KEY } from "@/config/api";
 import { appColors, appFont } from "@/config/theme";
@@ -26,11 +27,16 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  StatusBar,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import Svg, {
   Circle as SvgCircle,
   Defs,
@@ -44,6 +50,7 @@ import Svg, {
 const screenWidth = Dimensions.get("window").width;
 const CHART_WIDTH = screenWidth - 60;
 const CHART_HEIGHT = 250;
+const CHART_STORAGE_PREFIX = "batari:overview-chart:";
 const WEATHER_LAYOUT = {
   cardMarginHorizontal: 24,
   cardMarginTop: 10,
@@ -88,6 +95,71 @@ const POWER_SERIES_CONFIG = [
   { key: "grid", label: "Grid", color: "#FF9300" },
   { key: "battery", label: "Battery", color: "#99E500" },
 ];
+
+const MANUAL_BUBBLE_OFFSET = {
+  grid: {
+    x: 0,
+    y: 0,
+  },
+  pv: {
+    x: 0,
+    y: 0,
+  },
+  battery: {
+    x: -50,
+    y: 0,
+  },
+  load: {
+    x: 0,
+    y: 0,
+  },
+};
+
+const BUBBLE_BASE_POSITION = {
+  grid: {
+    topPct: 0.0,
+    leftPct: 0.03,
+  },
+  pv: {
+    topPct: 0.02,
+    rightPct: 0.07,
+  },
+  battery: {
+    topPct: 0.77,
+    leftPct: 0.36,
+  },
+  load: {
+    topPct: 0.77,
+    rightPct: 0.06,
+  },
+};
+
+function getResponsiveBubblePositionStyle(key, boxWidth, boxHeight, scale) {
+  const base = BUBBLE_BASE_POSITION[key];
+  const offset = MANUAL_BUBBLE_OFFSET[key];
+
+  const positionStyle = {};
+
+  if (base.topPct !== undefined) {
+    positionStyle.top = boxHeight * base.topPct;
+  }
+
+  if (base.leftPct !== undefined) {
+    positionStyle.left = boxWidth * base.leftPct;
+  }
+
+  if (base.rightPct !== undefined) {
+    positionStyle.right = boxWidth * base.rightPct;
+  }
+
+  return {
+    ...positionStyle,
+    transform: [
+      { translateX: offset.x * scale },
+      { translateY: offset.y * scale },
+    ],
+  };
+}
 const POWER_LATEST_ENDPOINT_CONFIG = [
   {
     key: "pv",
@@ -151,6 +223,13 @@ const POWER_CHART_Y_RANGE = {
 const POWER_CHART_TIME_TICKS = [0, 3, 6, 9, 12, 15, 18, 21, 24];
 const POWER_CHART_HISTORY_MAX_POINTS = 720;
 const POWER_CHART_SAMPLE_MIN_GAP_MS = 60 * 1000;
+const POWER_CHART_RESPONSIVE_WIDTH = {
+  min: 240,
+  max: 520,
+  horizontalGap: 60,
+  compactInnerWidth: 260,
+  mediumInnerWidth: 340,
+};
 // Atur layout section dashboard energi dari sini.
 const DASHBOARD_LAYOUT = {
   sectionMarginTop: 6,
@@ -188,12 +267,12 @@ const DASHBOARD_FONT_SIZE = {
 };
 // Atur ukuran kotak Plant Testing dari sini.
 const PLANT_HEADER_BOX = {
-  minHeight: 50,
+  minHeight: 78,
   marginHorizontal: 0,
   marginTop: 0,
   marginBottom: 12,
   paddingHorizontal: 24,
-  paddingVertical: 15,
+  paddingVertical: 0,
   borderRadius: 0,
 };
 // Atur ukuran tulisan Plant Testing dan 0kW dari sini.
@@ -349,9 +428,7 @@ function getPowerTypeAliases(type) {
 function matchesApiText(value, aliases) {
   const normalizedValue = normalizeApiText(value);
 
-  return aliases.some(
-    (alias) => normalizeApiText(alias) === normalizedValue,
-  );
+  return aliases.some((alias) => normalizeApiText(alias) === normalizedValue);
 }
 
 function pickObjectValueByAliases(source, aliases) {
@@ -417,6 +494,40 @@ function formatRealtimeClock(date) {
 
 function formatChartHour(hour) {
   return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function getResponsiveChartWidth(windowWidth) {
+  return Math.min(
+    POWER_CHART_RESPONSIVE_WIDTH.max,
+    Math.max(
+      POWER_CHART_RESPONSIVE_WIDTH.min,
+      windowWidth - POWER_CHART_RESPONSIVE_WIDTH.horizontalGap,
+    ),
+  );
+}
+
+function getResponsiveChartTimeTicks(innerWidth) {
+  if (innerWidth < POWER_CHART_RESPONSIVE_WIDTH.compactInnerWidth) {
+    return [0, 6, 12, 18, 24];
+  }
+
+  if (innerWidth < POWER_CHART_RESPONSIVE_WIDTH.mediumInnerWidth) {
+    return [0, 4, 8, 12, 16, 20, 24];
+  }
+
+  return POWER_CHART_TIME_TICKS;
+}
+
+function getResponsiveChartTimeFontSize(innerWidth) {
+  if (innerWidth < POWER_CHART_RESPONSIVE_WIDTH.compactInnerWidth) {
+    return 10;
+  }
+
+  if (innerWidth < POWER_CHART_RESPONSIVE_WIDTH.mediumInnerWidth) {
+    return 11;
+  }
+
+  return POWER_CHART_LAYOUT.timeLabelFontSize;
 }
 
 function clampChartValue(value, minY, maxY) {
@@ -931,6 +1042,58 @@ function mergeAndLimitChartSeries(...seriesGroups) {
   return limitChartSeriesRows(mergeChartSeries(...seriesGroups));
 }
 
+function getStoredChartSeriesKey(chartSelectionKey) {
+  return `${CHART_STORAGE_PREFIX}${chartSelectionKey}`;
+}
+
+async function loadStoredChartSeries(chartSelectionKey) {
+  if (!chartSelectionKey) {
+    return createEmptyChartSeries();
+  }
+
+  try {
+    const rawValue = await AsyncStorage.getItem(
+      getStoredChartSeriesKey(chartSelectionKey),
+    );
+
+    if (!rawValue) {
+      return createEmptyChartSeries();
+    }
+
+    const parsedValue = JSON.parse(rawValue);
+    const storedSeries = parsedValue?.chartSeries ?? parsedValue;
+
+    return mergeAndLimitChartSeries(storedSeries);
+  } catch (error) {
+    console.warn("Gagal memuat data grafik tersimpan:", error);
+    return createEmptyChartSeries();
+  }
+}
+
+async function saveStoredChartSeries(chartSelectionKey, chartSeries) {
+  if (!chartSelectionKey) {
+    return;
+  }
+
+  const limitedSeries = mergeAndLimitChartSeries(chartSeries);
+
+  if (!hasChartSeriesRows(limitedSeries)) {
+    return;
+  }
+
+  try {
+    await AsyncStorage.setItem(
+      getStoredChartSeriesKey(chartSelectionKey),
+      JSON.stringify({
+        savedAt: new Date().toISOString(),
+        chartSeries: limitedSeries,
+      }),
+    );
+  } catch (error) {
+    console.warn("Gagal menyimpan data grafik:", error);
+  }
+}
+
 function getLatestChartTimestampValue(series) {
   const timestamps = POWER_SERIES_CONFIG.map((item) => {
     const rows = series?.[item.key] ?? [];
@@ -1023,7 +1186,12 @@ function buildChartSelectionKey(
   ].join(":");
 }
 
-function isSelectedCurrentDay(segment, selectedDay, selectedMonth, selectedYear) {
+function isSelectedCurrentDay(
+  segment,
+  selectedDay,
+  selectedMonth,
+  selectedYear,
+) {
   const now = new Date();
 
   return (
@@ -1048,12 +1216,10 @@ function buildZeroSeries(length = 6) {
 }
 
 function buildLatestPowerRequests(plantId, config) {
-  return getPowerCategoryAliases(config.category).map(
-    (category) => ({
-      sourceCategory: config.category,
-      endpoint: `${BASE_URL}/api/data/?plantId=${plantId}&category=${category}&type=${config.types.join(",")}&latestBy=inserted`,
-    }),
-  );
+  return getPowerCategoryAliases(config.category).map((category) => ({
+    sourceCategory: config.category,
+    endpoint: `${BASE_URL}/api/data/?plantId=${plantId}&category=${category}&type=${config.types.join(",")}&latestBy=inserted`,
+  }));
 }
 
 function buildChartEndpoint(
@@ -1171,17 +1337,20 @@ function DailyOverviewChart({
   onToggleSeries,
   currentTime = new Date(),
 }) {
+  const isCompactChart = chartWidth < 320;
   const pad = {
     top: POWER_CHART_LAYOUT.paddingTop,
-    right: POWER_CHART_LAYOUT.paddingRight,
-    bottom: POWER_CHART_LAYOUT.paddingBottom,
-    left: POWER_CHART_LAYOUT.paddingLeft,
+    right: isCompactChart ? 50 : POWER_CHART_LAYOUT.paddingRight,
+    bottom: isCompactChart ? 46 : POWER_CHART_LAYOUT.paddingBottom,
+    left: isCompactChart ? 40 : POWER_CHART_LAYOUT.paddingLeft,
   };
   const yTicks = POWER_CHART_Y_RANGE.leftTicks;
   const minY = POWER_CHART_Y_RANGE.minKw;
   const maxY = POWER_CHART_Y_RANGE.maxKw;
-  const innerWidth = chartWidth - pad.left - pad.right;
+  const innerWidth = Math.max(0, chartWidth - pad.left - pad.right);
   const innerHeight = CHART_HEIGHT - pad.top - pad.bottom;
+  const timeTicks = getResponsiveChartTimeTicks(innerWidth);
+  const timeLabelFontSize = getResponsiveChartTimeFontSize(innerWidth);
   const currentHour =
     currentTime.getHours() +
     currentTime.getMinutes() / 60 +
@@ -1275,7 +1444,7 @@ function DailyOverviewChart({
           );
         })}
 
-        {POWER_CHART_TIME_TICKS.map((hour) => {
+        {timeTicks.map((hour) => {
           const x = pad.left + (hour / 24) * innerWidth;
 
           return (
@@ -1291,8 +1460,8 @@ function DailyOverviewChart({
 
               <SvgText
                 x={x}
-                y={CHART_HEIGHT - 10}
-                fontSize={POWER_CHART_LAYOUT.timeLabelFontSize}
+                y={CHART_HEIGHT - 12}
+                fontSize={timeLabelFontSize}
                 fill="rgba(248,250,252,0.52)"
                 textAnchor="middle"
               >
@@ -1415,9 +1584,11 @@ function DailyOverviewChart({
 }
 
 export default function OverviewScreen() {
+  const insets = useSafeAreaInsets();
   const { selectedDevice } = useContext(AuthContext);
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { width: windowWidth } = useWindowDimensions();
   const resolvedPlantId = resolvePlantId(id, selectedDevice?.id);
   const plantId = resolvedPlantId ?? "1";
   const [activeSegment, setActiveSegment] = useState("day");
@@ -1440,6 +1611,29 @@ export default function OverviewScreen() {
       return items;
     }, {}),
   );
+  const overviewChartWidth = useMemo(
+    () => getResponsiveChartWidth(windowWidth),
+    [windowWidth],
+  );
+  const chartSelectionKey = useMemo(() => {
+    if (!resolvedPlantId) {
+      return null;
+    }
+
+    return buildChartSelectionKey(
+      activeSegment,
+      resolvedPlantId,
+      selectedDay,
+      selectedMonth,
+      selectedYear,
+    );
+  }, [
+    activeSegment,
+    resolvedPlantId,
+    selectedDay,
+    selectedMonth,
+    selectedYear,
+  ]);
   const weatherCardAnim = useRef(new Animated.Value(0)).current;
   const now = new Date();
   const todayDay = now.getDate();
@@ -1499,7 +1693,7 @@ export default function OverviewScreen() {
           setIsRefreshLoading(true);
         }
 
-        if (!resolvedPlantId) {
+        if (!resolvedPlantId || !chartSelectionKey) {
           return;
         }
 
@@ -1568,13 +1762,6 @@ export default function OverviewScreen() {
               latestRequests[index]?.sourceCategory,
             ),
           ),
-        );
-        const chartSelectionKey = buildChartSelectionKey(
-          activeSegment,
-          resolvedPlantId,
-          selectedDay,
-          selectedMonth,
-          selectedYear,
         );
         const realtimeChartSampleSeries = isSelectedCurrentDay(
           activeSegment,
@@ -1734,16 +1921,17 @@ export default function OverviewScreen() {
             chartSelectionKey,
           };
         });
-    } catch (error) {
-      console.error("Error fetching plant data:", error);
-    } finally {
-      if (showLoading) {
-        setIsRefreshLoading(false);
+      } catch (error) {
+        console.error("Error fetching plant data:", error);
+      } finally {
+        if (showLoading) {
+          setIsRefreshLoading(false);
+        }
       }
-    }
     },
     [
       activeSegment,
+      chartSelectionKey,
       getAuthorizedHeaders,
       requestJson,
       resolvedPlantId,
@@ -1759,6 +1947,57 @@ export default function OverviewScreen() {
       setFocusRefreshKey((prev) => prev + 1);
     }, []),
   );
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (chartSelectionKey) {
+      loadStoredChartSeries(chartSelectionKey).then((storedSeries) => {
+        if (!isActive || !hasChartSeriesRows(storedSeries)) {
+          return;
+        }
+
+        setFetchedData((current) => {
+          const currentSeries =
+            current?.chartSelectionKey === chartSelectionKey
+              ? current?.chartSeries
+              : createEmptyChartSeries();
+          const nextChartSeries = mergeAndLimitChartSeries(
+            storedSeries,
+            currentSeries,
+          );
+
+          if (!hasChartSeriesRows(nextChartSeries)) {
+            return current;
+          }
+
+          return {
+            ...(current ?? {}),
+            chartSeries: nextChartSeries,
+            chartSelectionKey,
+          };
+        });
+      });
+    }
+
+    return () => {
+      isActive = false;
+    };
+  }, [chartSelectionKey]);
+
+  useEffect(() => {
+    if (
+      !fetchedData?.chartSelectionKey ||
+      !hasChartSeriesRows(fetchedData.chartSeries)
+    ) {
+      return;
+    }
+
+    saveStoredChartSeries(
+      fetchedData.chartSelectionKey,
+      fetchedData.chartSeries,
+    );
+  }, [fetchedData?.chartSelectionKey, fetchedData?.chartSeries]);
 
   const plantData = useMemo(
     () => ({
@@ -1994,8 +2233,23 @@ export default function OverviewScreen() {
     };
   }, [fetchOverviewData, focusRefreshKey]);
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Animated.View style={[styles.stickyTopBar, weatherCardAnimatedStyle]}>
+    <SafeAreaView edges={["top", "left", "right"]} style={styles.safeArea}>
+      <StatusBar
+        translucent={false}
+        backgroundColor="#111326"
+        barStyle="light-content"
+      />
+
+      <Animated.View
+        style={[
+          styles.stickyTopBar,
+          {
+            paddingHorizontal: windowWidth < 380 ? 18 : 24,
+            minHeight: windowWidth < 380 ? 72 : 78,
+          },
+          weatherCardAnimatedStyle,
+        ]}
+      >
         <View style={styles.leftHeader}>
           <TouchableOpacity
             onPress={() => router.replace("/(home)/plant")}
@@ -2559,7 +2813,7 @@ export default function OverviewScreen() {
               activeSegment === "lifetime") && (
               <DailyOverviewChart
                 series={dailySeries}
-                chartWidth={CHART_WIDTH}
+                chartWidth={overviewChartWidth}
                 visibleSeries={visiblePowerSeries}
                 onToggleSeries={togglePowerSeries}
                 currentTime={chartCurrentTime}
@@ -2582,19 +2836,29 @@ const styles = StyleSheet.create({
     backgroundColor: appColors.screen,
   },
   stickyTopBar: {
+    width: "100%",
+    alignSelf: "stretch",
+
     minHeight: PLANT_HEADER_BOX.minHeight,
-    marginHorizontal: PLANT_HEADER_BOX.marginHorizontal,
-    marginTop: PLANT_HEADER_BOX.marginTop,
+    marginHorizontal: 0,
+    marginTop: 0,
     marginBottom: PLANT_HEADER_BOX.marginBottom,
-    paddingHorizontal: PLANT_HEADER_BOX.paddingHorizontal,
+
     paddingVertical: PLANT_HEADER_BOX.paddingVertical,
-    borderRadius: PLANT_HEADER_BOX.borderRadius,
+    borderRadius: 0,
+
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+
     backgroundColor: appColors.bubble,
-    borderWidth: 1,
-    borderColor: "rgba(8,174,234,0.22)",
+
+    borderTopWidth: 0,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    borderBottomColor: "rgba(8,174,234,0.22)",
+
     shadowColor: appColors.accent,
     shadowOpacity: 0.24,
     shadowRadius: 18,

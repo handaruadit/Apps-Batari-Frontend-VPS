@@ -1,7 +1,16 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { View } from "react-native";
 import { appColors } from "@/config/theme";
+
+const hiddenScreens = [
+  "data",
+  "eksperimen",
+  "index",
+  "sub-plant/data-battery",
+  "sub-plant/data-grid",
+  "sub-plant/data-load",
+  "sub-plant/data-pv",
+];
 
 export default function PlantDetailLayout() {
   return (
@@ -13,17 +22,15 @@ export default function PlantDetailLayout() {
 
         tabBarStyle: {
           position: "absolute",
-          left: 40,
-          right: 40,
-          bottom: 12,
-
-          height: 60,              // tinggi kotak tab
-          paddingHorizontal: 24,   // jarak logo dari kiri-kanan
-          paddingTop: 10,           // dorong isi ke bawah
-          paddingBottom: 0,        // dorong isi ke atas
-
+          left: 24,
+          right: 24,
+          bottom: 16,
+          height: 64,
+          paddingHorizontal: 0,
+          paddingTop: 8,
+          paddingBottom: 8,
           backgroundColor: appColors.bubble,
-          borderRadius: 20,
+          borderRadius: 22,
           borderTopWidth: 0,
           borderWidth: 1,
           borderColor: "rgba(0,170,255,0.45)",
@@ -36,19 +43,16 @@ export default function PlantDetailLayout() {
 
         tabBarItemStyle: {
           flex: 1,
-          height: 60,              // tinggi area klik tiap icon
+          height: 48,
           alignItems: "center",
           justifyContent: "center",
-
-          marginHorizontal: 0,     // tambah kalau ingin kedua icon makin ke tengah
-          paddingTop: 0,           // turunkan icon
-          paddingBottom: 0,        // naikkan icon
+          paddingVertical: 0,
         },
 
         tabBarIconStyle: {
-          width: 24,
-          height: 24,
-          marginTop: 0,            // turunkan/naikkan icon global
+          width: 32,
+          height: 32,
+          marginTop: 0,
           marginBottom: 0,
         },
 
@@ -60,25 +64,11 @@ export default function PlantDetailLayout() {
         name="overview"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <View
-              style={{
-                width: 24,              // ukuran area bungkus icon
-                height: 24,
-                alignItems: "center",
-                justifyContent: "center",
-
-                marginTop: 0,           // turunkan icon overview
-                marginBottom: 0,
-                marginLeft: 15,          // geser overview ke kanan/kiri
-                marginRight: 0,
-              }}
-            >
-              <Ionicons
-                name={focused ? "grid" : "grid-outline"}
-                size={30}               // ukuran logo overview
-                color={color}
-              />
-            </View>
+            <Ionicons
+              name={focused ? "grid" : "grid-outline"}
+              size={30}
+              color={color}
+            />
           ),
         }}
       />
@@ -87,43 +77,22 @@ export default function PlantDetailLayout() {
         name="perangkat"
         options={{
           tabBarIcon: ({ color, focused }) => (
-            <View
-              style={{
-                width: 24,
-                height: 24,
-                alignItems: "center",
-                justifyContent: "center",
-
-                marginTop: 0,           // turunkan icon perangkat
-                marginBottom: 0,
-                marginLeft: 0,          // geser perangkat ke kanan/kiri
-                marginRight: 0,
-              }}
-            >
-              <Ionicons
-                name={focused ? "cube" : "cube-outline"}
-                size={30}               // ukuran logo perangkat
-                color={color}
-              />
-            </View>
+            <Ionicons
+              name={focused ? "cube" : "cube-outline"}
+              size={30}
+              color={color}
+            />
           ),
         }}
       />
 
-      <Tabs.Screen
-        name="data"
-        options={{ href: null }}
-      />
-
-      <Tabs.Screen
-        name="eksperimen"
-        options={{ href: null }}
-      />
-
-      <Tabs.Screen
-        name="index"
-        options={{ href: null }}
-      />
+      {hiddenScreens.map((screenName) => (
+        <Tabs.Screen
+          key={screenName}
+          name={screenName}
+          options={{ href: null }}
+        />
+      ))}
     </Tabs>
   );
 }

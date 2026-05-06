@@ -89,11 +89,18 @@ const POWER_FLOW_FONT_SIZE = {
 };
 
 function formatValue(value) {
-  return Number(value || 0).toFixed(0);
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "0.00";
+  }
+
+  return number.toFixed(2);
 }
 
 function MetricBlock({ metricKey, icon, title, value, color, subtitle }) {
-  const font = POWER_FLOW_FONT_SIZE[metricKey] || POWER_FLOW_FONT_SIZE.production;
+  const font =
+    POWER_FLOW_FONT_SIZE[metricKey] || POWER_FLOW_FONT_SIZE.production;
 
   return (
     <View style={styles.metricBlock}>
@@ -134,12 +141,7 @@ function MetricBlock({ metricKey, icon, title, value, color, subtitle }) {
           numberOfLines={1}
         >
           {value}
-          <Text
-            style={[
-              styles.metricUnit,
-              { color, fontSize: font.unit },
-            ]}
-          >
+          <Text style={[styles.metricUnit, { color, fontSize: font.unit }]}>
             kW
           </Text>
         </Text>
@@ -149,6 +151,9 @@ function MetricBlock({ metricKey, icon, title, value, color, subtitle }) {
     </View>
   );
 }
+
+
+
 
 export default function PowerFlowDiagram({ data = {} }) {
   const production = Number(data.production || 0);
@@ -252,12 +257,12 @@ export default function PowerFlowDiagram({ data = {} }) {
           </Svg>
 
           <View style={styles.centerContent}>
-          <Text style={styles.centerLabel}>TOTAL</Text>
-          <Text style={styles.centerValue}>
-            {formatValue(totalConsumed)}
-            <Text style={styles.centerUnit}>kW</Text>
-          </Text>
-        </View>
+            <Text style={styles.centerLabel}>TOTAL</Text>
+            <Text style={styles.centerValue}>
+              {formatValue(totalConsumed)}
+              <Text style={styles.centerUnit}>kW</Text>
+            </Text>
+          </View>
         </View>
 
         <View style={styles.upsLoadBlock}>
