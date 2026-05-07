@@ -9,7 +9,12 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.handaruadit.appsbatarifrontend",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.nitro.belajarapp",
@@ -29,6 +34,7 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/with-android-cleartext-traffic",
       [
         "expo-splash-screen",
         {
@@ -40,11 +46,18 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4b829a30-35f6-447c-a914-4e5632c37537"
+      }
     }
   }
 }

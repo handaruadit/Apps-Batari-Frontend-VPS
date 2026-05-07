@@ -948,10 +948,22 @@ function normalizeLatestPowerValues(data, sourceCategory) {
 }
 
 function normalizeChartSeries(data) {
+  const directSeries = {
+    production: normalizeSeriesRows(data?.production),
+    load: normalizeSeriesRows(data?.load),
+    upsLoad: normalizeSeriesRows(data?.upsLoad),
+    grid: normalizeSeriesRows(data?.grid),
+    battery: normalizeSeriesRows(data?.battery),
+  };
+  const hasDirectSeries = hasChartSeriesRows(directSeries);
   const production = getApiSeries(data, "pv", "chargePower");
   const pvPower = getApiSeries(data, "pv", "power");
   const outPower = getApiSeries(data, "load", "power");
   const outVaPower = getApiSeries(data, "load", "vaPower");
+
+  if (hasDirectSeries) {
+    return directSeries;
+  }
 
   return {
     production: production.length ? production : pvPower,
@@ -1094,6 +1106,18 @@ async function saveStoredChartSeries(chartSelectionKey, chartSeries) {
   }
 }
 
+async function removeStoredChartSeries(chartSelectionKey) {
+  if (!chartSelectionKey) {
+    return;
+  }
+
+  try {
+    await AsyncStorage.removeItem(getStoredChartSeriesKey(chartSelectionKey));
+  } catch (error) {
+    console.warn("Gagal menghapus cache grafik:", error);
+  }
+}
+
 function getLatestChartTimestampValue(series) {
   const timestamps = POWER_SERIES_CONFIG.map((item) => {
     const rows = series?.[item.key] ?? [];
@@ -1222,6 +1246,16 @@ function buildLatestPowerRequests(plantId, config) {
   }));
 }
 
+function buildQueryString(params) {
+  return Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null && value !== "")
+    .map(
+      ([key, value]) =>
+        `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`,
+    )
+    .join("&");
+}
+
 function buildChartEndpoint(
   segment,
   plantId,
@@ -1231,20 +1265,27 @@ function buildChartEndpoint(
 ) {
   const month = String(selectedMonth).padStart(2, "0");
   const day = String(selectedDay).padStart(2, "0");
+  const params = {
+    plantId: String(plantId),
+    segment,
+  };
 
   if (segment === "day") {
-    return `${BASE_URL}/api/data/daily?plantId=${plantId}&date=${selectedYear}-${month}-${day}`;
+    params.date = `${selectedYear}-${month}-${day}`;
+    return `${BASE_URL}/api/data/chart?${buildQueryString(params)}`;
   }
 
   if (segment === "month") {
-    return `${BASE_URL}/api/data/monthly?plantId=${plantId}&date=${selectedYear}-${month}`;
+    params.date = `${selectedYear}-${month}`;
+    return `${BASE_URL}/api/data/chart?${buildQueryString(params)}`;
   }
 
   if (segment === "year") {
-    return `${BASE_URL}/api/data/yearly?plantId=${plantId}&date=${selectedYear}`;
+    params.date = String(selectedYear);
+    return `${BASE_URL}/api/data/chart?${buildQueryString(params)}`;
   }
 
-  return `${BASE_URL}/api/data/lifetime?plantId=${plantId}`;
+  return `${BASE_URL}/api/data/chart?${buildQueryString(params)}`;
 }
 
 function getChartPoints(data, minY, maxY, width, height, pad) {
@@ -1656,7 +1697,6 @@ export default function OverviewScreen() {
     return {
       Accept: "application/json",
       "Content-Type": "application/json",
-      "ngrok-skip-browser-warning": "any-value",
       Authorization: `Bearer ${token}`,
     };
   }, [router]);
@@ -1751,10 +1791,14 @@ export default function OverviewScreen() {
           googleWeather = null;
         }
 
-        const chartSeries =
-          chartResult?.ok && chartResult?.json?.data != null
-            ? mergeChartSeries(normalizeChartSeries(chartResult.json.data))
-            : null;
+        const chartRequestSucceeded =
+          chartResult?.ok && chartResult?.json?.data != null;
+        const chartSeries = chartRequestSucceeded
+          ? mergeChartSeries(normalizeChartSeries(chartResult.json.data))
+          : createEmptyChartSeries();
+        const fallbackChartSeries = chartRequestSucceeded
+          ? createEmptyChartSeries()
+          : await loadStoredChartSeries(chartSelectionKey);
         const apiPowerValues = mergePowerValues(
           ...latestResults.map((item, index) =>
             normalizeLatestPowerValues(
@@ -1777,10 +1821,12 @@ export default function OverviewScreen() {
             current?.chartSelectionKey === chartSelectionKey
               ? current?.chartSeries
               : createEmptyChartSeries();
-          let nextChartSeries = mergeAndLimitChartSeries(
-            currentChartSeries,
-            chartSeries ?? createEmptyChartSeries(),
-          );
+          const baseChartSeries = chartRequestSucceeded
+            ? chartSeries
+            : hasChartSeriesRows(fallbackChartSeries)
+              ? fallbackChartSeries
+              : currentChartSeries;
+          let nextChartSeries = mergeAndLimitChartSeries(baseChartSeries);
 
           if (
             shouldAppendRealtimeChartSample(
@@ -1921,6 +1967,10 @@ export default function OverviewScreen() {
             chartSelectionKey,
           };
         });
+
+        if (chartRequestSucceeded && !hasChartSeriesRows(chartSeries)) {
+          await removeStoredChartSeries(chartSelectionKey);
+        }
       } catch (error) {
         console.error("Error fetching plant data:", error);
       } finally {
@@ -1947,43 +1997,6 @@ export default function OverviewScreen() {
       setFocusRefreshKey((prev) => prev + 1);
     }, []),
   );
-
-  useEffect(() => {
-    let isActive = true;
-
-    if (chartSelectionKey) {
-      loadStoredChartSeries(chartSelectionKey).then((storedSeries) => {
-        if (!isActive || !hasChartSeriesRows(storedSeries)) {
-          return;
-        }
-
-        setFetchedData((current) => {
-          const currentSeries =
-            current?.chartSelectionKey === chartSelectionKey
-              ? current?.chartSeries
-              : createEmptyChartSeries();
-          const nextChartSeries = mergeAndLimitChartSeries(
-            storedSeries,
-            currentSeries,
-          );
-
-          if (!hasChartSeriesRows(nextChartSeries)) {
-            return current;
-          }
-
-          return {
-            ...(current ?? {}),
-            chartSeries: nextChartSeries,
-            chartSelectionKey,
-          };
-        });
-      });
-    }
-
-    return () => {
-      isActive = false;
-    };
-  }, [chartSelectionKey]);
 
   useEffect(() => {
     if (

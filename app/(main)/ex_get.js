@@ -37,7 +37,6 @@ const DataScreen = () => {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'any-value',
           'Authorization': `Bearer ${token}`, // Otentikasi masuk di sini
         },
       });

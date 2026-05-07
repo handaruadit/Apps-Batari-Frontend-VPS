@@ -84,7 +84,6 @@ const LoginScreen = () => {
       return;
     }
 
-    // export const BASE_URL = 'http://192.168.1.11:3000';
     const endpoint = `${BASE_URL}/api/auth/login`;
 
     setLoading(true);
@@ -96,7 +95,6 @@ const LoginScreen = () => {
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
-          'ngrok-skip-browser-warning': 'any-value',
         },
         body: JSON.stringify({
           email,
