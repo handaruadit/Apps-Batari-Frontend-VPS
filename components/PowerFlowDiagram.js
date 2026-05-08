@@ -143,7 +143,12 @@ function MetricBlock({
       <View
         style={[
           styles.metricTitleSlot,
-          { height: scaleValue(POWER_FLOW_LAYOUT.metricTitleHeight, layoutScale) },
+          {
+            height: scaleValue(
+              POWER_FLOW_LAYOUT.metricTitleHeight,
+              layoutScale,
+            ),
+          },
         ]}
       >
         <Text
@@ -165,7 +170,10 @@ function MetricBlock({
         style={[
           styles.metricValueSlot,
           {
-            height: scaleValue(POWER_FLOW_LAYOUT.metricValueHeight, layoutScale),
+            height: scaleValue(
+              POWER_FLOW_LAYOUT.metricValueHeight,
+              layoutScale,
+            ),
             marginTop: scaleValue(
               POWER_FLOW_LAYOUT.metricValueMarginTop,
               layoutScale,
@@ -191,9 +199,12 @@ function MetricBlock({
         >
           {value}
           <Text
-            style={[styles.metricUnit, { color, fontSize: font.unit * fontScale }]}
+            style={[
+              styles.metricUnit,
+              { color, fontSize: font.unit * fontScale },
+            ]}
           >
-            kW
+            kWh
           </Text>
         </Text>
       </View>
@@ -202,9 +213,6 @@ function MetricBlock({
     </View>
   );
 }
-
-
-
 
 export default function PowerFlowDiagram({ data = {} }) {
   const { width } = useWindowDimensions();
@@ -238,7 +246,10 @@ export default function PowerFlowDiagram({ data = {} }) {
             POWER_FLOW_LAYOUT.containerPaddingHorizontal,
             layoutScale,
           ),
-          minHeight: scaleValue(POWER_FLOW_LAYOUT.containerMinHeight, layoutScale),
+          minHeight: scaleValue(
+            POWER_FLOW_LAYOUT.containerMinHeight,
+            layoutScale,
+          ),
         },
       ]}
     >
@@ -272,7 +283,7 @@ export default function PowerFlowDiagram({ data = {} }) {
           fontScale={fontScale}
         />
 
-        <MetricBlock
+        {/* <MetricBlock
           metricKey="load"
           icon={
             <View style={{ marginTop: 6 }}>
@@ -289,11 +300,13 @@ export default function PowerFlowDiagram({ data = {} }) {
           subtitle=""
           layoutScale={layoutScale}
           fontScale={fontScale}
-        />
+        /> */}
       </View>
 
       <View style={[styles.centerSection, { width: centerSectionWidth }]}>
-        <View style={[styles.ringWrapper, { width: ringSize, height: ringSize }]}>
+        <View
+          style={[styles.ringWrapper, { width: ringSize, height: ringSize }]}
+        >
           <Svg width={ringSize} height={ringSize} viewBox="0 0 238 238">
             <Circle
               cx="119"
@@ -347,7 +360,12 @@ export default function PowerFlowDiagram({ data = {} }) {
           <View
             style={[
               styles.centerContent,
-              { top: scaleValue(POWER_FLOW_LAYOUT.centerContentTop, layoutScale) },
+              {
+                top: scaleValue(
+                  POWER_FLOW_LAYOUT.centerContentTop,
+                  layoutScale,
+                ),
+              },
             ]}
           >
             <Text
@@ -381,13 +399,13 @@ export default function PowerFlowDiagram({ data = {} }) {
                   { fontSize: POWER_FLOW_FONT_SIZE.center.unit * fontScale },
                 ]}
               >
-                kW
+                kWh
               </Text>
             </Text>
           </View>
         </View>
 
-        <View
+        {/* <View
           style={[
             styles.upsLoadBlock,
             {
@@ -460,6 +478,89 @@ export default function PowerFlowDiagram({ data = {} }) {
               kW
             </Text>
           </Text>
+        </View> */}
+        <View
+          style={[
+            styles.upsLoadBlock,
+            {
+              width: scaleValue(
+                POWER_FLOW_LAYOUT.upsLoadBlockWidth,
+                layoutScale,
+              ),
+              height: scaleValue(
+                POWER_FLOW_LAYOUT.upsLoadBlockHeight,
+                layoutScale,
+              ),
+              marginTop: scaleValue(
+                POWER_FLOW_LAYOUT.upsLoadMarginTop,
+                layoutScale,
+              ),
+            },
+          ]}
+        >
+          <FontAwesome5
+            name="broadcast-tower"
+            size={28 * iconScale}
+            color="#FF9300"
+            style={{
+              marginBottom: scaleValue(
+                POWER_FLOW_LAYOUT.upsLoadIconMarginBottom,
+                layoutScale,
+              ),
+            }}
+          />
+
+          <Text
+            style={[
+              styles.upsLoadLabel,
+              {
+                fontSize: POWER_FLOW_FONT_SIZE.grid.title * fontScale,
+                lineHeight:
+                  POWER_FLOW_FONT_SIZE.grid.titleLineHeight * fontScale,
+              },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            Grid
+          </Text>
+
+          <Text
+            style={[
+              styles.upsLoadValue,
+              {
+                color: "#FF9300",
+                fontSize: POWER_FLOW_FONT_SIZE.grid.value * fontScale,
+                lineHeight:
+                  POWER_FLOW_FONT_SIZE.grid.valueLineHeight * fontScale,
+                transform: [
+                  {
+                    translateX:
+                      POWER_FLOW_FONT_SIZE.grid.valueOffsetX * layoutScale,
+                  },
+                  {
+                    translateY:
+                      POWER_FLOW_FONT_SIZE.grid.valueOffsetY * layoutScale,
+                  },
+                ],
+              },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {formatValue(grid)}
+            <Text
+              style={[
+                styles.upsLoadUnit,
+                {
+                  color: "#FF9300",
+                  fontSize: POWER_FLOW_FONT_SIZE.grid.unit * fontScale,
+                },
+              ]}
+            >
+              kWh
+            </Text>
+          </Text>
         </View>
       </View>
 
@@ -489,22 +590,7 @@ export default function PowerFlowDiagram({ data = {} }) {
           fontScale={fontScale}
         />
 
-        <MetricBlock
-          metricKey="grid"
-          icon={
-            <FontAwesome5
-              name="broadcast-tower"
-              size={28 * iconScale}
-              color="#FF9300"
-            />
-          }
-          title={"Grid"}
-          value={formatValue(grid)}
-          color="#FF9300"
-          subtitle=""
-          layoutScale={layoutScale}
-          fontScale={fontScale}
-        />
+        
       </View>
     </View>
   );
