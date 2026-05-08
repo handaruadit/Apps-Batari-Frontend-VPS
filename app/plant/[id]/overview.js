@@ -102,6 +102,22 @@ const BUBBLE_POSITION_CONFIG = {
   bubbleLeftPct: 0.02,
 };
 
+const POWER_FLOW_OVERLAY_LAYOUT = {
+  baselineWidth: 390,
+  baselineHeight: 360,
+  minScale: 0.86,
+  maxScale: 1,
+  minHeight: 340,
+  maxHeight: 360,
+  bubbleMinWidth: 86,
+  bubbleMaxWidth: 118,
+  bubblePaddingHorizontal: 14,
+  bubblePaddingVertical: 10,
+  bubbleBorderRadius: 18,
+  bubbleLabelFontSize: 14,
+  bubbleValueFontSize: 16,
+};
+
 const BATTERY_BUBBLE_CONFIG = {
   widthExtra: 10, // tambah lebar Battery dari ukuran Grid
   heightExtra: 0,
@@ -294,6 +310,38 @@ function getResponsiveBubblePositionStyle(key, boxWidth, boxHeight, scale) {
       { translateY: offset.y * scale },
     ],
   };
+}
+
+function clampResponsiveValue(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getPowerFlowOverlayHeight(width) {
+  const widthScale = width / POWER_FLOW_OVERLAY_LAYOUT.baselineWidth;
+  const scaledHeight = POWER_FLOW_OVERLAY_LAYOUT.baselineHeight * widthScale;
+
+  return Math.round(
+    clampResponsiveValue(
+      scaledHeight,
+      POWER_FLOW_OVERLAY_LAYOUT.minHeight,
+      POWER_FLOW_OVERLAY_LAYOUT.maxHeight,
+    ),
+  );
+}
+
+function getPowerFlowOverlayScale(width, height) {
+  const scaleX = width / POWER_FLOW_OVERLAY_LAYOUT.baselineWidth;
+  const scaleY = height / POWER_FLOW_OVERLAY_LAYOUT.baselineHeight;
+
+  return clampResponsiveValue(
+    Math.min(scaleX, scaleY),
+    POWER_FLOW_OVERLAY_LAYOUT.minScale,
+    POWER_FLOW_OVERLAY_LAYOUT.maxScale,
+  );
+}
+
+function getScaledLineThickness(config, scale) {
+  return Math.max(1, config.lineThickness * scale);
 }
 
 function getGridPointerCoordinates(containerLayout, gridBubbleLayout, scale) {
@@ -2043,7 +2091,6 @@ export default function OverviewScreen() {
   const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
   const resolvedPlantId = resolvePlantId(id, selectedDevice?.id);
-  const plantId = resolvedPlantId ?? "1";
   const [activeSegment, setActiveSegment] = useState("day");
   const [fetchedData, setFetchedData] = useState(null);
   const [focusRefreshKey, setFocusRefreshKey] = useState(0);
@@ -2798,9 +2845,35 @@ export default function OverviewScreen() {
     });
   }, [overviewChartWidth, windowWidth]);
 
-  const houseOverlayWidth = Math.max(0, windowWidth - 32);
-  const houseOverlayHeight = windowWidth < 380 ? 340 : 360;
-  const bubbleScale = Math.min(1, Math.max(0.86, houseOverlayWidth / 390));
+  const fallbackHouseOverlayWidth = Math.max(0, windowWidth - 32);
+  const houseOverlayWidth =
+    houseOverlayLayout?.width || fallbackHouseOverlayWidth;
+  const houseOverlayHeight = getPowerFlowOverlayHeight(houseOverlayWidth);
+  const bubbleScale = getPowerFlowOverlayScale(
+    houseOverlayWidth,
+    houseOverlayHeight,
+  );
+  const responsiveBubbleStyle = {
+    minWidth: POWER_FLOW_OVERLAY_LAYOUT.bubbleMinWidth * bubbleScale,
+    maxWidth: POWER_FLOW_OVERLAY_LAYOUT.bubbleMaxWidth * bubbleScale,
+    paddingHorizontal:
+      POWER_FLOW_OVERLAY_LAYOUT.bubblePaddingHorizontal * bubbleScale,
+    paddingVertical:
+      POWER_FLOW_OVERLAY_LAYOUT.bubblePaddingVertical * bubbleScale,
+    borderRadius: POWER_FLOW_OVERLAY_LAYOUT.bubbleBorderRadius * bubbleScale,
+  };
+  const responsiveBubbleLabelStyle = {
+    fontSize: POWER_FLOW_OVERLAY_LAYOUT.bubbleLabelFontSize * bubbleScale,
+  };
+  const responsiveBubbleValueStyle = {
+    fontSize: POWER_FLOW_OVERLAY_LAYOUT.bubbleValueFontSize * bubbleScale,
+  };
+  const responsiveBatteryLabelStyle = {
+    fontSize: BATTERY_BUBBLE_CONFIG.titleFontSize * bubbleScale,
+  };
+  const responsiveBatteryValueStyle = {
+    fontSize: BATTERY_BUBBLE_CONFIG.valueFontSize * bubbleScale,
+  };
   const gridPointerCoordinates = getGridPointerCoordinates(
     houseOverlayLayout,
     gridBubbleLayout,
@@ -2821,14 +2894,16 @@ export default function OverviewScreen() {
     loadBubbleLayout,
     bubbleScale,
   );
-  const gridPointerDotSize = GRID_POINTER_CONFIG.dotSize;
-  const gridPointerGlowSize = GRID_POINTER_CONFIG.dotSize * 2.8;
-  const batteryPointerDotSize = BATTERY_POINTER_CONFIG.dotSize;
-  const batteryPointerGlowSize = BATTERY_POINTER_CONFIG.dotSize * 2.8;
-  const pvPointerDotSize = PV_POINTER_CONFIG.dotSize;
-  const pvPointerGlowSize = PV_POINTER_CONFIG.dotSize * 2.8;
-  const loadPointerDotSize = LOAD_POINTER_CONFIG.dotSize;
-  const loadPointerGlowSize = LOAD_POINTER_CONFIG.dotSize * 2.8;
+  const gridPointerDotSize = GRID_POINTER_CONFIG.dotSize * bubbleScale;
+  const gridPointerGlowSize = GRID_POINTER_CONFIG.dotSize * 2.8 * bubbleScale;
+  const batteryPointerDotSize = BATTERY_POINTER_CONFIG.dotSize * bubbleScale;
+  const batteryPointerGlowSize =
+    BATTERY_POINTER_CONFIG.dotSize * 2.8 * bubbleScale;
+  const pvPointerDotSize = PV_POINTER_CONFIG.dotSize * bubbleScale;
+  const pvPointerGlowSize = PV_POINTER_CONFIG.dotSize * 2.8 * bubbleScale;
+  const loadPointerDotSize = LOAD_POINTER_CONFIG.dotSize * bubbleScale;
+  const loadPointerGlowSize =
+    LOAD_POINTER_CONFIG.dotSize * 2.8 * bubbleScale;
   const gridPointerDotX = gridPointerCoordinates
     ? gridPointerProgress.interpolate({
         inputRange: [0, gridPointerCoordinates.bendProgress, 1],
@@ -3299,7 +3374,10 @@ export default function OverviewScreen() {
                       <Path
                         d={gridPointerCoordinates.path}
                         stroke={GRID_POINTER_CONFIG.lineColor}
-                        strokeWidth={GRID_POINTER_CONFIG.lineThickness}
+                        strokeWidth={getScaledLineThickness(
+                          GRID_POINTER_CONFIG,
+                          bubbleScale,
+                        )}
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         fill="none"
@@ -3355,7 +3433,10 @@ export default function OverviewScreen() {
                       <Path
                         d={batteryPointerCoordinates.path}
                         stroke={BATTERY_POINTER_CONFIG.lineColor}
-                        strokeWidth={BATTERY_POINTER_CONFIG.lineThickness}
+                        strokeWidth={getScaledLineThickness(
+                          BATTERY_POINTER_CONFIG,
+                          bubbleScale,
+                        )}
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         fill="none"
@@ -3412,7 +3493,10 @@ export default function OverviewScreen() {
                       <Path
                         d={pvPointerCoordinates.path}
                         stroke={PV_POINTER_CONFIG.lineColor}
-                        strokeWidth={PV_POINTER_CONFIG.lineThickness}
+                        strokeWidth={getScaledLineThickness(
+                          PV_POINTER_CONFIG,
+                          bubbleScale,
+                        )}
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         fill="none"
@@ -3468,7 +3552,10 @@ export default function OverviewScreen() {
                       <Path
                         d={loadPointerCoordinates.path}
                         stroke={LOAD_POINTER_CONFIG.lineColor}
-                        strokeWidth={LOAD_POINTER_CONFIG.lineThickness}
+                        strokeWidth={getScaledLineThickness(
+                          LOAD_POINTER_CONFIG,
+                          bubbleScale,
+                        )}
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         fill="none"
@@ -3516,6 +3603,7 @@ export default function OverviewScreen() {
                 <View
                   style={[
                     styles.infoBubble,
+                    responsiveBubbleStyle,
                     styles.pvBubble,
                     getResponsiveBubblePositionStyle(
                       "pv",
@@ -3528,8 +3616,10 @@ export default function OverviewScreen() {
                     setPvBubbleLayout(nativeEvent.layout)
                   }
                 >
-                  <Text style={styles.infoBubbleLabel}>PV</Text>
-                  <Text style={styles.infoBubbleValue}>
+                  <Text style={[styles.infoBubbleLabel, responsiveBubbleLabelStyle]}>
+                    PV
+                  </Text>
+                  <Text style={[styles.infoBubbleValue, responsiveBubbleValueStyle]}>
                     {formatKwValue(plantData.production)}
                   </Text>
                 </View>
@@ -3537,6 +3627,7 @@ export default function OverviewScreen() {
                 <View
                   style={[
                     styles.infoBubble,
+                    responsiveBubbleStyle,
                     styles.gridBubble,
                     getResponsiveBubblePositionStyle(
                       "grid",
@@ -3549,8 +3640,10 @@ export default function OverviewScreen() {
                     setGridBubbleLayout(nativeEvent.layout)
                   }
                 >
-                  <Text style={styles.infoBubbleLabel}>Grid</Text>
-                  <Text style={styles.infoBubbleValue}>
+                  <Text style={[styles.infoBubbleLabel, responsiveBubbleLabelStyle]}>
+                    Grid
+                  </Text>
+                  <Text style={[styles.infoBubbleValue, responsiveBubbleValueStyle]}>
                     {formatKwValue(plantData.grid)}
                   </Text>
                 </View>
@@ -3558,6 +3651,7 @@ export default function OverviewScreen() {
                 <View
                   style={[
                     styles.infoBubble,
+                    responsiveBubbleStyle,
                     styles.batteryBubble,
                     gridBubbleLayout && {
                       width:
@@ -3578,8 +3672,10 @@ export default function OverviewScreen() {
                     setBatteryBubbleLayout(nativeEvent.layout)
                   }
                 >
-                  <Text style={styles.batteryLabel}>Battery</Text>
-                  <Text style={styles.batteryValue}>
+                  <Text style={[styles.batteryLabel, responsiveBatteryLabelStyle]}>
+                    Battery
+                  </Text>
+                  <Text style={[styles.batteryValue, responsiveBatteryValueStyle]}>
                     {formatKwValue(plantData.battery)}
                   </Text>
                 </View>
@@ -3587,6 +3683,7 @@ export default function OverviewScreen() {
                 <View
                   style={[
                     styles.infoBubble,
+                    responsiveBubbleStyle,
                     styles.loadBubble,
                     getResponsiveBubblePositionStyle(
                       "load",
@@ -3599,8 +3696,10 @@ export default function OverviewScreen() {
                     setLoadBubbleLayout(nativeEvent.layout)
                   }
                 >
-                  <Text style={styles.infoBubbleLabel}>Load</Text>
-                  <Text style={styles.infoBubbleValue}>
+                  <Text style={[styles.infoBubbleLabel, responsiveBubbleLabelStyle]}>
+                    Load
+                  </Text>
+                  <Text style={[styles.infoBubbleValue, responsiveBubbleValueStyle]}>
                     {formatKwValue(plantData.load)}
                   </Text>
                 </View>
