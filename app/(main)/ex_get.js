@@ -51,7 +51,7 @@ const DataScreen = () => {
         Alert.alert('Gagal', jsonResponse.message || 'Gagal mengambil data perangkat');
       }
     } catch (error) {
-      Alert.alert('Error', 'Terjadi masalah jaringan atau server Ngrok mati.');
+      Alert.alert('Error', 'Terjadi masalah jaringan atau server VPS tidak dapat diakses.');
       console.error(error);
     } finally {
       setIsLoading(false);

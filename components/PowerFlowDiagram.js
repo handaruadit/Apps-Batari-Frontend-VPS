@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import {
   Ionicons,
@@ -11,10 +11,10 @@ import {
 const POWER_FLOW_LAYOUT = {
   containerPaddingTop: 0,
   containerPaddingBottom: 0,
-  containerPaddingHorizontal: 12,
+  containerPaddingHorizontal: 8,
   containerMinHeight: 240,
   sideColumnWidth: 76,
-  sideColumnGap: 28,
+  sideColumnGap: 24,
   metricBlockWidth: 76,
   metricBlockHeight: 108,
   metricIconHeight: 48,
@@ -98,21 +98,64 @@ function formatValue(value) {
   return number.toFixed(2);
 }
 
-function MetricBlock({ metricKey, icon, title, value, color, subtitle }) {
+function scaleValue(value, scale) {
+  return Math.round(value * scale);
+}
+
+function MetricBlock({
+  metricKey,
+  icon,
+  title,
+  value,
+  color,
+  subtitle,
+  layoutScale,
+  fontScale,
+}) {
   const font =
     POWER_FLOW_FONT_SIZE[metricKey] || POWER_FLOW_FONT_SIZE.production;
 
   return (
-    <View style={styles.metricBlock}>
-      <View style={styles.metricIcon}>{icon}</View>
+    <View
+      style={[
+        styles.metricBlock,
+        {
+          width: scaleValue(POWER_FLOW_LAYOUT.metricBlockWidth, layoutScale),
+          height: scaleValue(POWER_FLOW_LAYOUT.metricBlockHeight, layoutScale),
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.metricIcon,
+          {
+            height: scaleValue(POWER_FLOW_LAYOUT.metricIconHeight, layoutScale),
+            marginBottom: scaleValue(
+              POWER_FLOW_LAYOUT.metricIconMarginBottom,
+              layoutScale,
+            ),
+          },
+        ]}
+      >
+        {icon}
+      </View>
 
-      <View style={styles.metricTitleSlot}>
+      <View
+        style={[
+          styles.metricTitleSlot,
+          { height: scaleValue(POWER_FLOW_LAYOUT.metricTitleHeight, layoutScale) },
+        ]}
+      >
         <Text
           style={[
             styles.metricTitle,
-            { fontSize: font.title, lineHeight: font.titleLineHeight },
+            {
+              fontSize: font.title * fontScale,
+              lineHeight: font.titleLineHeight * fontScale,
+            },
           ]}
           numberOfLines={2}
+          adjustsFontSizeToFit
         >
           {title}
         </Text>
@@ -122,9 +165,14 @@ function MetricBlock({ metricKey, icon, title, value, color, subtitle }) {
         style={[
           styles.metricValueSlot,
           {
+            height: scaleValue(POWER_FLOW_LAYOUT.metricValueHeight, layoutScale),
+            marginTop: scaleValue(
+              POWER_FLOW_LAYOUT.metricValueMarginTop,
+              layoutScale,
+            ),
             transform: [
-              { translateX: font.valueOffsetX },
-              { translateY: font.valueOffsetY },
+              { translateX: font.valueOffsetX * layoutScale },
+              { translateY: font.valueOffsetY * layoutScale },
             ],
           },
         ]}
@@ -134,14 +182,17 @@ function MetricBlock({ metricKey, icon, title, value, color, subtitle }) {
             styles.metricValue,
             {
               color,
-              fontSize: font.value,
-              lineHeight: font.valueLineHeight,
+              fontSize: font.value * fontScale,
+              lineHeight: font.valueLineHeight * fontScale,
             },
           ]}
           numberOfLines={1}
+          adjustsFontSizeToFit
         >
           {value}
-          <Text style={[styles.metricUnit, { color, fontSize: font.unit }]}>
+          <Text
+            style={[styles.metricUnit, { color, fontSize: font.unit * fontScale }]}
+          >
             kW
           </Text>
         </Text>
@@ -156,6 +207,7 @@ function MetricBlock({ metricKey, icon, title, value, color, subtitle }) {
 
 
 export default function PowerFlowDiagram({ data = {} }) {
+  const { width } = useWindowDimensions();
   const production = Number(data.production || 0);
   const grid = Number(data.grid || 0);
   const battery = Number(data.battery || 0);
@@ -163,18 +215,50 @@ export default function PowerFlowDiagram({ data = {} }) {
   const load = Number(data.load || 0);
 
   const totalConsumed = upsLoad + load;
+  const availableWidth = Math.max(304, width - 64);
+  const layoutScale = Math.min(1, Math.max(0.74, availableWidth / 404));
+  const fontScale = Math.min(1, Math.max(0.82, layoutScale + 0.08));
+  const ringSize = scaleValue(POWER_FLOW_LAYOUT.ringSize, layoutScale);
+  const centerSectionWidth = scaleValue(
+    POWER_FLOW_LAYOUT.centerSectionWidth,
+    layoutScale,
+  );
+  const sideColumnWidth = scaleValue(
+    POWER_FLOW_LAYOUT.sideColumnWidth,
+    layoutScale,
+  );
+  const iconScale = Math.min(1, Math.max(0.82, layoutScale));
 
   return (
-    <View style={styles.container}>
-      <View style={styles.sideColumn}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingHorizontal: scaleValue(
+            POWER_FLOW_LAYOUT.containerPaddingHorizontal,
+            layoutScale,
+          ),
+          minHeight: scaleValue(POWER_FLOW_LAYOUT.containerMinHeight, layoutScale),
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.sideColumn,
+          {
+            width: sideColumnWidth,
+            gap: scaleValue(POWER_FLOW_LAYOUT.sideColumnGap, layoutScale),
+          },
+        ]}
+      >
         <MetricBlock
           metricKey="production"
           icon={
             <View style={styles.flashWrap}>
-              <Ionicons name="flash" size={38} color="#1FB7FF" />
+              <Ionicons name="flash" size={38 * iconScale} color="#1FB7FF" />
               <Ionicons
                 name="add"
-                size={14}
+                size={14 * iconScale}
                 color="#1FB7FF"
                 style={styles.flashPlus}
               />
@@ -184,6 +268,8 @@ export default function PowerFlowDiagram({ data = {} }) {
           value={formatValue(production)}
           color="#1FB7FF"
           subtitle=""
+          layoutScale={layoutScale}
+          fontScale={fontScale}
         />
 
         <MetricBlock
@@ -192,7 +278,7 @@ export default function PowerFlowDiagram({ data = {} }) {
             <View style={{ marginTop: 6 }}>
               <MaterialCommunityIcons
                 name="solar-panel"
-                size={34}
+                size={34 * iconScale}
                 color="#FF4646"
               />
             </View>
@@ -201,12 +287,14 @@ export default function PowerFlowDiagram({ data = {} }) {
           value={formatValue(load)}
           color="#FF4646"
           subtitle=""
+          layoutScale={layoutScale}
+          fontScale={fontScale}
         />
       </View>
 
-      <View style={styles.centerSection}>
-        <View style={styles.ringWrapper}>
-          <Svg width={238} height={238} viewBox="0 0 238 238">
+      <View style={[styles.centerSection, { width: centerSectionWidth }]}>
+        <View style={[styles.ringWrapper, { width: ringSize, height: ringSize }]}>
+          <Svg width={ringSize} height={ringSize} viewBox="0 0 238 238">
             <Circle
               cx="119"
               cy="119"
@@ -256,47 +344,140 @@ export default function PowerFlowDiagram({ data = {} }) {
             />
           </Svg>
 
-          <View style={styles.centerContent}>
-            <Text style={styles.centerLabel}>TOTAL</Text>
-            <Text style={styles.centerValue}>
+          <View
+            style={[
+              styles.centerContent,
+              { top: scaleValue(POWER_FLOW_LAYOUT.centerContentTop, layoutScale) },
+            ]}
+          >
+            <Text
+              style={[
+                styles.centerLabel,
+                {
+                  fontSize: POWER_FLOW_FONT_SIZE.center.label * fontScale,
+                  lineHeight:
+                    POWER_FLOW_FONT_SIZE.center.labelLineHeight * fontScale,
+                },
+              ]}
+            >
+              TOTAL
+            </Text>
+            <Text
+              style={[
+                styles.centerValue,
+                {
+                  fontSize: POWER_FLOW_FONT_SIZE.center.value * fontScale,
+                  lineHeight:
+                    POWER_FLOW_FONT_SIZE.center.valueLineHeight * fontScale,
+                },
+              ]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
               {formatValue(totalConsumed)}
-              <Text style={styles.centerUnit}>kW</Text>
+              <Text
+                style={[
+                  styles.centerUnit,
+                  { fontSize: POWER_FLOW_FONT_SIZE.center.unit * fontScale },
+                ]}
+              >
+                kW
+              </Text>
             </Text>
           </View>
         </View>
 
-        <View style={styles.upsLoadBlock}>
+        <View
+          style={[
+            styles.upsLoadBlock,
+            {
+              width: scaleValue(POWER_FLOW_LAYOUT.upsLoadBlockWidth, layoutScale),
+              height: scaleValue(
+                POWER_FLOW_LAYOUT.upsLoadBlockHeight,
+                layoutScale,
+              ),
+              marginTop: scaleValue(
+                POWER_FLOW_LAYOUT.upsLoadMarginTop,
+                layoutScale,
+              ),
+            },
+          ]}
+        >
           <MaterialCommunityIcons
             name="transmission-tower"
-            size={POWER_FLOW_LAYOUT.upsLoadIconSize}
+            size={POWER_FLOW_LAYOUT.upsLoadIconSize * iconScale}
             color="#FFD54A"
-            style={{ marginBottom: POWER_FLOW_LAYOUT.upsLoadIconMarginBottom }}
+            style={{
+              marginBottom: scaleValue(
+                POWER_FLOW_LAYOUT.upsLoadIconMarginBottom,
+                layoutScale,
+              ),
+            }}
           />
-          <Text style={styles.upsLoadLabel}>Ups-Load</Text>
+          <Text
+            style={[
+              styles.upsLoadLabel,
+              {
+                fontSize: POWER_FLOW_FONT_SIZE.upsLoad.title * fontScale,
+                lineHeight:
+                  POWER_FLOW_FONT_SIZE.upsLoad.titleLineHeight * fontScale,
+              },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            Ups-Load
+          </Text>
           <Text
             style={[
               styles.upsLoadValue,
               {
+                fontSize: POWER_FLOW_FONT_SIZE.upsLoad.value * fontScale,
+                lineHeight:
+                  POWER_FLOW_FONT_SIZE.upsLoad.valueLineHeight * fontScale,
                 transform: [
-                  { translateX: POWER_FLOW_FONT_SIZE.upsLoad.valueOffsetX },
-                  { translateY: POWER_FLOW_FONT_SIZE.upsLoad.valueOffsetY },
+                  {
+                    translateX:
+                      POWER_FLOW_FONT_SIZE.upsLoad.valueOffsetX * layoutScale,
+                  },
+                  {
+                    translateY:
+                      POWER_FLOW_FONT_SIZE.upsLoad.valueOffsetY * layoutScale,
+                  },
                 ],
               },
             ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
           >
             {formatValue(upsLoad)}
-            <Text style={styles.upsLoadUnit}>kW</Text>
+            <Text
+              style={[
+                styles.upsLoadUnit,
+                { fontSize: POWER_FLOW_FONT_SIZE.upsLoad.unit * fontScale },
+              ]}
+            >
+              kW
+            </Text>
           </Text>
         </View>
       </View>
 
-      <View style={styles.sideColumn}>
+      <View
+        style={[
+          styles.sideColumn,
+          {
+            width: sideColumnWidth,
+            gap: scaleValue(POWER_FLOW_LAYOUT.sideColumnGap, layoutScale),
+          },
+        ]}
+      >
         <MetricBlock
           metricKey="battery"
           icon={
             <MaterialCommunityIcons
               name="battery-charging-high"
-              size={34}
+              size={34 * iconScale}
               color="#99E500"
             />
           }
@@ -304,17 +485,25 @@ export default function PowerFlowDiagram({ data = {} }) {
           value={formatValue(battery)}
           color="#99E500"
           subtitle=""
+          layoutScale={layoutScale}
+          fontScale={fontScale}
         />
 
         <MetricBlock
           metricKey="grid"
           icon={
-            <FontAwesome5 name="broadcast-tower" size={28} color="#FF9300" />
+            <FontAwesome5
+              name="broadcast-tower"
+              size={28 * iconScale}
+              color="#FF9300"
+            />
           }
           title={"Grid"}
           value={formatValue(grid)}
           color="#FF9300"
           subtitle=""
+          layoutScale={layoutScale}
+          fontScale={fontScale}
         />
       </View>
     </View>

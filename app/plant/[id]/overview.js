@@ -51,6 +51,8 @@ const screenWidth = Dimensions.get("window").width;
 const CHART_WIDTH = screenWidth - 60;
 const CHART_HEIGHT = 250;
 const CHART_STORAGE_PREFIX = "batari:overview-chart:";
+const DEBUG_CHART = process.env.EXPO_PUBLIC_DEBUG_CHART === "true";
+const DEBUG_LAYOUT = process.env.EXPO_PUBLIC_DEBUG_LAYOUT === "true";
 const WEATHER_LAYOUT = {
   cardMarginHorizontal: 24,
   cardMarginTop: 10,
@@ -117,20 +119,20 @@ const MANUAL_BUBBLE_OFFSET = {
 
 const BUBBLE_BASE_POSITION = {
   grid: {
-    topPct: 0.0,
-    leftPct: 0.03,
+    topPct: 0.02,
+    leftPct: 0.02,
   },
   pv: {
     topPct: 0.02,
-    rightPct: 0.07,
+    rightPct: 0.03,
   },
   battery: {
-    topPct: 0.77,
-    leftPct: 0.36,
+    topPct: 0.76,
+    leftPct: 0.34,
   },
   load: {
-    topPct: 0.77,
-    rightPct: 0.06,
+    topPct: 0.76,
+    rightPct: 0.03,
   },
 };
 
@@ -1106,6 +1108,42 @@ async function saveStoredChartSeries(chartSelectionKey, chartSeries) {
   }
 }
 
+function getChartSeriesCounts(series) {
+  return POWER_SERIES_CONFIG.reduce((counts, item) => {
+    counts[item.key] = Array.isArray(series?.[item.key])
+      ? series[item.key].length
+      : 0;
+    return counts;
+  }, {});
+}
+
+function getChartRequestDate(segment, selectedDay, selectedMonth, selectedYear) {
+  const month = String(selectedMonth).padStart(2, "0");
+  const day = String(selectedDay).padStart(2, "0");
+
+  if (segment === "day") {
+    return `${selectedYear}-${month}-${day}`;
+  }
+
+  if (segment === "month") {
+    return `${selectedYear}-${month}`;
+  }
+
+  if (segment === "year") {
+    return String(selectedYear);
+  }
+
+  return null;
+}
+
+function debugChartLog(message, payload = {}) {
+  if (!DEBUG_CHART || !__DEV__) {
+    return;
+  }
+
+  console.log(`[chart-debug] ${message}`, payload);
+}
+
 async function removeStoredChartSeries(chartSelectionKey) {
   if (!chartSelectionKey) {
     return;
@@ -1263,26 +1301,19 @@ function buildChartEndpoint(
   selectedMonth,
   selectedYear,
 ) {
-  const month = String(selectedMonth).padStart(2, "0");
-  const day = String(selectedDay).padStart(2, "0");
+  const date = getChartRequestDate(
+    segment,
+    selectedDay,
+    selectedMonth,
+    selectedYear,
+  );
   const params = {
     plantId: String(plantId),
     segment,
   };
 
-  if (segment === "day") {
-    params.date = `${selectedYear}-${month}-${day}`;
-    return `${BASE_URL}/api/data/chart?${buildQueryString(params)}`;
-  }
-
-  if (segment === "month") {
-    params.date = `${selectedYear}-${month}`;
-    return `${BASE_URL}/api/data/chart?${buildQueryString(params)}`;
-  }
-
-  if (segment === "year") {
-    params.date = String(selectedYear);
-    return `${BASE_URL}/api/data/chart?${buildQueryString(params)}`;
+  if (date) {
+    params.date = date;
   }
 
   return `${BASE_URL}/api/data/chart?${buildQueryString(params)}`;
@@ -1753,6 +1784,19 @@ export default function OverviewScreen() {
           selectedMonth,
           selectedYear,
         );
+        const chartDate = getChartRequestDate(
+          activeSegment,
+          selectedDay,
+          selectedMonth,
+          selectedYear,
+        );
+
+        debugChartLog("request", {
+          endpoint: chartEndpoint,
+          plantId: resolvedPlantId,
+          segment: activeSegment,
+          date: chartDate,
+        });
 
         const [plantResult, chartResult, ...latestResults] = await Promise.all([
           requestJson(`${BASE_URL}/api/plant/`, headers),
@@ -1796,6 +1840,15 @@ export default function OverviewScreen() {
         const chartSeries = chartRequestSucceeded
           ? mergeChartSeries(normalizeChartSeries(chartResult.json.data))
           : createEmptyChartSeries();
+        debugChartLog("response", {
+          plantId: resolvedPlantId,
+          segment: activeSegment,
+          date: chartDate,
+          status: chartResult?.status,
+          ok: chartResult?.ok,
+          error: chartResult?.error,
+          counts: getChartSeriesCounts(chartSeries),
+        });
         const fallbackChartSeries = chartRequestSucceeded
           ? createEmptyChartSeries()
           : await loadStoredChartSeries(chartSelectionKey);
@@ -2228,6 +2281,21 @@ export default function OverviewScreen() {
     (_, i) => 2021 + i,
   );
 
+  useEffect(() => {
+    if (!DEBUG_LAYOUT || !__DEV__) {
+      return;
+    }
+
+    console.log("[layout-debug] overview screen", {
+      width: windowWidth,
+      chartWidth: overviewChartWidth,
+    });
+  }, [overviewChartWidth, windowWidth]);
+
+  const houseOverlayWidth = Math.max(0, windowWidth - 32);
+  const houseOverlayHeight = windowWidth < 380 ? 340 : 360;
+  const bubbleScale = Math.min(1, Math.max(0.86, houseOverlayWidth / 390));
+
   const lifetimeOptions = Array.from({ length: 40 }, (_, i) => (i + 1) * 5);
   useEffect(() => {
     let isMounted = true;
@@ -2431,15 +2499,29 @@ export default function OverviewScreen() {
         <View style={styles.content}>
           <View style={styles.powerFlowSection}>
             <View style={styles.houseImageOnly}>
-              <View style={styles.houseOverlayWrap}>
+              <View
+                style={[
+                  styles.houseOverlayWrap,
+                  { height: houseOverlayHeight },
+                ]}
+              >
                 <Image
                   source={require("@/assets/images/Asset App Batari Alternative.png")}
-                  style={styles.houseImage}
+                  style={[styles.houseImage, { height: houseOverlayHeight }]}
                   resizeMode="contain"
                 />
 
                 <TouchableOpacity
-                  style={[styles.infoBubble, styles.pvBubble]}
+                  style={[
+                    styles.infoBubble,
+                    styles.pvBubble,
+                    getResponsiveBubblePositionStyle(
+                      "pv",
+                      houseOverlayWidth,
+                      houseOverlayHeight,
+                      bubbleScale,
+                    ),
+                  ]}
                   activeOpacity={0.85}
                   onPress={() =>
                     router.push(`/plant/${plantId}/sub-plant/data-pv`)
@@ -2452,7 +2534,16 @@ export default function OverviewScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.infoBubble, styles.gridBubble]}
+                  style={[
+                    styles.infoBubble,
+                    styles.gridBubble,
+                    getResponsiveBubblePositionStyle(
+                      "grid",
+                      houseOverlayWidth,
+                      houseOverlayHeight,
+                      bubbleScale,
+                    ),
+                  ]}
                   activeOpacity={0.85}
                   onPress={() =>
                     router.push(`/plant/${plantId}/sub-plant/data-grid`)
@@ -2465,7 +2556,16 @@ export default function OverviewScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.infoBubble, styles.batteryBubble]}
+                  style={[
+                    styles.infoBubble,
+                    styles.batteryBubble,
+                    getResponsiveBubblePositionStyle(
+                      "battery",
+                      houseOverlayWidth,
+                      houseOverlayHeight,
+                      bubbleScale,
+                    ),
+                  ]}
                   activeOpacity={0.85}
                   onPress={() =>
                     router.push(`/plant/${plantId}/sub-plant/data-battery`)
@@ -2478,7 +2578,16 @@ export default function OverviewScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.infoBubble, styles.loadBubble]}
+                  style={[
+                    styles.infoBubble,
+                    styles.loadBubble,
+                    getResponsiveBubblePositionStyle(
+                      "load",
+                      houseOverlayWidth,
+                      houseOverlayHeight,
+                      bubbleScale,
+                    ),
+                  ]}
                   activeOpacity={0.85}
                   onPress={() =>
                     router.push(`/plant/${plantId}/sub-plant/data-load`)
@@ -3581,7 +3690,6 @@ const styles = StyleSheet.create({
   },
   houseImage: {
     width: "100%",
-    height: 360,
   },
   powerFlowWrapper: {
     backgroundColor: appColors.bubble,
@@ -3600,7 +3708,7 @@ const styles = StyleSheet.create({
   },
   houseOverlayWrap: {
     position: "relative",
-    width: screenWidth - 32,
+    width: "100%",
     height: 360,
     alignItems: "center",
     justifyContent: "center",
@@ -3638,23 +3746,19 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   pvBubble: {
-    top: 8,
-    right: 26,
+    maxWidth: 118,
   },
   gridBubble: {
-    top: 0,
-    left: 10,
+    maxWidth: 118,
   },
   batteryBubble: {
-    top: 280,
-    left: 120,
     minWidth: 110,
+    maxWidth: 132,
     paddingHorizontal: 16,
     alignItems: "center",
   },
   loadBubble: {
-    bottom: 22,
-    right: 22,
+    maxWidth: 118,
   },
   batteryLabel: {
     fontSize: 13,

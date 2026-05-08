@@ -260,7 +260,7 @@ describe('API Service', () => {
       const result = await apiGet('/test');
 
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost:3000/test',
+        'http://103.31.205.39:3000/test',
         expect.objectContaining({
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
@@ -297,7 +297,7 @@ describe('API Service', () => {
       const result = await apiPost('/test', mockBody);
 
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost:3000/test',
+        'http://103.31.205.39:3000/test',
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
