@@ -98,6 +98,19 @@ const POWER_SERIES_CONFIG = [
   { key: "battery", label: "Battery", color: "#99E500" },
 ];
 
+const BUBBLE_POSITION_CONFIG = {
+  bubbleLeftPct: 0.02,
+};
+
+const BATTERY_BUBBLE_CONFIG = {
+  widthExtra: 10, // tambah lebar Battery dari ukuran Grid
+  heightExtra: 0,
+  titleFontSize: 14,
+  valueFontSize: 16,
+  titleFontWeight: "700",
+  valueFontWeight: "800",
+};
+
 const MANUAL_BUBBLE_OFFSET = {
   grid: {
     x: 0,
@@ -108,7 +121,7 @@ const MANUAL_BUBBLE_OFFSET = {
     y: 0,
   },
   battery: {
-    x: -50,
+    x: 0,
     y: 0,
   },
   load: {
@@ -117,10 +130,130 @@ const MANUAL_BUBBLE_OFFSET = {
   },
 };
 
+// Atur garis Grid ke tower dari sini.
+const GRID_POINTER_CONFIG = {
+  lineOffsetX: 0,
+  lineOffsetY: 0,
+  lineStartOffsetX: 0,
+  lineStartOffsetY: 0,
+  lineBendOffsetX: 0,
+  lineBendOffsetY: 0,
+  lineEndOffsetX: -30,
+  lineEndOffsetY: 0,
+  verticalLineLength: 100,
+  horizontalLineLength: 60,
+  lineEndAnchorPctX: 0.25,
+  lineEndAnchorPctY: 0.85,
+  lineThickness: 1,
+  lineColor: "#FFFFFF",
+  dotColor: "#FF1F1F",
+  dotGlowColor: "rgba(255,31,31,0.45)",
+  dotSize: 7,
+  animationDuration: 10000,
+  animationLoopInterval: 10500,
+  animationEffect: "glow",
+  animationEasing: "linear",
+  dotFrameSmoothing: true,
+  bendTransitionSmoothing: true,
+  dotOpacity: 1,
+  enableGlow: true,
+  enablePulse: true,
+};
+
+// Atur garis Battery ke image dari sini.
+const BATTERY_POINTER_CONFIG = {
+  lineOffsetX: 0,
+  lineOffsetY: 0,
+  lineStartOffsetX: 0,
+  lineStartOffsetY: 0,
+  lineBendOffsetX: 0,
+  lineBendOffsetY: 0,
+  lineEndOffsetX: 0,
+  lineEndOffsetY: 0,
+  horizontalLineLength: 80,
+  verticalLineLength: -90,
+  lineEndAnchorPctX: 0.5,
+  lineEndAnchorPctY: 0.62,
+  lineThickness: GRID_POINTER_CONFIG.lineThickness,
+  lineColor: GRID_POINTER_CONFIG.lineColor,
+  dotColor: GRID_POINTER_CONFIG.dotColor,
+  dotGlowColor: GRID_POINTER_CONFIG.dotGlowColor,
+  dotSize: GRID_POINTER_CONFIG.dotSize,
+  animationDuration: GRID_POINTER_CONFIG.animationDuration,
+  animationLoopInterval: GRID_POINTER_CONFIG.animationLoopInterval,
+  animationEffect: GRID_POINTER_CONFIG.animationEffect,
+  animationEasing: GRID_POINTER_CONFIG.animationEasing,
+  dotFrameSmoothing: GRID_POINTER_CONFIG.dotFrameSmoothing,
+  bendTransitionSmoothing: GRID_POINTER_CONFIG.bendTransitionSmoothing,
+  dotOpacity: GRID_POINTER_CONFIG.dotOpacity,
+  enableGlow: GRID_POINTER_CONFIG.enableGlow,
+  enablePulse: GRID_POINTER_CONFIG.enablePulse,
+};
+
+// Atur garis PV ke solar panel dari sini.
+const PV_POINTER_CONFIG = {
+  lineOffsetX: 0,
+  lineOffsetY: 0,
+  lineStartOffsetX: 0,
+  lineStartOffsetY: 0,
+  lineBendOffsetX: 0,
+  lineBendOffsetY: 0,
+  lineEndOffsetX: 0,
+  lineEndOffsetY: 0,
+  horizontalLineLength: 70,
+  verticalLineLength: 76,
+  lineEndAnchorPctX: 0.5,
+  lineEndAnchorPctY: 0.5,
+  lineThickness: GRID_POINTER_CONFIG.lineThickness,
+  lineColor: GRID_POINTER_CONFIG.lineColor,
+  dotColor: GRID_POINTER_CONFIG.dotColor,
+  dotGlowColor: GRID_POINTER_CONFIG.dotGlowColor,
+  dotSize: GRID_POINTER_CONFIG.dotSize,
+  animationDuration: GRID_POINTER_CONFIG.animationDuration,
+  animationLoopInterval: GRID_POINTER_CONFIG.animationLoopInterval,
+  animationEffect: GRID_POINTER_CONFIG.animationEffect,
+  animationEasing: GRID_POINTER_CONFIG.animationEasing,
+  dotFrameSmoothing: GRID_POINTER_CONFIG.dotFrameSmoothing,
+  bendTransitionSmoothing: GRID_POINTER_CONFIG.bendTransitionSmoothing,
+  dotOpacity: GRID_POINTER_CONFIG.dotOpacity,
+  enableGlow: GRID_POINTER_CONFIG.enableGlow,
+  enablePulse: GRID_POINTER_CONFIG.enablePulse,
+};
+
+// Atur garis Load ke image dari sini.
+const LOAD_POINTER_CONFIG = {
+  lineOffsetX: 0,
+  lineOffsetY: 0,
+  lineStartOffsetX: 0,
+  lineStartOffsetY: 0,
+  lineBendOffsetX: 0,
+  lineBendOffsetY: 0,
+  lineEndOffsetX: 0,
+  lineEndOffsetY: 0,
+  horizontalLineLength: 25, // space ke kiri dulu
+  verticalLineLength: 90, // lalu naik ke atas
+  lineEndAnchorPctX: 0.5,
+  lineEndAnchorPctY: 0.5,
+  lineThickness: GRID_POINTER_CONFIG.lineThickness,
+  lineColor: GRID_POINTER_CONFIG.lineColor,
+  dotColor: GRID_POINTER_CONFIG.dotColor,
+  dotGlowColor: GRID_POINTER_CONFIG.dotGlowColor,
+  dotSize: GRID_POINTER_CONFIG.dotSize,
+  animationDuration: GRID_POINTER_CONFIG.animationDuration,
+  animationLoopInterval: GRID_POINTER_CONFIG.animationLoopInterval,
+  animationEffect: GRID_POINTER_CONFIG.animationEffect,
+  animationEasing: GRID_POINTER_CONFIG.animationEasing,
+  dotFrameSmoothing: GRID_POINTER_CONFIG.dotFrameSmoothing,
+  bendTransitionSmoothing: GRID_POINTER_CONFIG.bendTransitionSmoothing,
+  dotOpacity: GRID_POINTER_CONFIG.dotOpacity,
+  enableGlow: GRID_POINTER_CONFIG.enableGlow,
+  enablePulse: GRID_POINTER_CONFIG.enablePulse,
+};
+
 const BUBBLE_BASE_POSITION = {
   grid: {
     topPct: 0.02,
-    leftPct: 0.02,
+    leftPct: BUBBLE_POSITION_CONFIG.bubbleLeftPct,
   },
   pv: {
     topPct: 0.02,
@@ -128,7 +261,7 @@ const BUBBLE_BASE_POSITION = {
   },
   battery: {
     topPct: 0.76,
-    leftPct: 0.34,
+    leftPct: BUBBLE_POSITION_CONFIG.bubbleLeftPct,
   },
   load: {
     topPct: 0.76,
@@ -161,6 +294,247 @@ function getResponsiveBubblePositionStyle(key, boxWidth, boxHeight, scale) {
       { translateY: offset.y * scale },
     ],
   };
+}
+
+function getGridPointerCoordinates(containerLayout, gridBubbleLayout, scale) {
+  if (
+    !containerLayout?.width ||
+    !containerLayout?.height ||
+    !gridBubbleLayout
+  ) {
+    return null;
+  }
+
+  const config = GRID_POINTER_CONFIG;
+  const bubbleOffset = MANUAL_BUBBLE_OFFSET.grid || { x: 0, y: 0 };
+  const targetEndX = containerLayout.width * config.lineEndAnchorPctX;
+  const targetEndY = containerLayout.height * config.lineEndAnchorPctY;
+  const startX =
+    gridBubbleLayout.x +
+    gridBubbleLayout.width / 2 +
+    bubbleOffset.x * scale +
+    (config.lineOffsetX + config.lineStartOffsetX) * scale;
+  const startY =
+    gridBubbleLayout.y +
+    gridBubbleLayout.height +
+    bubbleOffset.y * scale +
+    (config.lineOffsetY + config.lineStartOffsetY) * scale;
+  const bendX = startX + (config.lineBendOffsetX || 0) * scale;
+  const verticalLength =
+    config.verticalLineLength == null
+      ? targetEndY - startY
+      : config.verticalLineLength * scale;
+  const bendY = startY + verticalLength + (config.lineBendOffsetY || 0) * scale;
+  const endX =
+    config.horizontalLineLength == null
+      ? targetEndX + (config.lineOffsetX + config.lineEndOffsetX) * scale
+      : bendX +
+        config.horizontalLineLength * scale +
+        config.lineEndOffsetX * scale;
+  const endY = bendY + (config.lineEndOffsetY || 0) * scale;
+  const firstSegmentLength = Math.hypot(bendX - startX, bendY - startY);
+  const secondSegmentLength = Math.hypot(endX - bendX, endY - bendY);
+  const totalLength = firstSegmentLength + secondSegmentLength || 1;
+  const bendProgress = Math.min(
+    0.98,
+    Math.max(0.02, firstSegmentLength / totalLength),
+  );
+
+  return {
+    startX,
+    startY,
+    bendX,
+    bendY,
+    endX,
+    endY,
+    path: `M ${startX} ${startY} L ${bendX} ${bendY} L ${endX} ${endY}`,
+    bendProgress,
+  };
+}
+
+function getBatteryPointerCoordinates(
+  containerLayout,
+  batteryBubbleLayout,
+  scale,
+) {
+  if (
+    !containerLayout?.width ||
+    !containerLayout?.height ||
+    !batteryBubbleLayout
+  ) {
+    return null;
+  }
+
+  const config = BATTERY_POINTER_CONFIG;
+  const bubbleOffset = MANUAL_BUBBLE_OFFSET.battery || { x: 0, y: 0 };
+  const targetEndY = containerLayout.height * config.lineEndAnchorPctY;
+  const startX =
+    batteryBubbleLayout.x +
+    batteryBubbleLayout.width +
+    bubbleOffset.x * scale +
+    (config.lineOffsetX + config.lineStartOffsetX) * scale;
+  const startY =
+    batteryBubbleLayout.y +
+    batteryBubbleLayout.height / 2 +
+    bubbleOffset.y * scale +
+    (config.lineOffsetY + config.lineStartOffsetY) * scale;
+  const horizontalLength =
+    config.horizontalLineLength == null
+      ? containerLayout.width * config.lineEndAnchorPctX - startX
+      : config.horizontalLineLength * scale;
+  const bendX =
+    startX + horizontalLength + (config.lineBendOffsetX || 0) * scale;
+  const bendY = startY + (config.lineBendOffsetY || 0) * scale;
+  const endX = bendX + (config.lineEndOffsetX || 0) * scale;
+  const endY =
+    config.verticalLineLength == null
+      ? targetEndY + (config.lineOffsetY + config.lineEndOffsetY) * scale
+      : bendY +
+        config.verticalLineLength * scale +
+        (config.lineEndOffsetY || 0) * scale;
+  const firstSegmentLength = Math.hypot(bendX - startX, bendY - startY);
+  const secondSegmentLength = Math.hypot(endX - bendX, endY - bendY);
+  const totalLength = firstSegmentLength + secondSegmentLength || 1;
+  const bendProgress = Math.min(
+    0.98,
+    Math.max(0.02, firstSegmentLength / totalLength),
+  );
+
+  return {
+    startX,
+    startY,
+    bendX,
+    bendY,
+    endX,
+    endY,
+    path: `M ${startX} ${startY} L ${bendX} ${bendY} L ${endX} ${endY}`,
+    bendProgress,
+  };
+}
+
+function getPvPointerCoordinates(containerLayout, pvBubbleLayout, scale) {
+  if (!containerLayout?.width || !containerLayout?.height || !pvBubbleLayout) {
+    return null;
+  }
+
+  const config = PV_POINTER_CONFIG;
+  const bubbleOffset = MANUAL_BUBBLE_OFFSET.pv || { x: 0, y: 0 };
+  const targetEndX = containerLayout.width * config.lineEndAnchorPctX;
+  const targetEndY = containerLayout.height * config.lineEndAnchorPctY;
+  const startX =
+    pvBubbleLayout.x +
+    bubbleOffset.x * scale +
+    (config.lineOffsetX + config.lineStartOffsetX) * scale;
+  const startY =
+    pvBubbleLayout.y +
+    pvBubbleLayout.height / 2 +
+    bubbleOffset.y * scale +
+    (config.lineOffsetY + config.lineStartOffsetY) * scale;
+  const horizontalLength =
+    config.horizontalLineLength == null
+      ? startX - targetEndX
+      : config.horizontalLineLength * scale;
+  const bendX =
+    startX - horizontalLength + (config.lineBendOffsetX || 0) * scale;
+  const bendY = startY + (config.lineBendOffsetY || 0) * scale;
+  const endX = bendX + (config.lineEndOffsetX || 0) * scale;
+  const endY =
+    config.verticalLineLength == null
+      ? targetEndY + (config.lineOffsetY + config.lineEndOffsetY) * scale
+      : bendY +
+        config.verticalLineLength * scale +
+        (config.lineEndOffsetY || 0) * scale;
+  const firstSegmentLength = Math.hypot(bendX - startX, bendY - startY);
+  const secondSegmentLength = Math.hypot(endX - bendX, endY - bendY);
+  const totalLength = firstSegmentLength + secondSegmentLength || 1;
+  const bendProgress = Math.min(
+    0.98,
+    Math.max(0.02, firstSegmentLength / totalLength),
+  );
+
+  return {
+    startX,
+    startY,
+    bendX,
+    bendY,
+    endX,
+    endY,
+    path: `M ${startX} ${startY} L ${bendX} ${bendY} L ${endX} ${endY}`,
+    bendProgress,
+  };
+}
+
+function getLoadPointerCoordinates(containerLayout, loadBubbleLayout, scale) {
+  if (
+    !containerLayout?.width ||
+    !containerLayout?.height ||
+    !loadBubbleLayout
+  ) {
+    return null;
+  }
+
+  const config = LOAD_POINTER_CONFIG;
+  const bubbleOffset = MANUAL_BUBBLE_OFFSET.load || { x: 0, y: 0 };
+  const targetEndY = containerLayout.height * config.lineEndAnchorPctY;
+
+  const startX =
+    loadBubbleLayout.x +
+    bubbleOffset.x * scale +
+    (config.lineOffsetX + config.lineStartOffsetX) * scale;
+
+  const startY =
+    loadBubbleLayout.y +
+    loadBubbleLayout.height / 2 +
+    bubbleOffset.y * scale +
+    (config.lineOffsetY + config.lineStartOffsetY) * scale;
+
+  // Garis pertama: dari kiri tengah bubble Load, maju ke kiri dulu
+  const horizontalLength =
+    config.horizontalLineLength == null
+      ? 40 * scale
+      : config.horizontalLineLength * scale;
+
+  const bendX =
+    startX - horizontalLength + (config.lineBendOffsetX || 0) * scale;
+
+  const bendY = startY + (config.lineBendOffsetY || 0) * scale;
+
+  // Garis kedua: setelah ada space ke kiri, baru naik ke atas
+  const verticalLength =
+    config.verticalLineLength == null
+      ? bendY - targetEndY
+      : config.verticalLineLength * scale;
+
+  const endX = bendX + (config.lineEndOffsetX || 0) * scale;
+
+  const endY = bendY - verticalLength + (config.lineEndOffsetY || 0) * scale;
+
+  const firstSegmentLength = Math.hypot(bendX - startX, bendY - startY);
+  const secondSegmentLength = Math.hypot(endX - bendX, endY - bendY);
+  const totalLength = firstSegmentLength + secondSegmentLength || 1;
+
+  const bendProgress = Math.min(
+    0.98,
+    Math.max(0.02, firstSegmentLength / totalLength),
+  );
+
+  return {
+    startX,
+    startY,
+    bendX,
+    bendY,
+    endX,
+    endY,
+    path: `M ${startX} ${startY} L ${bendX} ${bendY} L ${endX} ${endY}`,
+    bendProgress,
+  };
+}
+function getPointerAnimationEasing(config) {
+  if (config.animationEasing === "linear") {
+    return Easing.linear;
+  }
+
+  return Easing.linear;
 }
 const POWER_LATEST_ENDPOINT_CONFIG = [
   {
@@ -1117,7 +1491,12 @@ function getChartSeriesCounts(series) {
   }, {});
 }
 
-function getChartRequestDate(segment, selectedDay, selectedMonth, selectedYear) {
+function getChartRequestDate(
+  segment,
+  selectedDay,
+  selectedMonth,
+  selectedYear,
+) {
   const month = String(selectedMonth).padStart(2, "0");
   const day = String(selectedDay).padStart(2, "0");
 
@@ -1286,7 +1665,9 @@ function buildLatestPowerRequests(plantId, config) {
 
 function buildQueryString(params) {
   return Object.entries(params)
-    .filter(([, value]) => value !== undefined && value !== null && value !== "")
+    .filter(
+      ([, value]) => value !== undefined && value !== null && value !== "",
+    )
     .map(
       ([key, value]) =>
         `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`,
@@ -1683,6 +2064,11 @@ export default function OverviewScreen() {
       return items;
     }, {}),
   );
+  const [houseOverlayLayout, setHouseOverlayLayout] = useState(null);
+  const [gridBubbleLayout, setGridBubbleLayout] = useState(null);
+  const [batteryBubbleLayout, setBatteryBubbleLayout] = useState(null);
+  const [pvBubbleLayout, setPvBubbleLayout] = useState(null);
+  const [loadBubbleLayout, setLoadBubbleLayout] = useState(null);
   const overviewChartWidth = useMemo(
     () => getResponsiveChartWidth(windowWidth),
     [windowWidth],
@@ -1707,6 +2093,10 @@ export default function OverviewScreen() {
     selectedYear,
   ]);
   const weatherCardAnim = useRef(new Animated.Value(0)).current;
+  const gridPointerProgress = useRef(new Animated.Value(0)).current;
+  const batteryPointerProgress = useRef(new Animated.Value(0)).current;
+  const pvPointerProgress = useRef(new Animated.Value(0)).current;
+  const loadPointerProgress = useRef(new Animated.Value(0)).current;
   const now = new Date();
   const todayDay = now.getDate();
   const todayMonth = now.getMonth() + 1;
@@ -2269,6 +2659,122 @@ export default function OverviewScreen() {
   }, [weatherCardAnim]);
 
   useEffect(() => {
+    const loopDelay = Math.max(
+      0,
+      GRID_POINTER_CONFIG.animationLoopInterval -
+        GRID_POINTER_CONFIG.animationDuration,
+    );
+    const pointerLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(gridPointerProgress, {
+          toValue: 1,
+          duration: GRID_POINTER_CONFIG.animationDuration,
+          easing: getPointerAnimationEasing(GRID_POINTER_CONFIG),
+          useNativeDriver: true,
+        }),
+        Animated.delay(loopDelay),
+        Animated.timing(gridPointerProgress, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    gridPointerProgress.setValue(0);
+    pointerLoop.start();
+
+    return () => pointerLoop.stop();
+  }, [gridPointerProgress]);
+
+  useEffect(() => {
+    const loopDelay = Math.max(
+      0,
+      BATTERY_POINTER_CONFIG.animationLoopInterval -
+        BATTERY_POINTER_CONFIG.animationDuration,
+    );
+    const pointerLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(batteryPointerProgress, {
+          toValue: 1,
+          duration: BATTERY_POINTER_CONFIG.animationDuration,
+          easing: getPointerAnimationEasing(BATTERY_POINTER_CONFIG),
+          useNativeDriver: true,
+        }),
+        Animated.delay(loopDelay),
+        Animated.timing(batteryPointerProgress, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    batteryPointerProgress.setValue(0);
+    pointerLoop.start();
+
+    return () => pointerLoop.stop();
+  }, [batteryPointerProgress]);
+
+  useEffect(() => {
+    const loopDelay = Math.max(
+      0,
+      PV_POINTER_CONFIG.animationLoopInterval -
+        PV_POINTER_CONFIG.animationDuration,
+    );
+    const pointerLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pvPointerProgress, {
+          toValue: 1,
+          duration: PV_POINTER_CONFIG.animationDuration,
+          easing: getPointerAnimationEasing(PV_POINTER_CONFIG),
+          useNativeDriver: true,
+        }),
+        Animated.delay(loopDelay),
+        Animated.timing(pvPointerProgress, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    pvPointerProgress.setValue(0);
+    pointerLoop.start();
+
+    return () => pointerLoop.stop();
+  }, [pvPointerProgress]);
+
+  useEffect(() => {
+    const loopDelay = Math.max(
+      0,
+      LOAD_POINTER_CONFIG.animationLoopInterval -
+        LOAD_POINTER_CONFIG.animationDuration,
+    );
+    const pointerLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(loadPointerProgress, {
+          toValue: 1,
+          duration: LOAD_POINTER_CONFIG.animationDuration,
+          easing: getPointerAnimationEasing(LOAD_POINTER_CONFIG),
+          useNativeDriver: true,
+        }),
+        Animated.delay(loopDelay),
+        Animated.timing(loadPointerProgress, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    loadPointerProgress.setValue(0);
+    pointerLoop.start();
+
+    return () => pointerLoop.stop();
+  }, [loadPointerProgress]);
+
+  useEffect(() => {
     const clock = setInterval(() => {
       setChartCurrentTime(new Date());
     }, 1000);
@@ -2295,6 +2801,274 @@ export default function OverviewScreen() {
   const houseOverlayWidth = Math.max(0, windowWidth - 32);
   const houseOverlayHeight = windowWidth < 380 ? 340 : 360;
   const bubbleScale = Math.min(1, Math.max(0.86, houseOverlayWidth / 390));
+  const gridPointerCoordinates = getGridPointerCoordinates(
+    houseOverlayLayout,
+    gridBubbleLayout,
+    bubbleScale,
+  );
+  const batteryPointerCoordinates = getBatteryPointerCoordinates(
+    houseOverlayLayout,
+    batteryBubbleLayout,
+    bubbleScale,
+  );
+  const pvPointerCoordinates = getPvPointerCoordinates(
+    houseOverlayLayout,
+    pvBubbleLayout,
+    bubbleScale,
+  );
+  const loadPointerCoordinates = getLoadPointerCoordinates(
+    houseOverlayLayout,
+    loadBubbleLayout,
+    bubbleScale,
+  );
+  const gridPointerDotSize = GRID_POINTER_CONFIG.dotSize;
+  const gridPointerGlowSize = GRID_POINTER_CONFIG.dotSize * 2.8;
+  const batteryPointerDotSize = BATTERY_POINTER_CONFIG.dotSize;
+  const batteryPointerGlowSize = BATTERY_POINTER_CONFIG.dotSize * 2.8;
+  const pvPointerDotSize = PV_POINTER_CONFIG.dotSize;
+  const pvPointerGlowSize = PV_POINTER_CONFIG.dotSize * 2.8;
+  const loadPointerDotSize = LOAD_POINTER_CONFIG.dotSize;
+  const loadPointerGlowSize = LOAD_POINTER_CONFIG.dotSize * 2.8;
+  const gridPointerDotX = gridPointerCoordinates
+    ? gridPointerProgress.interpolate({
+        inputRange: [0, gridPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          gridPointerCoordinates.startX - gridPointerDotSize / 2,
+          gridPointerCoordinates.bendX - gridPointerDotSize / 2,
+          gridPointerCoordinates.endX - gridPointerDotSize / 2,
+        ],
+      })
+    : null;
+  const gridPointerDotY = gridPointerCoordinates
+    ? gridPointerProgress.interpolate({
+        inputRange: [0, gridPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          gridPointerCoordinates.startY - gridPointerDotSize / 2,
+          gridPointerCoordinates.bendY - gridPointerDotSize / 2,
+          gridPointerCoordinates.endY - gridPointerDotSize / 2,
+        ],
+      })
+    : null;
+  const gridPointerGlowX = gridPointerCoordinates
+    ? gridPointerProgress.interpolate({
+        inputRange: [0, gridPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          gridPointerCoordinates.startX - gridPointerGlowSize / 2,
+          gridPointerCoordinates.bendX - gridPointerGlowSize / 2,
+          gridPointerCoordinates.endX - gridPointerGlowSize / 2,
+        ],
+      })
+    : null;
+  const gridPointerGlowY = gridPointerCoordinates
+    ? gridPointerProgress.interpolate({
+        inputRange: [0, gridPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          gridPointerCoordinates.startY - gridPointerGlowSize / 2,
+          gridPointerCoordinates.bendY - gridPointerGlowSize / 2,
+          gridPointerCoordinates.endY - gridPointerGlowSize / 2,
+        ],
+      })
+    : null;
+  const batteryPointerDotX = batteryPointerCoordinates
+    ? batteryPointerProgress.interpolate({
+        inputRange: [0, batteryPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          batteryPointerCoordinates.startX - batteryPointerDotSize / 2,
+          batteryPointerCoordinates.bendX - batteryPointerDotSize / 2,
+          batteryPointerCoordinates.endX - batteryPointerDotSize / 2,
+        ],
+      })
+    : null;
+  const batteryPointerDotY = batteryPointerCoordinates
+    ? batteryPointerProgress.interpolate({
+        inputRange: [0, batteryPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          batteryPointerCoordinates.startY - batteryPointerDotSize / 2,
+          batteryPointerCoordinates.bendY - batteryPointerDotSize / 2,
+          batteryPointerCoordinates.endY - batteryPointerDotSize / 2,
+        ],
+      })
+    : null;
+  const batteryPointerGlowX = batteryPointerCoordinates
+    ? batteryPointerProgress.interpolate({
+        inputRange: [0, batteryPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          batteryPointerCoordinates.startX - batteryPointerGlowSize / 2,
+          batteryPointerCoordinates.bendX - batteryPointerGlowSize / 2,
+          batteryPointerCoordinates.endX - batteryPointerGlowSize / 2,
+        ],
+      })
+    : null;
+  const batteryPointerGlowY = batteryPointerCoordinates
+    ? batteryPointerProgress.interpolate({
+        inputRange: [0, batteryPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          batteryPointerCoordinates.startY - batteryPointerGlowSize / 2,
+          batteryPointerCoordinates.bendY - batteryPointerGlowSize / 2,
+          batteryPointerCoordinates.endY - batteryPointerGlowSize / 2,
+        ],
+      })
+    : null;
+  const pvPointerDotX = pvPointerCoordinates
+    ? pvPointerProgress.interpolate({
+        inputRange: [0, pvPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          pvPointerCoordinates.startX - pvPointerDotSize / 2,
+          pvPointerCoordinates.bendX - pvPointerDotSize / 2,
+          pvPointerCoordinates.endX - pvPointerDotSize / 2,
+        ],
+      })
+    : null;
+  const pvPointerDotY = pvPointerCoordinates
+    ? pvPointerProgress.interpolate({
+        inputRange: [0, pvPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          pvPointerCoordinates.startY - pvPointerDotSize / 2,
+          pvPointerCoordinates.bendY - pvPointerDotSize / 2,
+          pvPointerCoordinates.endY - pvPointerDotSize / 2,
+        ],
+      })
+    : null;
+  const pvPointerGlowX = pvPointerCoordinates
+    ? pvPointerProgress.interpolate({
+        inputRange: [0, pvPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          pvPointerCoordinates.startX - pvPointerGlowSize / 2,
+          pvPointerCoordinates.bendX - pvPointerGlowSize / 2,
+          pvPointerCoordinates.endX - pvPointerGlowSize / 2,
+        ],
+      })
+    : null;
+  const pvPointerGlowY = pvPointerCoordinates
+    ? pvPointerProgress.interpolate({
+        inputRange: [0, pvPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          pvPointerCoordinates.startY - pvPointerGlowSize / 2,
+          pvPointerCoordinates.bendY - pvPointerGlowSize / 2,
+          pvPointerCoordinates.endY - pvPointerGlowSize / 2,
+        ],
+      })
+    : null;
+  const loadPointerDotX = loadPointerCoordinates
+    ? loadPointerProgress.interpolate({
+        inputRange: [0, loadPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          loadPointerCoordinates.startX - loadPointerDotSize / 2,
+          loadPointerCoordinates.bendX - loadPointerDotSize / 2,
+          loadPointerCoordinates.endX - loadPointerDotSize / 2,
+        ],
+      })
+    : null;
+  const loadPointerDotY = loadPointerCoordinates
+    ? loadPointerProgress.interpolate({
+        inputRange: [0, loadPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          loadPointerCoordinates.startY - loadPointerDotSize / 2,
+          loadPointerCoordinates.bendY - loadPointerDotSize / 2,
+          loadPointerCoordinates.endY - loadPointerDotSize / 2,
+        ],
+      })
+    : null;
+  const loadPointerGlowX = loadPointerCoordinates
+    ? loadPointerProgress.interpolate({
+        inputRange: [0, loadPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          loadPointerCoordinates.startX - loadPointerGlowSize / 2,
+          loadPointerCoordinates.bendX - loadPointerGlowSize / 2,
+          loadPointerCoordinates.endX - loadPointerGlowSize / 2,
+        ],
+      })
+    : null;
+  const loadPointerGlowY = loadPointerCoordinates
+    ? loadPointerProgress.interpolate({
+        inputRange: [0, loadPointerCoordinates.bendProgress, 1],
+        outputRange: [
+          loadPointerCoordinates.startY - loadPointerGlowSize / 2,
+          loadPointerCoordinates.bendY - loadPointerGlowSize / 2,
+          loadPointerCoordinates.endY - loadPointerGlowSize / 2,
+        ],
+      })
+    : null;
+  const gridPointerDotOpacity =
+    GRID_POINTER_CONFIG.animationEffect === "fade"
+      ? gridPointerProgress.interpolate({
+          inputRange: [0, 0.15, 0.85, 1],
+          outputRange: [
+            0,
+            GRID_POINTER_CONFIG.dotOpacity,
+            GRID_POINTER_CONFIG.dotOpacity,
+            0,
+          ],
+        })
+      : GRID_POINTER_CONFIG.dotOpacity;
+  const gridPointerGlowScale =
+    GRID_POINTER_CONFIG.enablePulse ||
+    GRID_POINTER_CONFIG.animationEffect === "pulse"
+      ? gridPointerProgress.interpolate({
+          inputRange: [0, 0.5, 1],
+          outputRange: [0.9, 1.18, 0.9],
+        })
+      : 1;
+  const batteryPointerDotOpacity =
+    BATTERY_POINTER_CONFIG.animationEffect === "fade"
+      ? batteryPointerProgress.interpolate({
+          inputRange: [0, 0.15, 0.85, 1],
+          outputRange: [
+            0,
+            BATTERY_POINTER_CONFIG.dotOpacity,
+            BATTERY_POINTER_CONFIG.dotOpacity,
+            0,
+          ],
+        })
+      : BATTERY_POINTER_CONFIG.dotOpacity;
+  const batteryPointerGlowScale =
+    BATTERY_POINTER_CONFIG.enablePulse ||
+    BATTERY_POINTER_CONFIG.animationEffect === "pulse"
+      ? batteryPointerProgress.interpolate({
+          inputRange: [0, 0.5, 1],
+          outputRange: [0.9, 1.18, 0.9],
+        })
+      : 1;
+  const pvPointerDotOpacity =
+    PV_POINTER_CONFIG.animationEffect === "fade"
+      ? pvPointerProgress.interpolate({
+          inputRange: [0, 0.15, 0.85, 1],
+          outputRange: [
+            0,
+            PV_POINTER_CONFIG.dotOpacity,
+            PV_POINTER_CONFIG.dotOpacity,
+            0,
+          ],
+        })
+      : PV_POINTER_CONFIG.dotOpacity;
+  const pvPointerGlowScale =
+    PV_POINTER_CONFIG.enablePulse ||
+    PV_POINTER_CONFIG.animationEffect === "pulse"
+      ? pvPointerProgress.interpolate({
+          inputRange: [0, 0.5, 1],
+          outputRange: [0.9, 1.18, 0.9],
+        })
+      : 1;
+  const loadPointerDotOpacity =
+    LOAD_POINTER_CONFIG.animationEffect === "fade"
+      ? loadPointerProgress.interpolate({
+          inputRange: [0, 0.15, 0.85, 1],
+          outputRange: [
+            0,
+            LOAD_POINTER_CONFIG.dotOpacity,
+            LOAD_POINTER_CONFIG.dotOpacity,
+            0,
+          ],
+        })
+      : LOAD_POINTER_CONFIG.dotOpacity;
+  const loadPointerGlowScale =
+    LOAD_POINTER_CONFIG.enablePulse ||
+    LOAD_POINTER_CONFIG.animationEffect === "pulse"
+      ? loadPointerProgress.interpolate({
+          inputRange: [0, 0.5, 1],
+          outputRange: [0.9, 1.18, 0.9],
+        })
+      : 1;
 
   const lifetimeOptions = Array.from({ length: 40 }, (_, i) => (i + 1) * 5);
   useEffect(() => {
@@ -2504,6 +3278,9 @@ export default function OverviewScreen() {
                   styles.houseOverlayWrap,
                   { height: houseOverlayHeight },
                 ]}
+                onLayout={({ nativeEvent }) =>
+                  setHouseOverlayLayout(nativeEvent.layout)
+                }
               >
                 <Image
                   source={require("@/assets/images/Asset App Batari Alternative.png")}
@@ -2511,7 +3288,232 @@ export default function OverviewScreen() {
                   resizeMode="contain"
                 />
 
-                <TouchableOpacity
+                {gridPointerCoordinates && (
+                  <View pointerEvents="none" style={styles.gridPointerOverlay}>
+                    <Svg
+                      pointerEvents="none"
+                      style={styles.gridPointerOverlay}
+                      width="100%"
+                      height="100%"
+                    >
+                      <Path
+                        d={gridPointerCoordinates.path}
+                        stroke={GRID_POINTER_CONFIG.lineColor}
+                        strokeWidth={GRID_POINTER_CONFIG.lineThickness}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                    </Svg>
+                    {GRID_POINTER_CONFIG.enableGlow &&
+                      GRID_POINTER_CONFIG.animationEffect !== "plain" && (
+                        <Animated.View
+                          style={[
+                            styles.gridPointerDotGlow,
+                            {
+                              width: gridPointerGlowSize,
+                              height: gridPointerGlowSize,
+                              borderRadius: gridPointerGlowSize / 2,
+                              backgroundColor: GRID_POINTER_CONFIG.dotGlowColor,
+                              opacity: gridPointerDotOpacity,
+                              transform: [
+                                { translateX: gridPointerGlowX },
+                                { translateY: gridPointerGlowY },
+                                { scale: gridPointerGlowScale },
+                              ],
+                            },
+                          ]}
+                        />
+                      )}
+                    <Animated.View
+                      style={[
+                        styles.gridPointerDot,
+                        {
+                          width: gridPointerDotSize,
+                          height: gridPointerDotSize,
+                          borderRadius: gridPointerDotSize / 2,
+                          backgroundColor: GRID_POINTER_CONFIG.dotColor,
+                          opacity: gridPointerDotOpacity,
+                          transform: [
+                            { translateX: gridPointerDotX },
+                            { translateY: gridPointerDotY },
+                          ],
+                        },
+                      ]}
+                    />
+                  </View>
+                )}
+
+                {batteryPointerCoordinates && (
+                  <View pointerEvents="none" style={styles.gridPointerOverlay}>
+                    <Svg
+                      pointerEvents="none"
+                      style={styles.gridPointerOverlay}
+                      width="100%"
+                      height="100%"
+                    >
+                      <Path
+                        d={batteryPointerCoordinates.path}
+                        stroke={BATTERY_POINTER_CONFIG.lineColor}
+                        strokeWidth={BATTERY_POINTER_CONFIG.lineThickness}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                    </Svg>
+                    {BATTERY_POINTER_CONFIG.enableGlow &&
+                      BATTERY_POINTER_CONFIG.animationEffect !== "plain" && (
+                        <Animated.View
+                          style={[
+                            styles.gridPointerDotGlow,
+                            {
+                              width: batteryPointerGlowSize,
+                              height: batteryPointerGlowSize,
+                              borderRadius: batteryPointerGlowSize / 2,
+                              backgroundColor:
+                                BATTERY_POINTER_CONFIG.dotGlowColor,
+                              opacity: batteryPointerDotOpacity,
+                              transform: [
+                                { translateX: batteryPointerGlowX },
+                                { translateY: batteryPointerGlowY },
+                                { scale: batteryPointerGlowScale },
+                              ],
+                            },
+                          ]}
+                        />
+                      )}
+                    <Animated.View
+                      style={[
+                        styles.gridPointerDot,
+                        {
+                          width: batteryPointerDotSize,
+                          height: batteryPointerDotSize,
+                          borderRadius: batteryPointerDotSize / 2,
+                          backgroundColor: BATTERY_POINTER_CONFIG.dotColor,
+                          opacity: batteryPointerDotOpacity,
+                          transform: [
+                            { translateX: batteryPointerDotX },
+                            { translateY: batteryPointerDotY },
+                          ],
+                        },
+                      ]}
+                    />
+                  </View>
+                )}
+
+                {pvPointerCoordinates && (
+                  <View pointerEvents="none" style={styles.gridPointerOverlay}>
+                    <Svg
+                      pointerEvents="none"
+                      style={styles.gridPointerOverlay}
+                      width="100%"
+                      height="100%"
+                    >
+                      <Path
+                        d={pvPointerCoordinates.path}
+                        stroke={PV_POINTER_CONFIG.lineColor}
+                        strokeWidth={PV_POINTER_CONFIG.lineThickness}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                    </Svg>
+                    {PV_POINTER_CONFIG.enableGlow &&
+                      PV_POINTER_CONFIG.animationEffect !== "plain" && (
+                        <Animated.View
+                          style={[
+                            styles.gridPointerDotGlow,
+                            {
+                              width: pvPointerGlowSize,
+                              height: pvPointerGlowSize,
+                              borderRadius: pvPointerGlowSize / 2,
+                              backgroundColor: PV_POINTER_CONFIG.dotGlowColor,
+                              opacity: pvPointerDotOpacity,
+                              transform: [
+                                { translateX: pvPointerGlowX },
+                                { translateY: pvPointerGlowY },
+                                { scale: pvPointerGlowScale },
+                              ],
+                            },
+                          ]}
+                        />
+                      )}
+                    <Animated.View
+                      style={[
+                        styles.gridPointerDot,
+                        {
+                          width: pvPointerDotSize,
+                          height: pvPointerDotSize,
+                          borderRadius: pvPointerDotSize / 2,
+                          backgroundColor: PV_POINTER_CONFIG.dotColor,
+                          opacity: pvPointerDotOpacity,
+                          transform: [
+                            { translateX: pvPointerDotX },
+                            { translateY: pvPointerDotY },
+                          ],
+                        },
+                      ]}
+                    />
+                  </View>
+                )}
+
+                {loadPointerCoordinates && (
+                  <View pointerEvents="none" style={styles.gridPointerOverlay}>
+                    <Svg
+                      pointerEvents="none"
+                      style={styles.gridPointerOverlay}
+                      width="100%"
+                      height="100%"
+                    >
+                      <Path
+                        d={loadPointerCoordinates.path}
+                        stroke={LOAD_POINTER_CONFIG.lineColor}
+                        strokeWidth={LOAD_POINTER_CONFIG.lineThickness}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                    </Svg>
+                    {LOAD_POINTER_CONFIG.enableGlow &&
+                      LOAD_POINTER_CONFIG.animationEffect !== "plain" && (
+                        <Animated.View
+                          style={[
+                            styles.gridPointerDotGlow,
+                            {
+                              width: loadPointerGlowSize,
+                              height: loadPointerGlowSize,
+                              borderRadius: loadPointerGlowSize / 2,
+                              backgroundColor: LOAD_POINTER_CONFIG.dotGlowColor,
+                              opacity: loadPointerDotOpacity,
+                              transform: [
+                                { translateX: loadPointerGlowX },
+                                { translateY: loadPointerGlowY },
+                                { scale: loadPointerGlowScale },
+                              ],
+                            },
+                          ]}
+                        />
+                      )}
+                    <Animated.View
+                      style={[
+                        styles.gridPointerDot,
+                        {
+                          width: loadPointerDotSize,
+                          height: loadPointerDotSize,
+                          borderRadius: loadPointerDotSize / 2,
+                          backgroundColor: LOAD_POINTER_CONFIG.dotColor,
+                          opacity: loadPointerDotOpacity,
+                          transform: [
+                            { translateX: loadPointerDotX },
+                            { translateY: loadPointerDotY },
+                          ],
+                        },
+                      ]}
+                    />
+                  </View>
+                )}
+
+                <View
                   style={[
                     styles.infoBubble,
                     styles.pvBubble,
@@ -2522,18 +3524,17 @@ export default function OverviewScreen() {
                       bubbleScale,
                     ),
                   ]}
-                  activeOpacity={0.85}
-                  onPress={() =>
-                    router.push(`/plant/${plantId}/sub-plant/data-pv`)
+                  onLayout={({ nativeEvent }) =>
+                    setPvBubbleLayout(nativeEvent.layout)
                   }
                 >
                   <Text style={styles.infoBubbleLabel}>PV</Text>
                   <Text style={styles.infoBubbleValue}>
                     {formatKwValue(plantData.production)}
                   </Text>
-                </TouchableOpacity>
+                </View>
 
-                <TouchableOpacity
+                <View
                   style={[
                     styles.infoBubble,
                     styles.gridBubble,
@@ -2544,21 +3545,28 @@ export default function OverviewScreen() {
                       bubbleScale,
                     ),
                   ]}
-                  activeOpacity={0.85}
-                  onPress={() =>
-                    router.push(`/plant/${plantId}/sub-plant/data-grid`)
+                  onLayout={({ nativeEvent }) =>
+                    setGridBubbleLayout(nativeEvent.layout)
                   }
                 >
                   <Text style={styles.infoBubbleLabel}>Grid</Text>
                   <Text style={styles.infoBubbleValue}>
                     {formatKwValue(plantData.grid)}
                   </Text>
-                </TouchableOpacity>
+                </View>
 
-                <TouchableOpacity
+                <View
                   style={[
                     styles.infoBubble,
                     styles.batteryBubble,
+                    gridBubbleLayout && {
+                      width:
+                        gridBubbleLayout.width +
+                        BATTERY_BUBBLE_CONFIG.widthExtra * bubbleScale,
+                      height:
+                        gridBubbleLayout.height +
+                        BATTERY_BUBBLE_CONFIG.heightExtra * bubbleScale,
+                    },
                     getResponsiveBubblePositionStyle(
                       "battery",
                       houseOverlayWidth,
@@ -2566,18 +3574,17 @@ export default function OverviewScreen() {
                       bubbleScale,
                     ),
                   ]}
-                  activeOpacity={0.85}
-                  onPress={() =>
-                    router.push(`/plant/${plantId}/sub-plant/data-battery`)
+                  onLayout={({ nativeEvent }) =>
+                    setBatteryBubbleLayout(nativeEvent.layout)
                   }
                 >
                   <Text style={styles.batteryLabel}>Battery</Text>
                   <Text style={styles.batteryValue}>
                     {formatKwValue(plantData.battery)}
                   </Text>
-                </TouchableOpacity>
+                </View>
 
-                <TouchableOpacity
+                <View
                   style={[
                     styles.infoBubble,
                     styles.loadBubble,
@@ -2588,16 +3595,15 @@ export default function OverviewScreen() {
                       bubbleScale,
                     ),
                   ]}
-                  activeOpacity={0.85}
-                  onPress={() =>
-                    router.push(`/plant/${plantId}/sub-plant/data-load`)
+                  onLayout={({ nativeEvent }) =>
+                    setLoadBubbleLayout(nativeEvent.layout)
                   }
                 >
                   <Text style={styles.infoBubbleLabel}>Load</Text>
                   <Text style={styles.infoBubbleValue}>
                     {formatKwValue(plantData.load)}
                   </Text>
-                </TouchableOpacity>
+                </View>
               </View>
             </View>
 
@@ -3713,6 +4719,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  gridPointerOverlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+  gridPointerDotGlow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+  },
+  gridPointerDot: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+  },
   infoBubble: {
     position: "absolute",
     minWidth: 86,
@@ -3752,25 +4775,20 @@ const styles = StyleSheet.create({
     maxWidth: 118,
   },
   batteryBubble: {
-    minWidth: 110,
-    maxWidth: 132,
-    paddingHorizontal: 16,
-    alignItems: "center",
+    maxWidth: 118,
   },
   loadBubble: {
     maxWidth: 118,
   },
   batteryLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#374151",
-    textAlign: "center",
+    fontSize: BATTERY_BUBBLE_CONFIG.titleFontSize,
+    fontWeight: BATTERY_BUBBLE_CONFIG.titleFontWeight,
+    color: "#1F2937",
   },
   batteryValue: {
-    fontSize: 17,
-    fontWeight: "800",
+    fontSize: BATTERY_BUBBLE_CONFIG.valueFontSize,
+    fontWeight: BATTERY_BUBBLE_CONFIG.valueFontWeight,
     color: "#111827",
-    textAlign: "center",
     marginTop: 2,
   },
 });
