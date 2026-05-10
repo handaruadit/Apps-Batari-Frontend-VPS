@@ -21,11 +21,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -37,7 +39,12 @@ const appFont = Platform.select({
 });
 const BATARI_LOGO_SIZE = 100;
 
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
 const LoginScreen = () => {
+  const { width, height } = useWindowDimensions();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const { setUser } = useContext(AuthContext);
@@ -46,6 +53,15 @@ const LoginScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
   const introAnim = useRef(new Animated.Value(0)).current;
+  const isCompactHeight = height < 720;
+  const isNarrow = width < 360;
+  const logoSize = clamp(width * 0.24, isCompactHeight ? 72 : 84, 100);
+  const heroHeight = clamp(height * 0.23, isCompactHeight ? 132 : 164, 188);
+  const formTopPadding = isCompactHeight ? 22 : 45;
+  const horizontalPadding = isNarrow ? 18 : 22;
+  const buttonHeight = isCompactHeight ? 52 : 58;
+  const inputHeight = isCompactHeight ? 46 : 48;
+  const footerHeight = isCompactHeight ? 28 : 52;
 
   useEffect(() => {
     const checkStoredToken = async () => {
@@ -171,32 +187,80 @@ const LoginScreen = () => {
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           style={styles.container}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
         >
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[styles.scrollContent, { minHeight: height }]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
           <View style={styles.screen}>
             <ImageBackground
               source={require("@/assets/images/solar-bg.jpg")}
-              style={styles.hero}
+              style={[styles.hero, { height: heroHeight }]}
               imageStyle={styles.backgroundPhoto}
             >
               <View style={styles.heroOverlay} />
-              <Animated.View style={[styles.brandBlock, heroAnimatedStyle]}>
-                <View style={styles.logoFrame}>
+              <Animated.View
+                style={[
+                  styles.brandBlock,
+                  { paddingTop: isCompactHeight ? 8 : 14 },
+                  heroAnimatedStyle,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.logoFrame,
+                    {
+                      width: logoSize,
+                      height: logoSize,
+                      borderRadius: logoSize / 2,
+                    },
+                  ]}
+                >
                   <Image
                     source={require("@/assets/images/batari-logo.jpeg")}
-                    style={styles.logo}
+                    style={[
+                      styles.logo,
+                      {
+                        width: logoSize,
+                        height: logoSize,
+                        borderRadius: logoSize / 2,
+                      },
+                    ]}
                   />
                 </View>
-                <Text style={styles.welcome}>Welcome</Text>
+                <Text
+                  style={[
+                    styles.welcome,
+                    {
+                      fontSize: isCompactHeight ? 26 : 31,
+                      marginTop: isCompactHeight ? 4 : 8,
+                    },
+                  ]}
+                >
+                  Welcome
+                </Text>
               </Animated.View>
             </ImageBackground>
 
-            <Animated.View style={[styles.formSection, formAnimatedStyle]}>
+            <Animated.View
+              style={[
+                styles.formSection,
+                {
+                  paddingHorizontal: horizontalPadding,
+                  paddingTop: formTopPadding,
+                },
+                formAnimatedStyle,
+              ]}
+            >
               <View style={styles.formSurface}>
                 <Text style={styles.label}>Email</Text>
                 <View
                   style={[
                     styles.inputWrapper,
+                    { minHeight: inputHeight },
                     focusedField === "email" && styles.inputWrapperFocused,
                   ]}
                 >
@@ -225,6 +289,7 @@ const LoginScreen = () => {
                 <View
                   style={[
                     styles.inputWrapper,
+                    { minHeight: inputHeight },
                     focusedField === "password" && styles.inputWrapperFocused,
                   ]}
                 >
@@ -273,6 +338,7 @@ const LoginScreen = () => {
                 <TouchableOpacity
                   style={[
                     styles.loginButton,
+                    { minHeight: buttonHeight },
                     loading && styles.loginButtonBusy,
                   ]}
                   onPress={handleLogin}
@@ -299,7 +365,7 @@ const LoginScreen = () => {
                 <Text style={styles.orText}>OR</Text>
 
                 <TouchableOpacity
-                  style={styles.googleButton}
+                  style={[styles.googleButton, { minHeight: buttonHeight }]}
                   activeOpacity={0.8}
                 >
                   <AntDesign
@@ -312,7 +378,7 @@ const LoginScreen = () => {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.facebookButton}
+                  style={[styles.facebookButton, { minHeight: buttonHeight }]}
                   activeOpacity={0.8}
                 >
                   <FontAwesome
@@ -334,10 +400,11 @@ const LoginScreen = () => {
 
             <ImageBackground
               source={require("@/assets/images/solar-bg.jpg")}
-              style={styles.footerPhotoBlock}
+              style={[styles.footerPhotoBlock, { height: footerHeight }]}
               imageStyle={styles.footerPhoto}
             />
           </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </>
@@ -353,8 +420,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#0C1222",
   },
+  scroll: {
+    flex: 1,
+    backgroundColor: "#0C1222",
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
   screen: {
     flex: 1,
+    width: "100%",
     backgroundColor: "#0C1222",
   },
   hero: {
@@ -420,6 +495,8 @@ const styles = StyleSheet.create({
   },
   formSurface: {
     width: "100%",
+    maxWidth: 430,
+    alignSelf: "center",
   },
   label: {
     fontSize: 18,
@@ -524,6 +601,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    flexWrap: "wrap",
+    gap: 12,
   },
   link: {
     color: "#168CC8",

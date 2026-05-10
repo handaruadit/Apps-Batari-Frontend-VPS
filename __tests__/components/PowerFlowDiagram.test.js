@@ -15,14 +15,14 @@ describe('PowerFlowDiagram', () => {
   it('renders with power data', () => {
     const { getByText } = render(<PowerFlowDiagram data={mockPowerData} />);
 
-    expect(getByText('Production')).toBeTruthy();
+    expect(getByText('Consumption')).toBeTruthy();
     expect(getByText(/2\.10/)).toBeTruthy();
   });
 
   it('displays all flow labels', () => {
     const { getByText } = render(<PowerFlowDiagram data={mockPowerData} />);
 
-    expect(getByText('Production')).toBeTruthy();
+    expect(getByText('Consumption')).toBeTruthy();
     expect(getByText('Grid')).toBeTruthy();
     expect(getByText('Battery')).toBeTruthy();
     expect(getByText('Ups-Load')).toBeTruthy();
@@ -77,7 +77,7 @@ describe('PowerFlowDiagram', () => {
   it('renders all components', () => {
     const { getByText } = render(<PowerFlowDiagram data={mockPowerData} />);
 
-    expect(getByText('Production')).toBeTruthy();
+    expect(getByText('Consumption')).toBeTruthy();
     expect(getByText('Grid')).toBeTruthy();
     expect(getByText('On grid')).toBeTruthy();
     expect(getByText('Battery')).toBeTruthy();

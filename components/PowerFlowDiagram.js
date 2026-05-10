@@ -275,7 +275,7 @@ export default function PowerFlowDiagram({ data = {} }) {
               />
             </View>
           }
-          title={"Production"}
+          title={"Consumption"}
           value={formatValue(production)}
           color="#1FB7FF"
           subtitle=""

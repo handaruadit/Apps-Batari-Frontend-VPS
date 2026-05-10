@@ -4,7 +4,7 @@ import { clearAuth, getToken, isTokenValid } from "@/auth/token";
 import { BASE_URL, GOOGLE_MAPS_API_KEY } from "@/config/api";
 import { appColors, appFont } from "@/config/theme";
 import { AuthContext } from "@/context/AuthContext";
-import { Ionicons } from "@expo/vector-icons";
+import { FontAwesome5, Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import {
@@ -151,13 +151,14 @@ const GRID_POINTER_CONFIG = {
   lineOffsetX: 0,
   lineOffsetY: 0,
   lineStartOffsetX: 0,
-  lineStartOffsetY: 0,
+  lineStartOffsetY: -5,
+  startLeadLength: 50,
   lineBendOffsetX: 0,
   lineBendOffsetY: 0,
-  lineEndOffsetX: -30,
+  lineEndOffsetX: -87,
   lineEndOffsetY: 0,
   verticalLineLength: 100,
-  horizontalLineLength: 70,
+  horizontalLineLength: 148,
   lineEndAnchorPctX: 0.25,
   lineEndAnchorPctY: 0.85,
   lineThickness: 1,
@@ -165,8 +166,8 @@ const GRID_POINTER_CONFIG = {
   dotColor: "#FF1F1F",
   dotGlowColor: "rgba(255,31,31,0.45)",
   dotSize: 7,
-  animationDuration: 10000,
-  animationLoopInterval: 10500,
+  animationDuration: 3000,
+  animationLoopInterval: 2500,
   animationEffect: "glow",
   animationEasing: "linear",
   dotFrameSmoothing: true,
@@ -359,43 +360,57 @@ function getGridPointerCoordinates(containerLayout, gridBubbleLayout, scale) {
   const targetEndY = containerLayout.height * config.lineEndAnchorPctY;
   const startX =
     gridBubbleLayout.x +
-    gridBubbleLayout.width / 2 +
+    gridBubbleLayout.width +
     bubbleOffset.x * scale +
     (config.lineOffsetX + config.lineStartOffsetX) * scale;
   const startY =
     gridBubbleLayout.y +
-    gridBubbleLayout.height +
+    gridBubbleLayout.height / 2 +
     bubbleOffset.y * scale +
     (config.lineOffsetY + config.lineStartOffsetY) * scale;
-  const bendX = startX + (config.lineBendOffsetX || 0) * scale;
+  const leadX = startX + (config.startLeadLength || 0) * scale;
+  const leadY = startY;
+  const bendX = leadX + (config.lineBendOffsetX || 0) * scale;
   const verticalLength =
     config.verticalLineLength == null
       ? targetEndY - startY
       : config.verticalLineLength * scale;
-  const bendY = startY + verticalLength + (config.lineBendOffsetY || 0) * scale;
+  const bendY = leadY + verticalLength + (config.lineBendOffsetY || 0) * scale;
   const endX =
     config.horizontalLineLength == null
       ? targetEndX + (config.lineOffsetX + config.lineEndOffsetX) * scale
-      : bendX +
+      : startX +
         config.horizontalLineLength * scale +
         config.lineEndOffsetX * scale;
   const endY = bendY + (config.lineEndOffsetY || 0) * scale;
-  const firstSegmentLength = Math.hypot(bendX - startX, bendY - startY);
-  const secondSegmentLength = Math.hypot(endX - bendX, endY - bendY);
-  const totalLength = firstSegmentLength + secondSegmentLength || 1;
+  const firstSegmentLength = Math.hypot(leadX - startX, leadY - startY);
+  const secondSegmentLength = Math.hypot(bendX - leadX, bendY - leadY);
+  const thirdSegmentLength = Math.hypot(endX - bendX, endY - bendY);
+  const totalLength =
+    firstSegmentLength + secondSegmentLength + thirdSegmentLength || 1;
+  const leadProgress = Math.min(
+    0.96,
+    Math.max(0.02, firstSegmentLength / totalLength),
+  );
   const bendProgress = Math.min(
     0.98,
-    Math.max(0.02, firstSegmentLength / totalLength),
+    Math.max(
+      leadProgress + 0.02,
+      (firstSegmentLength + secondSegmentLength) / totalLength,
+    ),
   );
 
   return {
     startX,
     startY,
+    leadX,
+    leadY,
     bendX,
     bendY,
     endX,
     endY,
-    path: `M ${startX} ${startY} L ${bendX} ${bendY} L ${endX} ${endY}`,
+    path: `M ${startX} ${startY} L ${leadX} ${leadY} L ${bendX} ${bendY} L ${endX} ${endY}`,
+    leadProgress,
     bendProgress,
   };
 }
@@ -679,8 +694,8 @@ const DASHBOARD_LAYOUT = {
 };
 // Atur ukuran font section dashboard energi dari sini.
 const DASHBOARD_FONT_SIZE = {
-  metricLabel: 12,
-  metricValue: 15,
+  metricLabel: 15,
+  metricValue: 20,
   sectionTitle: 24,
   sectionMeta: 15,
   sourcePercent: 17,
@@ -726,7 +741,7 @@ const weatherForecastDays = [
 const dashboardMetricCards = [
   {
     key: "consumption",
-    label: "konsumsi",
+    label: "production",
     value: "0kWh",
     icon: "flash-outline",
     color: appColors.accent,
@@ -736,13 +751,6 @@ const dashboardMetricCards = [
     label: "Total\nPengisian",
     value: "0kWh",
     icon: "battery-charging-outline",
-    color: appColors.accent,
-  },
-  {
-    key: "usage",
-    label: "Penggunaan\nListrik",
-    value: "0kWh",
-    icon: "reload-circle-outline",
     color: appColors.accent,
   },
 ];
@@ -763,7 +771,8 @@ const energySourceItems = [
   },
   {
     key: "solar",
-    icon: "grid-outline",
+    icon: "broadcast-tower",
+    iconLibrary: "FontAwesome5",
     color: "#E0262E",
     value: "0%",
     barFlex: 1,
@@ -2906,9 +2915,15 @@ export default function OverviewScreen() {
     LOAD_POINTER_CONFIG.dotSize * 2.8 * bubbleScale;
   const gridPointerDotX = gridPointerCoordinates
     ? gridPointerProgress.interpolate({
-        inputRange: [0, gridPointerCoordinates.bendProgress, 1],
+        inputRange: [
+          0,
+          gridPointerCoordinates.leadProgress,
+          gridPointerCoordinates.bendProgress,
+          1,
+        ],
         outputRange: [
           gridPointerCoordinates.startX - gridPointerDotSize / 2,
+          gridPointerCoordinates.leadX - gridPointerDotSize / 2,
           gridPointerCoordinates.bendX - gridPointerDotSize / 2,
           gridPointerCoordinates.endX - gridPointerDotSize / 2,
         ],
@@ -2916,9 +2931,15 @@ export default function OverviewScreen() {
     : null;
   const gridPointerDotY = gridPointerCoordinates
     ? gridPointerProgress.interpolate({
-        inputRange: [0, gridPointerCoordinates.bendProgress, 1],
+        inputRange: [
+          0,
+          gridPointerCoordinates.leadProgress,
+          gridPointerCoordinates.bendProgress,
+          1,
+        ],
         outputRange: [
           gridPointerCoordinates.startY - gridPointerDotSize / 2,
+          gridPointerCoordinates.leadY - gridPointerDotSize / 2,
           gridPointerCoordinates.bendY - gridPointerDotSize / 2,
           gridPointerCoordinates.endY - gridPointerDotSize / 2,
         ],
@@ -2926,9 +2947,15 @@ export default function OverviewScreen() {
     : null;
   const gridPointerGlowX = gridPointerCoordinates
     ? gridPointerProgress.interpolate({
-        inputRange: [0, gridPointerCoordinates.bendProgress, 1],
+        inputRange: [
+          0,
+          gridPointerCoordinates.leadProgress,
+          gridPointerCoordinates.bendProgress,
+          1,
+        ],
         outputRange: [
           gridPointerCoordinates.startX - gridPointerGlowSize / 2,
+          gridPointerCoordinates.leadX - gridPointerGlowSize / 2,
           gridPointerCoordinates.bendX - gridPointerGlowSize / 2,
           gridPointerCoordinates.endX - gridPointerGlowSize / 2,
         ],
@@ -2936,9 +2963,15 @@ export default function OverviewScreen() {
     : null;
   const gridPointerGlowY = gridPointerCoordinates
     ? gridPointerProgress.interpolate({
-        inputRange: [0, gridPointerCoordinates.bendProgress, 1],
+        inputRange: [
+          0,
+          gridPointerCoordinates.leadProgress,
+          gridPointerCoordinates.bendProgress,
+          1,
+        ],
         outputRange: [
           gridPointerCoordinates.startY - gridPointerGlowSize / 2,
+          gridPointerCoordinates.leadY - gridPointerGlowSize / 2,
           gridPointerCoordinates.bendY - gridPointerGlowSize / 2,
           gridPointerCoordinates.endY - gridPointerGlowSize / 2,
         ],
@@ -3028,9 +3061,9 @@ export default function OverviewScreen() {
     ? loadPointerProgress.interpolate({
         inputRange: [0, loadPointerCoordinates.bendProgress, 1],
         outputRange: [
-          loadPointerCoordinates.startX - loadPointerDotSize / 2,
-          loadPointerCoordinates.bendX - loadPointerDotSize / 2,
           loadPointerCoordinates.endX - loadPointerDotSize / 2,
+          loadPointerCoordinates.bendX - loadPointerDotSize / 2,
+          loadPointerCoordinates.startX - loadPointerDotSize / 2,
         ],
       })
     : null;
@@ -3038,9 +3071,9 @@ export default function OverviewScreen() {
     ? loadPointerProgress.interpolate({
         inputRange: [0, loadPointerCoordinates.bendProgress, 1],
         outputRange: [
-          loadPointerCoordinates.startY - loadPointerDotSize / 2,
-          loadPointerCoordinates.bendY - loadPointerDotSize / 2,
           loadPointerCoordinates.endY - loadPointerDotSize / 2,
+          loadPointerCoordinates.bendY - loadPointerDotSize / 2,
+          loadPointerCoordinates.startY - loadPointerDotSize / 2,
         ],
       })
     : null;
@@ -3048,9 +3081,9 @@ export default function OverviewScreen() {
     ? loadPointerProgress.interpolate({
         inputRange: [0, loadPointerCoordinates.bendProgress, 1],
         outputRange: [
-          loadPointerCoordinates.startX - loadPointerGlowSize / 2,
-          loadPointerCoordinates.bendX - loadPointerGlowSize / 2,
           loadPointerCoordinates.endX - loadPointerGlowSize / 2,
+          loadPointerCoordinates.bendX - loadPointerGlowSize / 2,
+          loadPointerCoordinates.startX - loadPointerGlowSize / 2,
         ],
       })
     : null;
@@ -3058,9 +3091,9 @@ export default function OverviewScreen() {
     ? loadPointerProgress.interpolate({
         inputRange: [0, loadPointerCoordinates.bendProgress, 1],
         outputRange: [
-          loadPointerCoordinates.startY - loadPointerGlowSize / 2,
-          loadPointerCoordinates.bendY - loadPointerGlowSize / 2,
           loadPointerCoordinates.endY - loadPointerGlowSize / 2,
+          loadPointerCoordinates.bendY - loadPointerGlowSize / 2,
+          loadPointerCoordinates.startY - loadPointerGlowSize / 2,
         ],
       })
     : null;
@@ -3675,7 +3708,12 @@ export default function OverviewScreen() {
                   <Text style={[styles.batteryLabel, responsiveBatteryLabelStyle]}>
                     Battery
                   </Text>
-                  <Text style={[styles.batteryValue, responsiveBatteryValueStyle]}>
+                  <Text
+                    style={[styles.batteryValue, responsiveBatteryValueStyle]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.72}
+                  >
                     {formatKwValue(plantData.battery)}
                   </Text>
                 </View>
@@ -3741,11 +3779,19 @@ export default function OverviewScreen() {
               <View style={styles.energySourceRow}>
                 {energySourceItems.map((item) => (
                   <View key={item.key} style={styles.energySourceItem}>
-                    <Ionicons
-                      name={item.icon}
-                      size={DASHBOARD_LAYOUT.sourceIconSize}
-                      color={item.color}
-                    />
+                    {item.iconLibrary === "FontAwesome5" ? (
+                      <FontAwesome5
+                        name={item.icon}
+                        size={DASHBOARD_LAYOUT.sourceIconSize}
+                        color={item.color}
+                      />
+                    ) : (
+                      <Ionicons
+                        name={item.icon}
+                        size={DASHBOARD_LAYOUT.sourceIconSize}
+                        color={item.color}
+                      />
+                    )}
                     <Text
                       style={[
                         styles.energySourcePercent,
@@ -4407,7 +4453,7 @@ const styles = StyleSheet.create({
   },
   dashboardMetricTextBlock: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 12,
   },
   dashboardMetricLabel: {
     color: appColors.text,
@@ -4416,6 +4462,7 @@ const styles = StyleSheet.create({
     lineHeight: DASHBOARD_FONT_SIZE.metricLabel + 4,
     fontWeight: "500",
     letterSpacing: 0,
+    flexShrink: 1,
   },
   dashboardMetricValue: {
     color: appColors.text,
@@ -4424,7 +4471,7 @@ const styles = StyleSheet.create({
     lineHeight: DASHBOARD_FONT_SIZE.metricValue + 5,
     fontWeight: "500",
     letterSpacing: 0,
-    marginTop: 2,
+    marginTop: 4,
   },
   energySourceCard: {
     marginTop: DASHBOARD_LAYOUT.cardGap + 10,
