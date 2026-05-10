@@ -51,6 +51,16 @@ import Svg, {
 const screenWidth = Dimensions.get("window").width;
 const CHART_WIDTH = screenWidth - 60;
 const CHART_HEIGHT = 250;
+const LANDSCAPE_CHART_LAYOUT = {
+  horizontalPadding: 2,
+  headerHeight: 44,
+  bottomPadding: 2,
+  minHeight: 300,
+  axisTopPadding: 34,
+  axisRightPadding: 42,
+  axisBottomPadding: 26,
+  axisLeftPadding: 38,
+};
 const CHART_STORAGE_PREFIX = "batari:overview-chart:";
 const DEBUG_CHART = process.env.EXPO_PUBLIC_DEBUG_CHART === "true";
 const DEBUG_LAYOUT = process.env.EXPO_PUBLIC_DEBUG_LAYOUT === "true";
@@ -1884,22 +1894,42 @@ function buildSmoothAreaPath(data, minY, maxY, width, height, pad) {
 function DailyOverviewChart({
   series,
   chartWidth = CHART_WIDTH,
+  chartHeight = CHART_HEIGHT,
   visibleSeries,
   onToggleSeries,
   currentTime = new Date(),
+  showSwitches = true,
+  showCurrentTime = true,
+  onFullscreenPress,
+  mode = "portrait",
 }) {
   const isCompactChart = chartWidth < 320;
+  const isLandscapeMode = mode === "landscape";
   const pad = {
-    top: POWER_CHART_LAYOUT.paddingTop,
-    right: isCompactChart ? 50 : POWER_CHART_LAYOUT.paddingRight,
-    bottom: isCompactChart ? 46 : POWER_CHART_LAYOUT.paddingBottom,
-    left: isCompactChart ? 40 : POWER_CHART_LAYOUT.paddingLeft,
+    top: isLandscapeMode
+      ? LANDSCAPE_CHART_LAYOUT.axisTopPadding
+      : POWER_CHART_LAYOUT.paddingTop,
+    right: isLandscapeMode
+      ? LANDSCAPE_CHART_LAYOUT.axisRightPadding
+      : isCompactChart
+        ? 50
+        : POWER_CHART_LAYOUT.paddingRight,
+    bottom: isLandscapeMode
+      ? LANDSCAPE_CHART_LAYOUT.axisBottomPadding
+      : isCompactChart
+        ? 46
+        : POWER_CHART_LAYOUT.paddingBottom,
+    left: isLandscapeMode
+      ? LANDSCAPE_CHART_LAYOUT.axisLeftPadding
+      : isCompactChart
+        ? 40
+        : POWER_CHART_LAYOUT.paddingLeft,
   };
   const yTicks = POWER_CHART_Y_RANGE.leftTicks;
   const minY = POWER_CHART_Y_RANGE.minKw;
   const maxY = POWER_CHART_Y_RANGE.maxKw;
   const innerWidth = Math.max(0, chartWidth - pad.left - pad.right);
-  const innerHeight = CHART_HEIGHT - pad.top - pad.bottom;
+  const innerHeight = chartHeight - pad.top - pad.bottom;
   const timeTicks = getResponsiveChartTimeTicks(innerWidth);
   const timeLabelFontSize = getResponsiveChartTimeFontSize(innerWidth);
   const currentHour =
@@ -1913,17 +1943,26 @@ function DailyOverviewChart({
     data: series[item.key] || [],
   }));
   const activeDatasets = datasets.filter((item) => visibleSeries[item.key]);
+  const gradientSuffix = isLandscapeMode ? "Landscape" : "Portrait";
 
   return (
-    <View style={styles.chartSection}>
-      <Text style={styles.chartCurrentTimeText}>{currentTimeLabel}</Text>
+    <View
+      style={[
+        styles.chartSection,
+        isLandscapeMode && styles.chartLandscapeSection,
+      ]}
+    >
+      {showCurrentTime && (
+        <Text style={styles.chartCurrentTimeText}>{currentTimeLabel}</Text>
+      )}
 
-      <Svg width={chartWidth} height={CHART_HEIGHT}>
+      <View style={styles.chartCanvasWrap}>
+        <Svg width={chartWidth} height={chartHeight}>
         <Defs>
           {datasets.map((item) => (
             <LinearGradient
               key={`${item.key}-gradient`}
-              id={`${item.key}Gradient`}
+              id={`${item.key}Gradient${gradientSuffix}`}
               x1="0"
               y1="0"
               x2="0"
@@ -2004,14 +2043,14 @@ function DailyOverviewChart({
                 x1={x}
                 y1={pad.top}
                 x2={x}
-                y2={CHART_HEIGHT - pad.bottom}
+                y2={chartHeight - pad.bottom}
                 stroke="rgba(248,250,252,0.1)"
                 strokeWidth="1"
               />
 
               <SvgText
                 x={x}
-                y={CHART_HEIGHT - 12}
+                y={chartHeight - 12}
                 fontSize={timeLabelFontSize}
                 fill="rgba(248,250,252,0.52)"
                 textAnchor="middle"
@@ -2026,7 +2065,7 @@ function DailyOverviewChart({
           x1={currentTimeX}
           y1={pad.top}
           x2={currentTimeX}
-          y2={CHART_HEIGHT - pad.bottom}
+          y2={chartHeight - pad.bottom}
           stroke="rgba(147,197,253,0.62)"
           strokeWidth="1.4"
           strokeDasharray="7 7"
@@ -2040,10 +2079,10 @@ function DailyOverviewChart({
               minY,
               maxY,
               chartWidth,
-              CHART_HEIGHT,
+              chartHeight,
               pad,
             )}
-            fill={`url(#${item.key}Gradient)`}
+            fill={`url(#${item.key}Gradient${gradientSuffix})`}
           />
         ))}
 
@@ -2055,7 +2094,7 @@ function DailyOverviewChart({
               minY,
               maxY,
               chartWidth,
-              CHART_HEIGHT,
+              chartHeight,
               pad,
             )}
             stroke={item.color}
@@ -2072,7 +2111,7 @@ function DailyOverviewChart({
             minY,
             maxY,
             chartWidth,
-            CHART_HEIGHT,
+            chartHeight,
             pad,
           );
 
@@ -2088,9 +2127,25 @@ function DailyOverviewChart({
             />
           ) : null;
         })}
-      </Svg>
+        </Svg>
+        {!!onFullscreenPress && (
+          <TouchableOpacity
+            activeOpacity={0.78}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            onPress={onFullscreenPress}
+            style={styles.chartFullscreenButton}
+          >
+            <Ionicons
+              name="expand-outline"
+              size={18}
+              color={appColors.accent}
+            />
+          </TouchableOpacity>
+        )}
+      </View>
 
-      <View style={styles.chartSwitchRow}>
+      {showSwitches && (
+        <View style={styles.chartSwitchRow}>
         {datasets.map((item) => {
           const isActive = visibleSeries[item.key];
           const switchLabel = POWER_SERIES_SWITCH_LABELS[item.key] ?? item.label;
@@ -2139,7 +2194,8 @@ function DailyOverviewChart({
             </View>
           );
         })}
-      </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -2149,7 +2205,7 @@ export default function OverviewScreen() {
   const { selectedDevice } = useContext(AuthContext);
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const resolvedPlantId = resolvePlantId(id, selectedDevice?.id);
   const [activeSegment, setActiveSegment] = useState("day");
   const [fetchedData, setFetchedData] = useState(null);
@@ -2164,6 +2220,7 @@ export default function OverviewScreen() {
   const [selectedLifetimeRange, setSelectedLifetimeRange] = useState(5);
   const [plantMenuVisible, setPlantMenuVisible] = useState(false);
   const [isRefreshLoading, setIsRefreshLoading] = useState(false);
+  const [isChartLandscapeVisible, setIsChartLandscapeVisible] = useState(false);
   const [chartCurrentTime, setChartCurrentTime] = useState(() => new Date());
   const [visiblePowerSeries, setVisiblePowerSeries] = useState(() =>
     POWER_SERIES_CONFIG.reduce((items, item) => {
@@ -3278,6 +3335,25 @@ export default function OverviewScreen() {
     };
   }, [fetchOverviewData, focusRefreshKey]);
   const overviewSafeTopPadding = Platform.OS === "ios" ? insets.top : 0;
+  const isLandscapeChartRotated = windowHeight > windowWidth;
+  const landscapeChartWidth = Math.max(
+    320,
+    isLandscapeChartRotated
+      ? windowHeight -
+          overviewSafeTopPadding -
+          LANDSCAPE_CHART_LAYOUT.headerHeight -
+          LANDSCAPE_CHART_LAYOUT.bottomPadding
+      : windowWidth - LANDSCAPE_CHART_LAYOUT.horizontalPadding * 2,
+  );
+  const landscapeChartHeight = Math.max(
+    LANDSCAPE_CHART_LAYOUT.minHeight,
+    isLandscapeChartRotated
+      ? windowWidth - LANDSCAPE_CHART_LAYOUT.horizontalPadding * 2
+      : windowHeight -
+          overviewSafeTopPadding -
+          LANDSCAPE_CHART_LAYOUT.headerHeight -
+          LANDSCAPE_CHART_LAYOUT.bottomPadding,
+  );
 
   return (
     <SafeAreaView
@@ -4177,11 +4253,65 @@ export default function OverviewScreen() {
                 visibleSeries={visiblePowerSeries}
                 onToggleSeries={togglePowerSeries}
                 currentTime={chartCurrentTime}
+                onFullscreenPress={() => setIsChartLandscapeVisible(true)}
               />
             )}
           </View>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={isChartLandscapeVisible}
+        animationType="fade"
+        presentationStyle="fullScreen"
+        statusBarTranslucent={false}
+        onRequestClose={() => setIsChartLandscapeVisible(false)}
+      >
+        <SafeAreaView
+          edges={["top", "left", "right", "bottom"]}
+          style={styles.chartLandscapeSafeArea}
+        >
+          <View style={styles.chartLandscapeHeader}>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              onPress={() => setIsChartLandscapeVisible(false)}
+              style={styles.chartLandscapeBackButton}
+            >
+              <Ionicons
+                name="chevron-back"
+                size={32}
+                color="rgba(248,250,252,0.9)"
+              />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.chartLandscapeBody}>
+            <View
+              style={[
+                styles.chartLandscapeFrame,
+                isLandscapeChartRotated && {
+                  width: landscapeChartWidth,
+                  height: landscapeChartHeight,
+                  transform: [{ rotate: "90deg" }],
+                },
+              ]}
+            >
+              <DailyOverviewChart
+                series={dailySeries}
+                chartWidth={landscapeChartWidth}
+                chartHeight={landscapeChartHeight}
+                visibleSeries={visiblePowerSeries}
+                onToggleSeries={togglePowerSeries}
+                currentTime={chartCurrentTime}
+                showCurrentTime={false}
+                showSwitches={false}
+                mode="landscape"
+              />
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -4791,6 +4921,32 @@ const styles = StyleSheet.create({
     marginTop: 14,
     paddingTop: 2,
   },
+  chartLandscapeSection: {
+    flex: 1,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 0,
+    paddingTop: 0,
+  },
+  chartCanvasWrap: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chartFullscreenButton: {
+    position: "absolute",
+    right: 4,
+    bottom: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(2,7,19,0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(8,174,234,0.32)",
+  },
   chartCurrentTimeText: {
     color: appColors.textSoft,
     fontFamily: appFont,
@@ -4846,6 +5002,37 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0,
     textAlign: "center",
+  },
+  chartLandscapeSafeArea: {
+    flex: 1,
+    backgroundColor: appColors.screen,
+  },
+  chartLandscapeHeader: {
+    minHeight: LANDSCAPE_CHART_LAYOUT.headerHeight,
+    paddingHorizontal: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: appColors.screen,
+  },
+  chartLandscapeBackButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  chartLandscapeBody: {
+    flex: 1,
+    paddingHorizontal: LANDSCAPE_CHART_LAYOUT.horizontalPadding,
+    paddingBottom: LANDSCAPE_CHART_LAYOUT.bottomPadding,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: appColors.screen,
+  },
+  chartLandscapeFrame: {
+    width: "100%",
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   dayScrollContent: {
     paddingRight: 12,
