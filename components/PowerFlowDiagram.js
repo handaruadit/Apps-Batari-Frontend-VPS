@@ -216,13 +216,11 @@ function MetricBlock({
 
 export default function PowerFlowDiagram({ data = {} }) {
   const { width } = useWindowDimensions();
-  const production = Number(data.production || 0);
-  const grid = Number(data.grid || 0);
-  const battery = Number(data.battery || 0);
-  const upsLoad = Number(data.upsLoad || 0);
-  const load = Number(data.load || 0);
-
-  const totalConsumed = upsLoad + load;
+  const energy = data.energy || {};
+  const consumptionKwh = Number(energy.consumptionKwh || 0);
+  const batteryKwh = Number(energy.batteryKwh || 0);
+  const gridKwh = Number(energy.gridKwh || 0);
+  const totalKwh = Number(energy.totalKwh || 0);
   const availableWidth = Math.max(304, width - 64);
   const layoutScale = Math.min(1, Math.max(0.74, availableWidth / 404));
   const fontScale = Math.min(1, Math.max(0.82, layoutScale + 0.08));
@@ -276,7 +274,7 @@ export default function PowerFlowDiagram({ data = {} }) {
             </View>
           }
           title={"Consumption"}
-          value={formatValue(production)}
+          value={formatValue(consumptionKwh)}
           color="#1FB7FF"
           subtitle=""
           layoutScale={layoutScale}
@@ -392,7 +390,7 @@ export default function PowerFlowDiagram({ data = {} }) {
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              {formatValue(totalConsumed)}
+              {formatValue(totalKwh)}
               <Text
                 style={[
                   styles.centerUnit,
@@ -548,7 +546,7 @@ export default function PowerFlowDiagram({ data = {} }) {
             numberOfLines={1}
             adjustsFontSizeToFit
           >
-            {formatValue(grid)}
+            {formatValue(gridKwh)}
             <Text
               style={[
                 styles.upsLoadUnit,
@@ -583,7 +581,7 @@ export default function PowerFlowDiagram({ data = {} }) {
             />
           }
           title={`Battery`}
-          value={formatValue(battery)}
+          value={formatValue(batteryKwh)}
           color="#99E500"
           subtitle=""
           layoutScale={layoutScale}

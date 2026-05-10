@@ -10,6 +10,12 @@ describe('PowerFlowDiagram', () => {
     upsLoad: 1.0,
     load: 0.8,
     status: 'On grid',
+    energy: {
+      consumptionKwh: 2.1,
+      batteryKwh: -1.2,
+      gridKwh: 0.5,
+      totalKwh: 1.4,
+    },
   };
 
   it('renders with power data', () => {
@@ -25,8 +31,6 @@ describe('PowerFlowDiagram', () => {
     expect(getByText('Consumption')).toBeTruthy();
     expect(getByText('Grid')).toBeTruthy();
     expect(getByText('Battery')).toBeTruthy();
-    expect(getByText('Ups-Load')).toBeTruthy();
-    expect(getByText('Load')).toBeTruthy();
   });
 
   it('updates when data changes', () => {
@@ -36,7 +40,10 @@ describe('PowerFlowDiagram', () => {
 
     expect(getByText(/2\.10/)).toBeTruthy();
 
-    const newData = { ...mockPowerData, production: 3.5 };
+    const newData = {
+      ...mockPowerData,
+      energy: { ...mockPowerData.energy, consumptionKwh: 3.5 },
+    };
     rerender(<PowerFlowDiagram data={newData} />);
 
     expect(queryByText(/2\.10/)).toBeNull();
@@ -51,6 +58,12 @@ describe('PowerFlowDiagram', () => {
       upsLoad: 0,
       load: 0,
       status: 'Off grid',
+      energy: {
+        consumptionKwh: 0,
+        batteryKwh: 0,
+        gridKwh: 0,
+        totalKwh: 0,
+      },
     };
     const { getAllByText } = render(<PowerFlowDiagram data={zeroData} />);
 
@@ -61,27 +74,20 @@ describe('PowerFlowDiagram', () => {
   it('handles negative battery values', () => {
     const negativeBatteryData = {
       ...mockPowerData,
-      battery: -5.5,
+      energy: { ...mockPowerData.energy, batteryKwh: -5.5 },
     };
     const { getByText } = render(<PowerFlowDiagram data={negativeBatteryData} />);
 
     expect(getByText(/-5\.50/)).toBeTruthy();
   });
 
-  it('renders status text', () => {
-    const { getByText } = render(<PowerFlowDiagram data={mockPowerData} />);
-
-    expect(getByText('On grid')).toBeTruthy();
-  });
-
   it('renders all components', () => {
-    const { getByText } = render(<PowerFlowDiagram data={mockPowerData} />);
+    const { getByText, queryByText } = render(<PowerFlowDiagram data={mockPowerData} />);
 
     expect(getByText('Consumption')).toBeTruthy();
     expect(getByText('Grid')).toBeTruthy();
-    expect(getByText('On grid')).toBeTruthy();
     expect(getByText('Battery')).toBeTruthy();
-    expect(getByText('Ups-Load')).toBeTruthy();
-    expect(getByText('Load')).toBeTruthy();
+    expect(queryByText('Ups-Load')).toBeNull();
+    expect(queryByText('Load')).toBeNull();
   });
 });

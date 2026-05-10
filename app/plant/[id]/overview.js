@@ -24,6 +24,7 @@ import {
   Easing,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -97,6 +98,13 @@ const POWER_SERIES_CONFIG = [
   { key: "grid", label: "Grid", color: "#FF9300" },
   { key: "battery", label: "Battery", color: "#99E500" },
 ];
+const POWER_SERIES_SWITCH_LABELS = {
+  production: "PV",
+  load: "Load",
+  upsLoad: "UPS-load",
+  grid: "Grid",
+  battery: "Battery",
+};
 
 const BUBBLE_POSITION_CONFIG = {
   bubbleLeftPct: 0.02,
@@ -218,7 +226,7 @@ const PV_POINTER_CONFIG = {
   lineEndOffsetX: 0,
   lineEndOffsetY: 0,
   horizontalLineLength: 70,
-  verticalLineLength: 76,
+  verticalLineLength: 86,
   lineEndAnchorPctX: 0.5,
   lineEndAnchorPctY: 0.5,
   lineThickness: GRID_POINTER_CONFIG.lineThickness,
@@ -706,10 +714,10 @@ const DASHBOARD_FONT_SIZE = {
 };
 // Atur ukuran kotak Plant Testing dari sini.
 const PLANT_HEADER_BOX = {
-  minHeight: 78,
+  minHeight: 64,
   marginHorizontal: 0,
   marginTop: 0,
-  marginBottom: 12,
+  marginBottom: 4,
   paddingHorizontal: 24,
   paddingVertical: 0,
   borderRadius: 0,
@@ -1378,6 +1386,39 @@ function normalizeLatestPowerValues(data, sourceCategory) {
   }
 
   return mergePowerValues(nestedValues, directValues);
+}
+
+function getBackendNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function normalizeLatestEnergyValues(responseJson) {
+  return {
+    energy: {
+      consumptionKwh: getBackendNumber(responseJson?.energy?.consumptionKwh),
+      batteryKwh: getBackendNumber(responseJson?.energy?.batteryKwh),
+      gridKwh: getBackendNumber(responseJson?.energy?.gridKwh),
+      totalKwh: getBackendNumber(responseJson?.energy?.totalKwh),
+    },
+    energyPercent: {
+      batteryPercent: getBackendNumber(
+        responseJson?.energyPercent?.batteryPercent,
+      ),
+      consumptionPercent: getBackendNumber(
+        responseJson?.energyPercent?.consumptionPercent,
+      ),
+      gridPercent: getBackendNumber(responseJson?.energyPercent?.gridPercent),
+    },
+  };
+}
+
+function getLatestEnergyValues(latestResults) {
+  const resultWithEnergy = latestResults.find(
+    (item) => item?.json?.energy || item?.json?.energyPercent,
+  );
+
+  return normalizeLatestEnergyValues(resultWithEnergy?.json);
 }
 
 function normalizeChartSeries(data) {
@@ -2052,40 +2093,50 @@ function DailyOverviewChart({
       <View style={styles.chartSwitchRow}>
         {datasets.map((item) => {
           const isActive = visibleSeries[item.key];
+          const switchLabel = POWER_SERIES_SWITCH_LABELS[item.key] ?? item.label;
 
           return (
-            <TouchableOpacity
-              key={item.key}
-              activeOpacity={0.82}
-              onPress={() => onToggleSeries(item.key)}
-              style={[
-                styles.chartSwitchButton,
-                {
-                  backgroundColor: isActive
-                    ? `${item.color}35`
-                    : "rgba(248,250,252,0.18)",
-                },
-              ]}
-            >
-              <View
+            <View key={item.key} style={styles.chartSwitchItem}>
+              <TouchableOpacity
+                activeOpacity={0.82}
+                onPress={() => onToggleSeries(item.key)}
                 style={[
-                  styles.chartSwitchKnob,
+                  styles.chartSwitchButton,
                   {
                     backgroundColor: isActive
-                      ? `${item.color}CC`
-                      : "rgba(248,250,252,0.45)",
-                    transform: [
-                      {
-                        translateX: isActive
-                          ? POWER_CHART_LAYOUT.switchWidth -
-                            POWER_CHART_LAYOUT.switchHeight
-                          : 0,
-                      },
-                    ],
+                      ? `${item.color}35`
+                      : "rgba(248,250,252,0.18)",
                   },
                 ]}
-              />
-            </TouchableOpacity>
+              >
+                <View
+                  style={[
+                    styles.chartSwitchKnob,
+                    {
+                      backgroundColor: isActive
+                        ? `${item.color}CC`
+                        : "rgba(248,250,252,0.45)",
+                      transform: [
+                        {
+                          translateX: isActive
+                            ? POWER_CHART_LAYOUT.switchWidth -
+                              POWER_CHART_LAYOUT.switchHeight
+                            : 0,
+                        },
+                      ],
+                    },
+                  ]}
+                />
+              </TouchableOpacity>
+              <Text
+                style={[styles.chartSwitchLabel, { color: item.color }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                {switchLabel}
+              </Text>
+            </View>
           );
         })}
       </View>
@@ -2306,6 +2357,7 @@ export default function OverviewScreen() {
             ),
           ),
         );
+        const apiEnergyValues = getLatestEnergyValues(latestResults);
         const realtimeChartSampleSeries = isSelectedCurrentDay(
           activeSegment,
           selectedDay,
@@ -2456,6 +2508,8 @@ export default function OverviewScreen() {
               plantInfo.load ??
               selectedDevice?.load ??
               0,
+            energy: apiEnergyValues.energy,
+            energyPercent: apiEnergyValues.energyPercent,
             status: pickValue(
               plantInfo.status,
               current?.status,
@@ -2577,11 +2631,39 @@ export default function OverviewScreen() {
       battery: pickNumber(fetchedData?.battery, selectedDevice?.battery),
       upsLoad: pickNumber(fetchedData?.upsLoad, selectedDevice?.upsLoad),
       load: pickNumber(fetchedData?.load, selectedDevice?.load),
+      energy: fetchedData?.energy ?? {
+        consumptionKwh: 0,
+        batteryKwh: 0,
+        gridKwh: 0,
+        totalKwh: 0,
+      },
+      energyPercent: fetchedData?.energyPercent ?? {
+        batteryPercent: 0,
+        consumptionPercent: 0,
+        gridPercent: 0,
+      },
       status: pickValue(fetchedData?.status, selectedDevice?.status, "--"),
       chartSeries: fetchedData?.chartSeries ?? createEmptyChartSeries(),
     }),
     [fetchedData, selectedDevice],
   );
+  const energySourceDisplayItems = useMemo(() => {
+    const percentByKey = {
+      battery: plantData.energyPercent?.batteryPercent,
+      grid: plantData.energyPercent?.consumptionPercent,
+      solar: plantData.energyPercent?.gridPercent,
+    };
+
+    return energySourceItems.map((item) => {
+      const percent = Number(percentByKey[item.key]);
+      const safePercent = Number.isFinite(percent) ? percent : 0;
+
+      return {
+        ...item,
+        value: `${Math.round(safePercent)}%`,
+      };
+    });
+  }, [plantData.energyPercent]);
 
   const weatherLocation = getWeatherLocation(plantData.address);
   const currentTemperature = pickNumber(
@@ -3195,11 +3277,16 @@ export default function OverviewScreen() {
       clearInterval(interval);
     };
   }, [fetchOverviewData, focusRefreshKey]);
+  const overviewSafeTopPadding = Platform.OS === "ios" ? insets.top : 0;
+
   return (
-    <SafeAreaView edges={["top", "left", "right"]} style={styles.safeArea}>
+    <SafeAreaView
+      edges={["left", "right"]}
+      style={[styles.safeArea, { paddingTop: overviewSafeTopPadding }]}
+    >
       <StatusBar
         translucent={false}
-        backgroundColor="#111326"
+        backgroundColor={appColors.bubble}
         barStyle="light-content"
       />
 
@@ -3208,7 +3295,7 @@ export default function OverviewScreen() {
           styles.stickyTopBar,
           {
             paddingHorizontal: windowWidth < 380 ? 18 : 24,
-            minHeight: windowWidth < 380 ? 72 : 78,
+            minHeight: windowWidth < 380 ? 62 : PLANT_HEADER_BOX.minHeight,
           },
           weatherCardAnimatedStyle,
         ]}
@@ -3777,7 +3864,7 @@ export default function OverviewScreen() {
               </Text>
 
               <View style={styles.energySourceRow}>
-                {energySourceItems.map((item) => (
+                {energySourceDisplayItems.map((item) => (
                   <View key={item.key} style={styles.energySourceItem}>
                     {item.iconLibrary === "FontAwesome5" ? (
                       <FontAwesome5
@@ -3805,7 +3892,7 @@ export default function OverviewScreen() {
               </View>
 
               <View style={styles.energySourceBar}>
-                {energySourceItems.map((item) => (
+                {energySourceDisplayItems.map((item) => (
                   <View
                     key={item.key}
                     style={[
@@ -4102,7 +4189,7 @@ export default function OverviewScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: appColors.screen,
+    backgroundColor: appColors.bubble,
   },
   container: {
     flex: 1,
@@ -4132,11 +4219,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
     borderBottomColor: "rgba(8,174,234,0.22)",
 
-    shadowColor: appColors.accent,
-    shadowOpacity: 0.24,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 9,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
     zIndex: 10,
   },
   headerCard: {
@@ -4725,10 +4811,17 @@ const styles = StyleSheet.create({
     marginTop: POWER_CHART_LAYOUT.switchMarginTop,
     marginBottom: 8,
     flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    flexWrap: "nowrap",
+    width: "100%",
+    paddingHorizontal: 2,
+  },
+  chartSwitchItem: {
+    flex: 1,
+    minWidth: 0,
     alignItems: "center",
-    justifyContent: "center",
-    flexWrap: "wrap",
-    gap: POWER_CHART_LAYOUT.switchGap,
+    justifyContent: "flex-start",
   },
   chartSwitchButton: {
     width: POWER_CHART_LAYOUT.switchWidth,
@@ -4743,6 +4836,16 @@ const styles = StyleSheet.create({
     height:
       POWER_CHART_LAYOUT.switchHeight - POWER_CHART_LAYOUT.switchPadding * 2,
     borderRadius: POWER_CHART_LAYOUT.switchHeight / 2,
+  },
+  chartSwitchLabel: {
+    marginTop: 5,
+    width: "100%",
+    fontFamily: appFont,
+    fontSize: 9,
+    lineHeight: 12,
+    fontWeight: "700",
+    letterSpacing: 0,
+    textAlign: "center",
   },
   dayScrollContent: {
     paddingRight: 12,
