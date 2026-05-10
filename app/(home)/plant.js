@@ -3,7 +3,8 @@ import { appColors, appFont } from "@/config/theme";
 import DeviceCard from "@/components/DeviceCard";
 import { AuthContext } from "@/context/AuthContext";
 import { router } from "expo-router";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
@@ -23,6 +24,7 @@ export default function PlantScreen() {
   const [search, setSearch] = useState("");
   const [plantList, setPlantList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isNavigatingOverview, setIsNavigatingOverview] = useState(false);
 
   const handleEditDevice = (device) => {
     console.log("Edit device:", device);
@@ -46,6 +48,12 @@ export default function PlantScreen() {
   useEffect(() => {
     fetchSensorData();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsNavigatingOverview(false);
+    }, []),
+  );
 
   const fetchSensorData = async () => {
     try {
@@ -104,8 +112,15 @@ export default function PlantScreen() {
   }, [search, plantList]);
 
   const handleSelectDevice = (device) => {
+    if (isNavigatingOverview) {
+      return;
+    }
+
+    setIsNavigatingOverview(true);
     setSelectedDevice(device);
-    router.push(`/plant/${device.id}/overview`);
+    setTimeout(() => {
+      router.push(`/plant/${device.id}/overview`);
+    }, 80);
   };
 
   const handleAddDevice = () => {
@@ -159,6 +174,13 @@ export default function PlantScreen() {
             <Text style={styles.emptyText}>Belum ada plant.</Text>
           }
         />
+      )}
+
+      {isNavigatingOverview && (
+        <View style={styles.navigationOverlay} pointerEvents="auto">
+          <ActivityIndicator size="large" color={appColors.accent} />
+          <Text style={styles.navigationLoadingText}>Membuka overview...</Text>
+        </View>
       )}
     </SafeAreaView>
   );
@@ -225,5 +247,19 @@ const styles = StyleSheet.create({
     fontFamily: appFont,
     marginTop: 24,
     fontSize: 15,
+  },
+  navigationOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: appColors.screen,
+  },
+  navigationLoadingText: {
+    marginTop: 12,
+    color: appColors.textSoft,
+    fontFamily: appFont,
+    fontSize: 15,
+    fontWeight: "600",
   },
 });

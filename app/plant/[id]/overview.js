@@ -166,7 +166,7 @@ const GRID_POINTER_CONFIG = {
   lineEndOffsetX: -87,
   lineEndOffsetY: 0,
   verticalLineLength: 100,
-  horizontalLineLength: 148,
+  horizontalLineLength: 150,
   lineEndAnchorPctX: 0.25,
   lineEndAnchorPctY: 0.85,
   lineThickness: 1,

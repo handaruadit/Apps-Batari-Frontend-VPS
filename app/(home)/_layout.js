@@ -10,10 +10,10 @@ export default function MainLayout() {
   const isSmallScreen = width < 380;
   const isShortScreen = height < 720;
 
-  const tabHorizontalMargin = isSmallScreen ? 16 : 24;
-  const tabBottom = isShortScreen ? 12 : 18;
-  const tabHeight = isSmallScreen ? 62 : 68;
-  const tabRadius = isSmallScreen ? 16 : 18;
+  const tabHorizontalMargin = isSmallScreen ? 18 : 24;
+  const tabBottom = isShortScreen ? 12 : 16;
+  const tabHeight = isSmallScreen ? 60 : 64;
+  const tabRadius = 22;
 
   const iconSize = isSmallScreen ? 26 : 28;
   const solarIconSize = isSmallScreen ? 30 : 34;
@@ -24,6 +24,8 @@ export default function MainLayout() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
+        tabBarHideOnKeyboard: true,
+        sceneStyle: { backgroundColor: appColors.screen },
 
         tabBarStyle: {
           position: "absolute",
@@ -33,19 +35,21 @@ export default function MainLayout() {
           height: tabHeight,
           backgroundColor: appColors.bubble,
           borderRadius: tabRadius,
-          paddingHorizontal: 8,
+          paddingHorizontal: 0,
           paddingTop: 8,
           paddingBottom: 8,
           borderTopWidth: 0,
-          shadowColor: "rgba(14, 165, 233, 0.77)",
+          borderWidth: 1,
+          borderColor: "rgba(0,170,255,0.45)",
+          shadowColor: "#00AEEF",
           shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 1,
-          shadowRadius: 5,
-          elevation: 8,
+          shadowOpacity: 0.35,
+          shadowRadius: 10,
+          elevation: 10,
         },
 
-        tabBarActiveTintColor: "#3B82F6",
-        tabBarInactiveTintColor: "#94A3B8",
+        tabBarActiveTintColor: "#2F80FF",
+        tabBarInactiveTintColor: "rgba(255,255,255,0.65)",
         tabBarActiveBackgroundColor: "transparent",
         tabBarInactiveBackgroundColor: "transparent",
 
@@ -64,7 +68,9 @@ export default function MainLayout() {
         },
 
         tabBarIconStyle: {
-          marginTop: 6,
+          width: 32,
+          height: 32,
+          marginTop: 0,
           marginBottom: 0,
         },
       }}
@@ -80,7 +86,9 @@ export default function MainLayout() {
                 height: iconBoxSize,
                 justifyContent: "center",
                 alignItems: "center",
-                transform: [{ translateY: 6 }],
+
+                // Atur posisi logo Plant dari sini
+                transform: [{ translateY: 5 }],
               }}
             >
               <SolarIcon color={color} size={solarIconSize} />

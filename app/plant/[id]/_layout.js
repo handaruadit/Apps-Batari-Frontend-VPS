@@ -19,6 +19,7 @@ export default function PlantDetailLayout() {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarHideOnKeyboard: true,
+        sceneStyle: { backgroundColor: appColors.screen },
 
         tabBarStyle: {
           position: "absolute",
