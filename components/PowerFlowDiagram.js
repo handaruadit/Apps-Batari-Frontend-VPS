@@ -43,6 +43,27 @@ const POWER_FLOW_COLORS = {
   battery: "#99E500",
 };
 
+const PRODUCTION_FLOW_COLORS = {
+  pv: "#EF4444",
+  grid: "#4F46E5",
+  battery: "#A855F7",
+};
+
+const POWER_FLOW_COPY = {
+  default: {
+    centerTitle: "Consumption",
+    pvTitle: "PV",
+    gridTitle: "Grid",
+    batteryTitle: "Battery",
+  },
+  production: {
+    centerTitle: "Production",
+    pvTitle: "PV Generate",
+    gridTitle: "Export",
+    batteryTitle: "Charge",
+  },
+};
+
 const POWER_FLOW_RING = {
   radius: 76,
   circumference: 477,
@@ -76,10 +97,59 @@ const POWER_FLOW_SEGMENTS = {
     activeStrokeWidth: 18,
   },
 };
+const POWER_FLOW_SEGMENT_ORDER = ["pv", "battery", "grid"];
+
+// Atur posisi dan ukuran teks tengah lingkaran dari sini.
+const POWER_FLOW_CENTER_TEXT_CONFIG = {
+  titleOffsetY: 6,
+  valueOffsetY: 3,
+  titleFontSize: 18,
+  valueFontSize: 28,
+  titleLineHeight: 22,
+  valueLineHeight: 31,
+  unitFontSize: 10,
+};
+
+// Atur posisi dan ukuran logo/nama/nilai/persen setiap segment dari sini.
+const POWER_FLOW_SEGMENT_LABEL_CONFIG = {
+  pv: {
+    iconOffsetY: 0,
+    nameOffsetY: 0,
+    valueOffsetY: 0,
+    percentOffsetY: 0,
+    iconSize: 38,
+    nameFontSize: 12,
+    valueFontSize: 20,
+    unitFontSize: 10,
+    percentFontSize: 14,
+  },
+  grid: {
+    iconOffsetY: 0,
+    nameOffsetY: 0,
+    valueOffsetY: 0,
+    percentOffsetY: 0,
+    iconSize: 28,
+    nameFontSize: 12,
+    valueFontSize: 20,
+    unitFontSize: 10,
+    percentFontSize: 14,
+  },
+  battery: {
+    iconOffsetY: 0,
+    nameOffsetY: 0,
+    valueOffsetY: 0,
+    percentOffsetY: 0,
+    iconSize: 34,
+    nameFontSize: 12,
+    valueFontSize: 20,
+    unitFontSize: 10,
+    percentFontSize: 14,
+  },
+};
 
 // Atur ukuran font setiap angka 0kW secara manual dari sini.
 const POWER_FLOW_FONT_SIZE = {
-  production: {
+  pv: {
     title: 12,
     titleLineHeight: 14,
     value: 20,
@@ -107,11 +177,11 @@ const POWER_FLOW_FONT_SIZE = {
     valueOffsetY: 0,
   },
   center: {
-    label: 18,
-    labelLineHeight: 22,
-    value: 28,
-    valueLineHeight: 31,
-    unit: 10,
+    label: POWER_FLOW_CENTER_TEXT_CONFIG.titleFontSize,
+    labelLineHeight: POWER_FLOW_CENTER_TEXT_CONFIG.titleLineHeight,
+    value: POWER_FLOW_CENTER_TEXT_CONFIG.valueFontSize,
+    valueLineHeight: POWER_FLOW_CENTER_TEXT_CONFIG.valueLineHeight,
+    unit: POWER_FLOW_CENTER_TEXT_CONFIG.unitFontSize,
   },
 };
 
@@ -123,6 +193,16 @@ function formatValue(value) {
   }
 
   return number.toFixed(2);
+}
+
+function formatPercent(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "0%";
+  }
+
+  return `${Math.round(number)}%`;
 }
 
 function scaleValue(value, scale) {
@@ -145,27 +225,75 @@ function getAngleSpan(startAngle, endAngle) {
   return span > 0 ? span : span + 360;
 }
 
-function getRingSegmentLength(segmentKey) {
+function getSafeRingValue(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, number) : 0;
+}
+
+function getRingSegmentRatios(values) {
+  const safeValues = POWER_FLOW_SEGMENT_ORDER.reduce((result, key) => {
+    result[key] = getSafeRingValue(values?.[key]);
+    return result;
+  }, {});
+  const total = POWER_FLOW_SEGMENT_ORDER.reduce(
+    (sum, key) => sum + safeValues[key],
+    0,
+  );
+
+  if (total <= 0) {
+    const equalRatio = 1 / POWER_FLOW_SEGMENT_ORDER.length;
+    return POWER_FLOW_SEGMENT_ORDER.reduce((result, key) => {
+      result[key] = equalRatio;
+      return result;
+    }, {});
+  }
+
+  return POWER_FLOW_SEGMENT_ORDER.reduce((result, key) => {
+    result[key] = safeValues[key] / total;
+    return result;
+  }, {});
+}
+
+function getRingSegmentLength(segmentKey, segmentRatios) {
   const segment = POWER_FLOW_SEGMENTS[segmentKey] || POWER_FLOW_SEGMENTS.pv;
-  const angleSpan =
-    getAngleSpan(segment.startAngle, segment.endAngle) +
-    POWER_FLOW_RING.joinOverlapAngle;
+  const ratio = Number(segmentRatios?.[segmentKey]);
+  const angleSpan = Number.isFinite(ratio)
+    ? ratio * 360 + POWER_FLOW_RING.joinOverlapAngle
+    : getAngleSpan(segment.startAngle, segment.endAngle) +
+      POWER_FLOW_RING.joinOverlapAngle;
   const angleLength = POWER_FLOW_RING.circumference * (angleSpan / 360);
   const fallbackLength = POWER_FLOW_RING.circumference * segment.proportion;
 
   return Number.isFinite(angleLength) ? angleLength : fallbackLength;
 }
 
-function getRingDashArray(segmentKey) {
-  const segmentLength = Math.max(0, getRingSegmentLength(segmentKey));
+function getRingDashArray(segmentKey, segmentRatios) {
+  const segmentLength = Math.max(
+    0,
+    getRingSegmentLength(segmentKey, segmentRatios),
+  );
   const gapLength = Math.max(0, POWER_FLOW_RING.circumference - segmentLength);
 
   return `${segmentLength} ${gapLength}`;
 }
 
-function getRingRotation(segmentKey) {
+function getRingRotation(segmentKey, segmentRatios) {
   const segment = POWER_FLOW_SEGMENTS[segmentKey] || POWER_FLOW_SEGMENTS.pv;
-  return normalizeAngle(segment.startAngle + POWER_FLOW_RING.rotationOffset) - 90;
+  const segmentIndex = POWER_FLOW_SEGMENT_ORDER.indexOf(segmentKey);
+
+  if (segmentIndex < 0 || !segmentRatios) {
+    return normalizeAngle(segment.startAngle + POWER_FLOW_RING.rotationOffset) - 90;
+  }
+
+  const baseStartAngle = POWER_FLOW_SEGMENTS.pv.startAngle;
+  const cumulativeAngle = POWER_FLOW_SEGMENT_ORDER.slice(0, segmentIndex).reduce(
+    (sum, key) => sum + (Number(segmentRatios[key]) || 0) * 360,
+    0,
+  );
+
+  return normalizeAngle(
+    baseStartAngle + cumulativeAngle + POWER_FLOW_RING.rotationOffset,
+  ) - 90;
 }
 
 function getRingStrokeWidth(segmentKey, isSelected) {
@@ -173,25 +301,17 @@ function getRingStrokeWidth(segmentKey, isSelected) {
   return isSelected ? segment.activeStrokeWidth : segment.strokeWidth;
 }
 
-function getActiveGlowStyle(color, selected) {
-  if (!selected) {
-    return null;
-  }
-
-  return {
-    shadowColor: color,
-    shadowOpacity: 0.55,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
-  };
+function getActiveGlowStyle() {
+  return null;
 }
 
 function MetricBlock({
+  segmentKey,
   metricKey,
   icon,
   title,
   value,
+  percent,
   color,
   subtitle,
   layoutScale,
@@ -199,8 +319,10 @@ function MetricBlock({
   selected = false,
   onPress,
 }) {
-  const font =
-    POWER_FLOW_FONT_SIZE[metricKey] || POWER_FLOW_FONT_SIZE.production;
+  const labelConfig =
+    POWER_FLOW_SEGMENT_LABEL_CONFIG[segmentKey] ||
+    POWER_FLOW_SEGMENT_LABEL_CONFIG.pv;
+  const font = POWER_FLOW_FONT_SIZE[metricKey] || POWER_FLOW_FONT_SIZE.pv;
   const Container = onPress ? Pressable : View;
 
   return (
@@ -225,6 +347,7 @@ function MetricBlock({
               POWER_FLOW_LAYOUT.metricIconMarginBottom,
               layoutScale,
             ),
+            transform: [{ translateY: labelConfig.iconOffsetY * layoutScale }],
           },
         ]}
       >
@@ -246,8 +369,11 @@ function MetricBlock({
           style={[
             styles.metricTitle,
             {
-              fontSize: font.title * fontScale,
+              fontSize: labelConfig.nameFontSize * fontScale,
               lineHeight: font.titleLineHeight * fontScale,
+              transform: [
+                { translateY: labelConfig.nameOffsetY * layoutScale },
+              ],
             },
           ]}
           numberOfLines={2}
@@ -271,7 +397,10 @@ function MetricBlock({
             ),
             transform: [
               { translateX: font.valueOffsetX * layoutScale },
-              { translateY: font.valueOffsetY * layoutScale },
+              {
+                translateY:
+                  (font.valueOffsetY + labelConfig.valueOffsetY) * layoutScale,
+              },
             ],
           },
         ]}
@@ -281,7 +410,7 @@ function MetricBlock({
             styles.metricValue,
             {
               color,
-              fontSize: font.value * fontScale,
+              fontSize: labelConfig.valueFontSize * fontScale,
               lineHeight: font.valueLineHeight * fontScale,
             },
           ]}
@@ -292,7 +421,7 @@ function MetricBlock({
           <Text
             style={[
               styles.metricUnit,
-              { color, fontSize: font.unit * fontScale },
+              { color, fontSize: labelConfig.unitFontSize * fontScale },
             ]}
           >
             kWh
@@ -300,19 +429,78 @@ function MetricBlock({
         </Text>
       </View>
 
+      <Text
+        style={[
+          styles.metricPercent,
+          {
+            color: "#FFFFFF",
+            fontSize: labelConfig.percentFontSize * fontScale,
+            lineHeight: (labelConfig.percentFontSize + 4) * fontScale,
+            transform: [
+              { translateY: labelConfig.percentOffsetY * layoutScale },
+            ],
+          },
+        ]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+      >
+        {percent}
+      </Text>
+
       {!!subtitle && <Text style={styles.metricSubtitle}>{subtitle}</Text>}
     </Container>
   );
 }
 
-export default function PowerFlowDiagram({ data = {} }) {
+export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
   const [selectedFlow, setSelectedFlow] = useState(null);
   const { width } = useWindowDimensions();
+  const isProductionVariant = variant === "production";
+  const copy = isProductionVariant
+    ? POWER_FLOW_COPY.production
+    : POWER_FLOW_COPY.default;
+  const colors = isProductionVariant ? PRODUCTION_FLOW_COLORS : POWER_FLOW_COLORS;
   const energy = data.energy || {};
-  const consumptionKwh = Number(energy.consumptionKwh || 0);
-  const batteryKwh = Number(energy.batteryKwh || 0);
-  const gridKwh = Number(energy.gridKwh || 0);
-  const totalKwh = Number(energy.totalKwh || 0);
+  const energyPercent = data.energyPercent || {};
+  const productionFlow = data.productionFlow || {};
+  const productionFlowPercent = data.productionFlowPercent || {};
+  const consumptionKwh = Number(
+    isProductionVariant
+      ? productionFlow.pvGenerateKwh
+      : energy.consumptionKwh || 0,
+  );
+  const batteryKwh = Number(
+    isProductionVariant ? productionFlow.chargeKwh : energy.batteryKwh || 0,
+  );
+  const gridKwh = Number(
+    isProductionVariant ? productionFlow.exportKwh : energy.gridKwh || 0,
+  );
+  const totalKwh = Number(
+    isProductionVariant
+      ? productionFlow.totalProductionKwh ??
+          consumptionKwh + batteryKwh + gridKwh
+      : energy.totalKwh || 0,
+  );
+  const pvPercent = formatPercent(
+    isProductionVariant
+      ? productionFlowPercent.pvGeneratePercent
+      : energyPercent.consumptionPercent,
+  );
+  const batteryPercent = formatPercent(
+    isProductionVariant
+      ? productionFlowPercent.chargePercent
+      : energyPercent.batteryPercent,
+  );
+  const gridPercent = formatPercent(
+    isProductionVariant
+      ? productionFlowPercent.exportPercent
+      : energyPercent.gridPercent,
+  );
+  const ringSegmentRatios = getRingSegmentRatios({
+    pv: consumptionKwh,
+    battery: batteryKwh,
+    grid: gridKwh,
+  });
   const availableWidth = Math.max(304, width - 64);
   const layoutScale = Math.min(1, Math.max(0.74, availableWidth / 404));
   const fontScale = Math.min(1, Math.max(0.82, layoutScale + 0.08));
@@ -359,25 +547,39 @@ export default function PowerFlowDiagram({ data = {} }) {
         ]}
       >
         <MetricBlock
-          metricKey="production"
+          segmentKey="pv"
+          metricKey="pv"
           icon={
-            <View style={styles.flashWrap}>
+            isProductionVariant ? (
               <Ionicons
-                name="flash"
-                size={38 * iconScale}
-                color={POWER_FLOW_COLORS.pv}
+                name="sunny"
+                size={POWER_FLOW_SEGMENT_LABEL_CONFIG.pv.iconSize * iconScale}
+                color={colors.pv}
               />
-              <Ionicons
-                name="add"
-                size={14 * iconScale}
-                color={POWER_FLOW_COLORS.pv}
-                style={styles.flashPlus}
-              />
-            </View>
+            ) : (
+              <View style={styles.flashWrap}>
+                <Ionicons
+                  name="flash"
+                  size={POWER_FLOW_SEGMENT_LABEL_CONFIG.pv.iconSize * iconScale}
+                  color={colors.pv}
+                />
+                <Ionicons
+                  name="add"
+                  size={
+                    POWER_FLOW_SEGMENT_LABEL_CONFIG.pv.iconSize *
+                    0.37 *
+                    iconScale
+                  }
+                  color={colors.pv}
+                  style={styles.flashPlus}
+                />
+              </View>
+            )
           }
-          title={"PV"}
+          title={copy.pvTitle}
           value={formatValue(consumptionKwh)}
-          color={POWER_FLOW_COLORS.pv}
+          percent={pvPercent}
+          color={colors.pv}
           subtitle=""
           layoutScale={layoutScale}
           fontScale={fontScale}
@@ -406,7 +608,7 @@ export default function PowerFlowDiagram({ data = {} }) {
                 cx="119"
                 cy="119"
                 r={POWER_FLOW_RING.radius}
-                stroke={POWER_FLOW_COLORS.pv}
+                stroke={colors.pv}
                 strokeWidth={
                   POWER_FLOW_SEGMENTS.pv.activeStrokeWidth +
                   POWER_FLOW_RING.glowStrokeWidth
@@ -414,8 +616,8 @@ export default function PowerFlowDiagram({ data = {} }) {
                 strokeLinecap="butt"
                 fill="none"
                 opacity={POWER_FLOW_RING.glowOpacity}
-                strokeDasharray={getRingDashArray("pv")}
-                transform={`rotate(${getRingRotation("pv")} 119 119)`}
+                strokeDasharray={getRingDashArray("pv", ringSegmentRatios)}
+                transform={`rotate(${getRingRotation("pv", ringSegmentRatios)} 119 119)`}
                 onPress={selectFlow("pv")}
               />
             )}
@@ -425,7 +627,7 @@ export default function PowerFlowDiagram({ data = {} }) {
                 cx="119"
                 cy="119"
                 r={POWER_FLOW_RING.radius}
-                stroke={POWER_FLOW_COLORS.battery}
+                stroke={colors.battery}
                 strokeWidth={
                   POWER_FLOW_SEGMENTS.battery.activeStrokeWidth +
                   POWER_FLOW_RING.glowStrokeWidth
@@ -433,8 +635,8 @@ export default function PowerFlowDiagram({ data = {} }) {
                 strokeLinecap="butt"
                 fill="none"
                 opacity={POWER_FLOW_RING.glowOpacity}
-                strokeDasharray={getRingDashArray("battery")}
-                transform={`rotate(${getRingRotation("battery")} 119 119)`}
+                strokeDasharray={getRingDashArray("battery", ringSegmentRatios)}
+                transform={`rotate(${getRingRotation("battery", ringSegmentRatios)} 119 119)`}
                 onPress={selectFlow("battery")}
               />
             )}
@@ -444,7 +646,7 @@ export default function PowerFlowDiagram({ data = {} }) {
                 cx="119"
                 cy="119"
                 r={POWER_FLOW_RING.radius}
-                stroke={POWER_FLOW_COLORS.grid}
+                stroke={colors.grid}
                 strokeWidth={
                   POWER_FLOW_SEGMENTS.grid.activeStrokeWidth +
                   POWER_FLOW_RING.glowStrokeWidth
@@ -452,8 +654,8 @@ export default function PowerFlowDiagram({ data = {} }) {
                 strokeLinecap="butt"
                 fill="none"
                 opacity={POWER_FLOW_RING.glowOpacity}
-                strokeDasharray={getRingDashArray("grid")}
-                transform={`rotate(${getRingRotation("grid")} 119 119)`}
+                strokeDasharray={getRingDashArray("grid", ringSegmentRatios)}
+                transform={`rotate(${getRingRotation("grid", ringSegmentRatios)} 119 119)`}
                 onPress={selectFlow("grid")}
               />
             )}
@@ -462,12 +664,12 @@ export default function PowerFlowDiagram({ data = {} }) {
               cx="119"
               cy="119"
               r={POWER_FLOW_RING.radius}
-              stroke={POWER_FLOW_COLORS.pv}
+              stroke={colors.pv}
               strokeWidth={getRingStrokeWidth("pv", selectedFlow === "pv")}
               strokeLinecap="butt"
               fill="none"
-              strokeDasharray={getRingDashArray("pv")}
-              transform={`rotate(${getRingRotation("pv")} 119 119)`}
+              strokeDasharray={getRingDashArray("pv", ringSegmentRatios)}
+              transform={`rotate(${getRingRotation("pv", ringSegmentRatios)} 119 119)`}
               onPress={selectFlow("pv")}
             />
 
@@ -475,15 +677,15 @@ export default function PowerFlowDiagram({ data = {} }) {
               cx="119"
               cy="119"
               r={POWER_FLOW_RING.radius}
-              stroke={POWER_FLOW_COLORS.battery}
+              stroke={colors.battery}
               strokeWidth={getRingStrokeWidth(
                 "battery",
                 selectedFlow === "battery",
               )}
               strokeLinecap="butt"
               fill="none"
-              strokeDasharray={getRingDashArray("battery")}
-              transform={`rotate(${getRingRotation("battery")} 119 119)`}
+              strokeDasharray={getRingDashArray("battery", ringSegmentRatios)}
+              transform={`rotate(${getRingRotation("battery", ringSegmentRatios)} 119 119)`}
               onPress={selectFlow("battery")}
             />
 
@@ -491,12 +693,12 @@ export default function PowerFlowDiagram({ data = {} }) {
               cx="119"
               cy="119"
               r={POWER_FLOW_RING.radius}
-              stroke={POWER_FLOW_COLORS.grid}
+              stroke={colors.grid}
               strokeWidth={getRingStrokeWidth("grid", selectedFlow === "grid")}
               strokeLinecap="butt"
               fill="none"
-              strokeDasharray={getRingDashArray("grid")}
-              transform={`rotate(${getRingRotation("grid")} 119 119)`}
+              strokeDasharray={getRingDashArray("grid", ringSegmentRatios)}
+              transform={`rotate(${getRingRotation("grid", ringSegmentRatios)} 119 119)`}
               onPress={selectFlow("grid")}
             />
           </Svg>
@@ -520,12 +722,19 @@ export default function PowerFlowDiagram({ data = {} }) {
                   fontSize: POWER_FLOW_FONT_SIZE.center.label * fontScale,
                   lineHeight:
                     POWER_FLOW_FONT_SIZE.center.labelLineHeight * fontScale,
+                  transform: [
+                    {
+                      translateY:
+                        POWER_FLOW_CENTER_TEXT_CONFIG.titleOffsetY *
+                        layoutScale,
+                    },
+                  ],
                 },
               ]}
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              Consumption
+              {copy.centerTitle}
             </Text>
             <Text
               style={[
@@ -534,6 +743,13 @@ export default function PowerFlowDiagram({ data = {} }) {
                   fontSize: POWER_FLOW_FONT_SIZE.center.value * fontScale,
                   lineHeight:
                     POWER_FLOW_FONT_SIZE.center.valueLineHeight * fontScale,
+                  transform: [
+                    {
+                      translateY:
+                        POWER_FLOW_CENTER_TEXT_CONFIG.valueOffsetY *
+                        layoutScale,
+                    },
+                  ],
                 },
               ]}
               numberOfLines={1}
@@ -570,43 +786,86 @@ export default function PowerFlowDiagram({ data = {} }) {
               ),
               transform: [{ scale: selectedFlow === "grid" ? 1.08 : 1 }],
             },
-            getActiveGlowStyle(POWER_FLOW_COLORS.grid, selectedFlow === "grid"),
+            getActiveGlowStyle(colors.grid, selectedFlow === "grid"),
           ]}
           onPress={selectFlow("grid")}
         >
-          <FontAwesome5
-            name="broadcast-tower"
-            size={28 * iconScale}
-            color={POWER_FLOW_COLORS.grid}
-            style={{
-              marginBottom: scaleValue(
-                POWER_FLOW_LAYOUT.gridIconMarginBottom,
-                layoutScale,
-              ),
-            }}
-          />
+          {isProductionVariant ? (
+            <Ionicons
+              name="send"
+              size={POWER_FLOW_SEGMENT_LABEL_CONFIG.grid.iconSize * iconScale}
+              color={colors.grid}
+              style={[
+                {
+                  marginBottom: scaleValue(
+                    POWER_FLOW_LAYOUT.gridIconMarginBottom,
+                    layoutScale,
+                  ),
+                  transform: [
+                    {
+                      translateY:
+                        POWER_FLOW_SEGMENT_LABEL_CONFIG.grid.iconOffsetY *
+                        layoutScale,
+                    },
+                  ],
+                },
+              ]}
+            />
+          ) : (
+            <FontAwesome5
+              name="broadcast-tower"
+              size={POWER_FLOW_SEGMENT_LABEL_CONFIG.grid.iconSize * iconScale}
+              color={colors.grid}
+              style={[
+                {
+                  marginBottom: scaleValue(
+                    POWER_FLOW_LAYOUT.gridIconMarginBottom,
+                    layoutScale,
+                  ),
+                  transform: [
+                    {
+                      translateY:
+                        POWER_FLOW_SEGMENT_LABEL_CONFIG.grid.iconOffsetY *
+                        layoutScale,
+                    },
+                  ],
+                },
+              ]}
+            />
+          )}
 
           <Text
             style={[
               styles.gridLabel,
               {
-                fontSize: POWER_FLOW_FONT_SIZE.grid.title * fontScale,
+                fontSize:
+                  POWER_FLOW_SEGMENT_LABEL_CONFIG.grid.nameFontSize *
+                  fontScale,
                 lineHeight:
                   POWER_FLOW_FONT_SIZE.grid.titleLineHeight * fontScale,
+                transform: [
+                  {
+                    translateY:
+                      POWER_FLOW_SEGMENT_LABEL_CONFIG.grid.nameOffsetY *
+                      layoutScale,
+                  },
+                ],
               },
             ]}
             numberOfLines={1}
             adjustsFontSizeToFit
           >
-            Grid
+            {copy.gridTitle}
           </Text>
 
           <Text
             style={[
               styles.gridValue,
               {
-                color: POWER_FLOW_COLORS.grid,
-                fontSize: POWER_FLOW_FONT_SIZE.grid.value * fontScale,
+                color: colors.grid,
+                fontSize:
+                  POWER_FLOW_SEGMENT_LABEL_CONFIG.grid.valueFontSize *
+                  fontScale,
                 lineHeight:
                   POWER_FLOW_FONT_SIZE.grid.valueLineHeight * fontScale,
                 transform: [
@@ -616,7 +875,9 @@ export default function PowerFlowDiagram({ data = {} }) {
                   },
                   {
                     translateY:
-                      POWER_FLOW_FONT_SIZE.grid.valueOffsetY * layoutScale,
+                      (POWER_FLOW_FONT_SIZE.grid.valueOffsetY +
+                        POWER_FLOW_SEGMENT_LABEL_CONFIG.grid.valueOffsetY) *
+                      layoutScale,
                   },
                 ],
               },
@@ -629,13 +890,40 @@ export default function PowerFlowDiagram({ data = {} }) {
               style={[
                 styles.gridUnit,
                 {
-                  color: POWER_FLOW_COLORS.grid,
-                  fontSize: POWER_FLOW_FONT_SIZE.grid.unit * fontScale,
+                  color: colors.grid,
+                  fontSize:
+                    POWER_FLOW_SEGMENT_LABEL_CONFIG.grid.unitFontSize *
+                    fontScale,
                 },
               ]}
             >
               kWh
             </Text>
+          </Text>
+          <Text
+            style={[
+              styles.gridPercent,
+              {
+                color: "#FFFFFF",
+                fontSize:
+                  POWER_FLOW_SEGMENT_LABEL_CONFIG.grid.percentFontSize *
+                  fontScale,
+                lineHeight:
+                  (POWER_FLOW_SEGMENT_LABEL_CONFIG.grid.percentFontSize + 4) *
+                  fontScale,
+                transform: [
+                  {
+                    translateY:
+                      POWER_FLOW_SEGMENT_LABEL_CONFIG.grid.percentOffsetY *
+                      layoutScale,
+                  },
+                ],
+              },
+            ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {gridPercent}
           </Text>
         </Pressable>
       </View>
@@ -650,17 +938,23 @@ export default function PowerFlowDiagram({ data = {} }) {
         ]}
       >
         <MetricBlock
+          segmentKey="battery"
           metricKey="battery"
           icon={
             <MaterialCommunityIcons
-              name="battery-charging-high"
-              size={34 * iconScale}
-              color="#99E500"
+              name={
+                isProductionVariant ? "battery-plus" : "battery-charging-high"
+              }
+              size={
+                POWER_FLOW_SEGMENT_LABEL_CONFIG.battery.iconSize * iconScale
+              }
+              color={colors.battery}
             />
           }
-          title={`Battery`}
+          title={copy.batteryTitle}
           value={formatValue(batteryKwh)}
-          color={POWER_FLOW_COLORS.battery}
+          percent={batteryPercent}
+          color={colors.battery}
           subtitle=""
           layoutScale={layoutScale}
           fontScale={fontScale}
@@ -752,6 +1046,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
 
+  metricPercent: {
+    marginTop: 2,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+
   metricSubtitle: {
     marginTop: 6,
     color: "#D7DDE6",
@@ -829,6 +1129,12 @@ const styles = StyleSheet.create({
     fontSize: POWER_FLOW_FONT_SIZE.grid.unit,
     fontWeight: "800",
     color: POWER_FLOW_COLORS.grid,
+  },
+
+  gridPercent: {
+    marginTop: 2,
+    fontWeight: "700",
+    textAlign: "center",
   },
 
   gridLabel: {

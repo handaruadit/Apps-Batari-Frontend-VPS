@@ -4,7 +4,7 @@ import { clearAuth, getToken, isTokenValid } from "@/auth/token";
 import { BASE_URL, GOOGLE_MAPS_API_KEY } from "@/config/api";
 import { appColors, appFont } from "@/config/theme";
 import { AuthContext } from "@/context/AuthContext";
-import { FontAwesome5, Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import {
@@ -116,6 +116,40 @@ const POWER_SERIES_SWITCH_LABELS = {
   battery: "Battery",
 };
 
+// Data/source khusus untuk PowerFlowDiagram bawah.
+// Ubah nilai dummy ini kalau ingin mengatur PV Generate, Charge, dan Export.
+const LOWER_POWER_FLOW_SOURCE_ROUTE = "local://power-flow/production";
+const LOWER_POWER_FLOW_DUMMY_DATA = {
+  pvGenerateKwh: 3.45,
+  chargeKwh: 1.28,
+  exportKwh: 0.86,
+};
+
+function buildLowerPowerFlowData(sourceData = LOWER_POWER_FLOW_DUMMY_DATA) {
+  const pvGenerateKwh = Number(sourceData.pvGenerateKwh || 0);
+  const chargeKwh = Number(sourceData.chargeKwh || 0);
+  const exportKwh = Number(sourceData.exportKwh || 0);
+  const totalProductionKwh = pvGenerateKwh + chargeKwh + exportKwh;
+  const hasTotal = totalProductionKwh !== 0;
+
+  return {
+    sourceRoute: LOWER_POWER_FLOW_SOURCE_ROUTE,
+    productionFlow: {
+      pvGenerateKwh,
+      chargeKwh,
+      exportKwh,
+      totalProductionKwh,
+    },
+    productionFlowPercent: {
+      pvGeneratePercent: hasTotal
+        ? (pvGenerateKwh / totalProductionKwh) * 100
+        : 0,
+      chargePercent: hasTotal ? (chargeKwh / totalProductionKwh) * 100 : 0,
+      exportPercent: hasTotal ? (exportKwh / totalProductionKwh) * 100 : 0,
+    },
+  };
+}
+
 const BUBBLE_POSITION_CONFIG = {
   bubbleLeftPct: 0.02,
 };
@@ -127,10 +161,10 @@ const POWER_FLOW_OVERLAY_LAYOUT = {
   maxScale: 1,
   minHeight: 340,
   maxHeight: 360,
-  bubbleMinWidth: 86,
-  bubbleMaxWidth: 118,
-  bubblePaddingHorizontal: 14,
-  bubblePaddingVertical: 10,
+  bubbleWidth: 96,
+  bubbleHeight: 58,
+  bubblePaddingHorizontal: 8,
+  bubblePaddingVertical: 6,
   bubbleBorderRadius: 18,
   bubbleLabelFontSize: 14,
   bubbleValueFontSize: 16,
@@ -197,6 +231,8 @@ const GRID_POINTER_CONFIG = {
 
 // Atur garis Battery ke image dari sini.
 const BATTERY_POINTER_CONFIG = {
+  // Ubah nilai di bawah ini untuk mengatur garis Battery.
+  // verticalLineLength mengatur jarak vertikal ke atas dari ujung garis.
   lineOffsetX: 0,
   lineOffsetY: 0,
   lineStartOffsetX: 0,
@@ -205,10 +241,10 @@ const BATTERY_POINTER_CONFIG = {
   lineBendOffsetY: 0,
   lineEndOffsetX: 0,
   lineEndOffsetY: 0,
-  horizontalLineLength: 90,
-  verticalLineLength: -90,
-  lineEndAnchorPctX: 0.5,
-  lineEndAnchorPctY: 0.62,
+  horizontalLineLength: 85,
+  verticalLineLength: 80,
+  lineEndAnchorPctX: 0.4,
+  lineEndAnchorPctY: 0.59,
   lineThickness: GRID_POINTER_CONFIG.lineThickness,
   lineColor: GRID_POINTER_CONFIG.lineColor,
   dotColor: GRID_POINTER_CONFIG.dotColor,
@@ -266,7 +302,7 @@ const LOAD_POINTER_CONFIG = {
   lineEndOffsetX: 0,
   lineEndOffsetY: 0,
   horizontalLineLength: 25, // space ke kiri dulu
-  verticalLineLength: 90, // lalu naik ke atas
+  verticalLineLength: 80, // lalu naik ke atas
   lineEndAnchorPctX: 0.5,
   lineEndAnchorPctY: 0.5,
   lineThickness: GRID_POINTER_CONFIG.lineThickness,
@@ -448,7 +484,10 @@ function getBatteryPointerCoordinates(
 
   const config = BATTERY_POINTER_CONFIG;
   const bubbleOffset = MANUAL_BUBBLE_OFFSET.battery || { x: 0, y: 0 };
+  const targetEndX = containerLayout.width * config.lineEndAnchorPctX;
   const targetEndY = containerLayout.height * config.lineEndAnchorPctY;
+  const endX = targetEndX + (config.lineEndOffsetX || 0) * scale;
+  const endY = targetEndY + (config.lineEndOffsetY || 0) * scale;
   const startX =
     batteryBubbleLayout.x +
     batteryBubbleLayout.width +
@@ -459,22 +498,24 @@ function getBatteryPointerCoordinates(
     batteryBubbleLayout.height / 2 +
     bubbleOffset.y * scale +
     (config.lineOffsetY + config.lineStartOffsetY) * scale;
-  const horizontalLength =
-    config.horizontalLineLength == null
-      ? containerLayout.width * config.lineEndAnchorPctX - startX
-      : config.horizontalLineLength * scale;
   const bendX =
-    startX + horizontalLength + (config.lineBendOffsetX || 0) * scale;
-  const bendY = startY + (config.lineBendOffsetY || 0) * scale;
-  const endX = bendX + (config.lineEndOffsetX || 0) * scale;
-  const endY =
+    config.horizontalLineLength == null
+      ? endX + (config.lineBendOffsetX || 0) * scale
+      : startX + config.horizontalLineLength * scale;
+  const bendY =
     config.verticalLineLength == null
-      ? targetEndY + (config.lineOffsetY + config.lineEndOffsetY) * scale
-      : bendY +
-        config.verticalLineLength * scale +
-        (config.lineEndOffsetY || 0) * scale;
+      ? startY + (config.lineBendOffsetY || 0) * scale
+      : startY + (config.lineBendOffsetY || 0) * scale;
+  const finalEndX =
+    config.horizontalLineLength == null
+      ? endX
+      : bendX + (config.lineEndOffsetX || 0) * scale;
+  const finalEndY =
+    config.verticalLineLength == null
+      ? endY
+      : bendY - config.verticalLineLength * scale + (config.lineEndOffsetY || 0) * scale;
   const firstSegmentLength = Math.hypot(bendX - startX, bendY - startY);
-  const secondSegmentLength = Math.hypot(endX - bendX, endY - bendY);
+  const secondSegmentLength = Math.hypot(finalEndX - bendX, finalEndY - bendY);
   const totalLength = firstSegmentLength + secondSegmentLength || 1;
   const bendProgress = Math.min(
     0.98,
@@ -486,9 +527,9 @@ function getBatteryPointerCoordinates(
     startY,
     bendX,
     bendY,
-    endX,
-    endY,
-    path: `M ${startX} ${startY} L ${bendX} ${bendY} L ${endX} ${endY}`,
+    endX: finalEndX,
+    endY: finalEndY,
+    path: `M ${startX} ${startY} L ${bendX} ${bendY} L ${finalEndX} ${finalEndY}`,
     bendProgress,
   };
 }
@@ -610,6 +651,41 @@ function getLoadPointerCoordinates(containerLayout, loadBubbleLayout, scale) {
     bendProgress,
   };
 }
+
+function lockPointerEndpoint(coordinates, endpointRef) {
+  if (!coordinates) {
+    return null;
+  }
+
+  if (!endpointRef.current) {
+    endpointRef.current = {
+      endX: coordinates.endX,
+      endY: coordinates.endY,
+    };
+  }
+
+  const lockedCoordinates = {
+    ...coordinates,
+    endX: endpointRef.current.endX,
+    endY: endpointRef.current.endY,
+  };
+
+  if (lockedCoordinates.leadX != null && lockedCoordinates.leadY != null) {
+    lockedCoordinates.path =
+      `M ${lockedCoordinates.startX} ${lockedCoordinates.startY} ` +
+      `L ${lockedCoordinates.leadX} ${lockedCoordinates.leadY} ` +
+      `L ${lockedCoordinates.bendX} ${lockedCoordinates.bendY} ` +
+      `L ${lockedCoordinates.endX} ${lockedCoordinates.endY}`;
+  } else {
+    lockedCoordinates.path =
+      `M ${lockedCoordinates.startX} ${lockedCoordinates.startY} ` +
+      `L ${lockedCoordinates.bendX} ${lockedCoordinates.bendY} ` +
+      `L ${lockedCoordinates.endX} ${lockedCoordinates.endY}`;
+  }
+
+  return lockedCoordinates;
+}
+
 function getPointerAnimationEasing(config) {
   if (config.animationEasing === "linear") {
     return Easing.linear;
@@ -664,7 +740,7 @@ const POWER_CHART_LAYOUT = {
   axisLabelFontSize: 13,
   timeLabelFontSize: 12,
   currentTimeFontSize: 13,
-  lineStrokeWidth: 3,
+  lineStrokeWidth: 1.6,
   pointRadius: 3.5,
   switchWidth: 44,
   switchHeight: 22,
@@ -691,16 +767,7 @@ const POWER_CHART_RESPONSIVE_WIDTH = {
 const DASHBOARD_LAYOUT = {
   sectionMarginTop: 6,
   sectionMarginBottom: 18,
-  cardGap: 10,
   cardRadius: 14,
-  metricCardHeight: 86,
-  metricCardPaddingHorizontal: 12,
-  metricIconSize: 28,
-  sourceCardPadding: 16,
-  sourceRowMarginTop: 28,
-  sourceIconSize: 34,
-  sourceBarHeight: 7,
-  sourceBarMarginTop: 26,
   monthlyMarginTop: 24,
   monthlyCardWidth: 154,
   monthlyCardHeight: 206,
@@ -712,11 +779,8 @@ const DASHBOARD_LAYOUT = {
 };
 // Atur ukuran font section dashboard energi dari sini.
 const DASHBOARD_FONT_SIZE = {
-  metricLabel: 15,
-  metricValue: 20,
   sectionTitle: 24,
   sectionMeta: 15,
-  sourcePercent: 17,
   monthTitle: 22,
   monthValue: 21,
   impactValue: 24,
@@ -755,46 +819,6 @@ const weatherForecastDays = [
   { day: "2", icon: "rainy-outline", temp: 26 },
   { day: "3", icon: "cloud-outline", temp: 26 },
   { day: "4", icon: "rainy-outline", temp: 29 },
-];
-const dashboardMetricCards = [
-  {
-    key: "consumption",
-    label: "production",
-    value: "0kWh",
-    icon: "flash-outline",
-    color: appColors.accent,
-  },
-  {
-    key: "charging",
-    label: "Total\nPengisian",
-    value: "0kWh",
-    icon: "battery-charging-outline",
-    color: appColors.accent,
-  },
-];
-const energySourceItems = [
-  {
-    key: "battery",
-    icon: "battery-charging-outline",
-    color: "#8CCB3F",
-    value: "0%",
-    barFlex: 1,
-  },
-  {
-    key: "grid",
-    icon: "flash-outline",
-    color: appColors.accent,
-    value: "0%",
-    barFlex: 1,
-  },
-  {
-    key: "solar",
-    icon: "broadcast-tower",
-    iconLibrary: "FontAwesome5",
-    color: "#E0262E",
-    value: "0%",
-    barFlex: 1,
-  },
 ];
 const monthlySavingItems = [
   { key: "jan", month: "January", value: "Rp0" },
@@ -2261,6 +2285,9 @@ export default function OverviewScreen() {
   const batteryPointerProgress = useRef(new Animated.Value(0)).current;
   const pvPointerProgress = useRef(new Animated.Value(0)).current;
   const loadPointerProgress = useRef(new Animated.Value(0)).current;
+  const gridPointerEndRef = useRef(null);
+  const pvPointerEndRef = useRef(null);
+  const loadPointerEndRef = useRef(null);
   const now = new Date();
   const todayDay = now.getDate();
   const todayMonth = now.getMonth() + 1;
@@ -2704,24 +2731,7 @@ export default function OverviewScreen() {
     }),
     [fetchedData, selectedDevice],
   );
-  const energySourceDisplayItems = useMemo(() => {
-    const percentByKey = {
-      battery: plantData.energyPercent?.batteryPercent,
-      grid: plantData.energyPercent?.consumptionPercent,
-      solar: plantData.energyPercent?.gridPercent,
-    };
-
-    return energySourceItems.map((item) => {
-      const percent = Number(percentByKey[item.key]);
-      const safePercent = Number.isFinite(percent) ? percent : 0;
-
-      return {
-        ...item,
-        value: `${Math.round(safePercent)}%`,
-      };
-    });
-  }, [plantData.energyPercent]);
-
+  const lowerPowerFlowData = useMemo(() => buildLowerPowerFlowData(), []);
   const weatherLocation = getWeatherLocation(plantData.address);
   const currentTemperature = pickNumber(
     plantData.weatherTemperature,
@@ -3002,8 +3012,8 @@ export default function OverviewScreen() {
     houseOverlayHeight,
   );
   const responsiveBubbleStyle = {
-    minWidth: POWER_FLOW_OVERLAY_LAYOUT.bubbleMinWidth * bubbleScale,
-    maxWidth: POWER_FLOW_OVERLAY_LAYOUT.bubbleMaxWidth * bubbleScale,
+    width: POWER_FLOW_OVERLAY_LAYOUT.bubbleWidth * bubbleScale,
+    height: POWER_FLOW_OVERLAY_LAYOUT.bubbleHeight * bubbleScale,
     paddingHorizontal:
       POWER_FLOW_OVERLAY_LAYOUT.bubblePaddingHorizontal * bubbleScale,
     paddingVertical:
@@ -3022,25 +3032,22 @@ export default function OverviewScreen() {
   const responsiveBatteryValueStyle = {
     fontSize: BATTERY_BUBBLE_CONFIG.valueFontSize * bubbleScale,
   };
-  const gridPointerCoordinates = getGridPointerCoordinates(
-    houseOverlayLayout,
-    gridBubbleLayout,
-    bubbleScale,
+  const gridPointerCoordinates = lockPointerEndpoint(
+    getGridPointerCoordinates(houseOverlayLayout, gridBubbleLayout, bubbleScale),
+    gridPointerEndRef,
   );
   const batteryPointerCoordinates = getBatteryPointerCoordinates(
     houseOverlayLayout,
     batteryBubbleLayout,
     bubbleScale,
   );
-  const pvPointerCoordinates = getPvPointerCoordinates(
-    houseOverlayLayout,
-    pvBubbleLayout,
-    bubbleScale,
+  const pvPointerCoordinates = lockPointerEndpoint(
+    getPvPointerCoordinates(houseOverlayLayout, pvBubbleLayout, bubbleScale),
+    pvPointerEndRef,
   );
-  const loadPointerCoordinates = getLoadPointerCoordinates(
-    houseOverlayLayout,
-    loadBubbleLayout,
-    bubbleScale,
+  const loadPointerCoordinates = lockPointerEndpoint(
+    getLoadPointerCoordinates(houseOverlayLayout, loadBubbleLayout, bubbleScale),
+    loadPointerEndRef,
   );
   const gridPointerDotSize = GRID_POINTER_CONFIG.dotSize * bubbleScale;
   const gridPointerGlowSize = GRID_POINTER_CONFIG.dotSize * 2.8 * bubbleScale;
@@ -3812,10 +3819,20 @@ export default function OverviewScreen() {
                     setPvBubbleLayout(nativeEvent.layout)
                   }
                 >
-                  <Text style={[styles.infoBubbleLabel, responsiveBubbleLabelStyle]}>
+                  <Text
+                    style={[styles.infoBubbleLabel, responsiveBubbleLabelStyle]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.78}
+                  >
                     PV
                   </Text>
-                  <Text style={[styles.infoBubbleValue, responsiveBubbleValueStyle]}>
+                  <Text
+                    style={[styles.infoBubbleValue, responsiveBubbleValueStyle]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.62}
+                  >
                     {formatKwValue(plantData.production)}
                   </Text>
                 </View>
@@ -3836,10 +3853,20 @@ export default function OverviewScreen() {
                     setGridBubbleLayout(nativeEvent.layout)
                   }
                 >
-                  <Text style={[styles.infoBubbleLabel, responsiveBubbleLabelStyle]}>
+                  <Text
+                    style={[styles.infoBubbleLabel, responsiveBubbleLabelStyle]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.78}
+                  >
                     Grid
                   </Text>
-                  <Text style={[styles.infoBubbleValue, responsiveBubbleValueStyle]}>
+                  <Text
+                    style={[styles.infoBubbleValue, responsiveBubbleValueStyle]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.62}
+                  >
                     {formatKwValue(plantData.grid)}
                   </Text>
                 </View>
@@ -3849,12 +3876,12 @@ export default function OverviewScreen() {
                     styles.infoBubble,
                     responsiveBubbleStyle,
                     styles.batteryBubble,
-                    gridBubbleLayout && {
+                    {
                       width:
-                        gridBubbleLayout.width +
+                        POWER_FLOW_OVERLAY_LAYOUT.bubbleWidth * bubbleScale +
                         BATTERY_BUBBLE_CONFIG.widthExtra * bubbleScale,
                       height:
-                        gridBubbleLayout.height +
+                        POWER_FLOW_OVERLAY_LAYOUT.bubbleHeight * bubbleScale +
                         BATTERY_BUBBLE_CONFIG.heightExtra * bubbleScale,
                     },
                     getResponsiveBubblePositionStyle(
@@ -3868,7 +3895,12 @@ export default function OverviewScreen() {
                     setBatteryBubbleLayout(nativeEvent.layout)
                   }
                 >
-                  <Text style={[styles.batteryLabel, responsiveBatteryLabelStyle]}>
+                  <Text
+                    style={[styles.batteryLabel, responsiveBatteryLabelStyle]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.78}
+                  >
                     Battery
                   </Text>
                   <Text
@@ -3897,89 +3929,39 @@ export default function OverviewScreen() {
                     setLoadBubbleLayout(nativeEvent.layout)
                   }
                 >
-                  <Text style={[styles.infoBubbleLabel, responsiveBubbleLabelStyle]}>
+                  <Text
+                    style={[styles.infoBubbleLabel, responsiveBubbleLabelStyle]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.78}
+                  >
                     Load
                   </Text>
-                  <Text style={[styles.infoBubbleValue, responsiveBubbleValueStyle]}>
+                  <Text
+                    style={[styles.infoBubbleValue, responsiveBubbleValueStyle]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.62}
+                  >
                     {formatKwValue(plantData.load)}
                   </Text>
                 </View>
               </View>
             </View>
 
+            <Text style={styles.powerFlowTitle}>
+              Self Consumption-Production Ratio
+            </Text>
             <View style={styles.powerFlowWrapper}>
               <PowerFlowDiagram data={plantData} />
+              <PowerFlowDiagram
+                data={lowerPowerFlowData}
+                variant="production"
+              />
             </View>
           </View>
 
           <View style={styles.dashboardSection}>
-            <View style={styles.dashboardMetricRow}>
-              {dashboardMetricCards.map((item) => (
-                <View key={item.key} style={styles.dashboardMetricCard}>
-                  <Ionicons
-                    name={item.icon}
-                    size={DASHBOARD_LAYOUT.metricIconSize}
-                    color={item.color}
-                  />
-
-                  <View style={styles.dashboardMetricTextBlock}>
-                    <Text style={styles.dashboardMetricLabel}>
-                      {item.label}
-                    </Text>
-                    <Text style={styles.dashboardMetricValue}>
-                      {item.value}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-
-            <View style={styles.energySourceCard}>
-              <Text style={styles.dashboardSectionTitle}>
-                Sumber Penggunaan Energi
-              </Text>
-
-              <View style={styles.energySourceRow}>
-                {energySourceDisplayItems.map((item) => (
-                  <View key={item.key} style={styles.energySourceItem}>
-                    {item.iconLibrary === "FontAwesome5" ? (
-                      <FontAwesome5
-                        name={item.icon}
-                        size={DASHBOARD_LAYOUT.sourceIconSize}
-                        color={item.color}
-                      />
-                    ) : (
-                      <Ionicons
-                        name={item.icon}
-                        size={DASHBOARD_LAYOUT.sourceIconSize}
-                        color={item.color}
-                      />
-                    )}
-                    <Text
-                      style={[
-                        styles.energySourcePercent,
-                        { color: item.color },
-                      ]}
-                    >
-                      {item.value}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-
-              <View style={styles.energySourceBar}>
-                {energySourceDisplayItems.map((item) => (
-                  <View
-                    key={item.key}
-                    style={[
-                      styles.energySourceBarSegment,
-                      { flex: item.barFlex, backgroundColor: item.color },
-                    ]}
-                  />
-                ))}
-              </View>
-            </View>
-
             <View style={styles.monthlySavingsSection}>
               <Text style={styles.dashboardSectionTitle}>
                 Penghematan Bulanan
@@ -4647,61 +4629,6 @@ const styles = StyleSheet.create({
     marginTop: DASHBOARD_LAYOUT.sectionMarginTop,
     marginBottom: DASHBOARD_LAYOUT.sectionMarginBottom,
   },
-  dashboardMetricRow: {
-    flexDirection: "row",
-    gap: DASHBOARD_LAYOUT.cardGap,
-  },
-  dashboardMetricCard: {
-    flex: 1,
-    minHeight: DASHBOARD_LAYOUT.metricCardHeight,
-    borderRadius: DASHBOARD_LAYOUT.cardRadius,
-    backgroundColor: appColors.bubble,
-    borderWidth: 1,
-    borderColor: "rgba(8,174,234,0.14)",
-    paddingHorizontal: DASHBOARD_LAYOUT.metricCardPaddingHorizontal,
-    flexDirection: "row",
-    alignItems: "center",
-    shadowColor: appColors.accent,
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
-  },
-  dashboardMetricTextBlock: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  dashboardMetricLabel: {
-    color: appColors.text,
-    fontFamily: appFont,
-    fontSize: DASHBOARD_FONT_SIZE.metricLabel,
-    lineHeight: DASHBOARD_FONT_SIZE.metricLabel + 4,
-    fontWeight: "500",
-    letterSpacing: 0,
-    flexShrink: 1,
-  },
-  dashboardMetricValue: {
-    color: appColors.text,
-    fontFamily: appFont,
-    fontSize: DASHBOARD_FONT_SIZE.metricValue,
-    lineHeight: DASHBOARD_FONT_SIZE.metricValue + 5,
-    fontWeight: "500",
-    letterSpacing: 0,
-    marginTop: 4,
-  },
-  energySourceCard: {
-    marginTop: DASHBOARD_LAYOUT.cardGap + 10,
-    borderRadius: DASHBOARD_LAYOUT.cardRadius,
-    backgroundColor: appColors.bubble,
-    borderWidth: 1,
-    borderColor: "rgba(8,174,234,0.14)",
-    padding: DASHBOARD_LAYOUT.sourceCardPadding,
-    shadowColor: appColors.accent,
-    shadowOpacity: 0.12,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 5,
-  },
   dashboardSectionTitle: {
     color: appColors.text,
     fontFamily: appFont,
@@ -4725,37 +4652,6 @@ const styles = StyleSheet.create({
     fontFamily: appFont,
     fontSize: 14,
     lineHeight: 20,
-  },
-  energySourceRow: {
-    marginTop: DASHBOARD_LAYOUT.sourceRowMarginTop,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-  },
-  energySourceItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 88,
-  },
-  energySourcePercent: {
-    fontFamily: appFont,
-    fontSize: DASHBOARD_FONT_SIZE.sourcePercent,
-    lineHeight: DASHBOARD_FONT_SIZE.sourcePercent + 6,
-    fontWeight: "500",
-    letterSpacing: 0,
-    marginLeft: 10,
-  },
-  energySourceBar: {
-    height: DASHBOARD_LAYOUT.sourceBarHeight,
-    borderRadius: DASHBOARD_LAYOUT.sourceBarHeight,
-    marginTop: DASHBOARD_LAYOUT.sourceBarMarginTop,
-    flexDirection: "row",
-    overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-  energySourceBarSegment: {
-    height: "100%",
   },
   monthlySavingsSection: {
     marginTop: DASHBOARD_LAYOUT.monthlyMarginTop,
@@ -5148,6 +5044,18 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     alignItems: "center",
   },
+  powerFlowTitle: {
+    alignSelf: "flex-start",
+    color: appColors.text,
+    fontFamily: appFont,
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: "350",
+    letterSpacing: 0,
+    textAlign: "left",
+    marginLeft: 4,
+    marginBottom: 8,
+  },
   houseOverlayWrap: {
     position: "relative",
     width: "100%",
@@ -5174,7 +5082,8 @@ const styles = StyleSheet.create({
   },
   infoBubble: {
     position: "absolute",
-    minWidth: 86,
+    width: POWER_FLOW_OVERLAY_LAYOUT.bubbleWidth,
+    height: POWER_FLOW_OVERLAY_LAYOUT.bubbleHeight,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 18,
@@ -5186,11 +5095,15 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 4,
+    alignItems: "center",
+    justifyContent: "center",
   },
   infoBubbleLabel: {
     fontSize: 14,
     fontWeight: "700",
     color: "#1F2937",
+    maxWidth: "100%",
+    textAlign: "center",
   },
   infoBubbleSub: {
     fontSize: 14,
@@ -5203,28 +5116,34 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#111827",
     marginTop: 2,
+    maxWidth: "100%",
+    textAlign: "center",
   },
   pvBubble: {
-    maxWidth: 118,
+    overflow: "hidden",
   },
   gridBubble: {
-    maxWidth: 118,
+    overflow: "hidden",
   },
   batteryBubble: {
-    maxWidth: 118,
+    overflow: "hidden",
   },
   loadBubble: {
-    maxWidth: 118,
+    overflow: "hidden",
   },
   batteryLabel: {
     fontSize: BATTERY_BUBBLE_CONFIG.titleFontSize,
     fontWeight: BATTERY_BUBBLE_CONFIG.titleFontWeight,
     color: "#1F2937",
+    maxWidth: "100%",
+    textAlign: "center",
   },
   batteryValue: {
     fontSize: BATTERY_BUBBLE_CONFIG.valueFontSize,
     fontWeight: BATTERY_BUBBLE_CONFIG.valueFontWeight,
     color: "#111827",
     marginTop: 2,
+    maxWidth: "100%",
+    textAlign: "center",
   },
 });

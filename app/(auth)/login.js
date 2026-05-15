@@ -1,8 +1,6 @@
 import { BASE_URL } from "@/config/api";
 import {
   getUserFromToken,
-  getUserInfo,
-  getValidRememberedToken,
   saveToken,
   saveUserInfo,
   setRememberMe,
@@ -62,28 +60,6 @@ const LoginScreen = () => {
   const buttonHeight = isCompactHeight ? 52 : 58;
   const inputHeight = isCompactHeight ? 46 : 48;
   const footerHeight = isCompactHeight ? 28 : 52;
-
-  useEffect(() => {
-    const checkStoredToken = async () => {
-      const token = await getValidRememberedToken();
-
-      if (token) {
-        const storedUser = await getUserInfo();
-        if (storedUser) {
-          setUser(storedUser);
-        } else {
-          const tokenUser = getUserFromToken(token);
-          if (tokenUser?.email) {
-            setUser(tokenUser);
-          }
-        }
-
-        router.replace("/(home)/plant");
-      }
-    };
-
-    checkStoredToken();
-  }, [setUser]);
 
   useEffect(() => {
     Animated.timing(introAnim, {
@@ -353,11 +329,17 @@ const LoginScreen = () => {
                 </TouchableOpacity>
 
                 <View style={styles.linkRow}>
-                  <TouchableOpacity activeOpacity={0.7}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => router.push("/(auth)/forgot-password")}
+                  >
                     <Text style={styles.link}>Forgot password</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity activeOpacity={0.7}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => router.push("/(auth)/register")}
+                  >
                     <Text style={styles.link}>Create new account</Text>
                   </TouchableOpacity>
                 </View>
