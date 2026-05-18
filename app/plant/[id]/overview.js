@@ -1,9 +1,17 @@
 import PowerFlowDiagram from "@/components/PowerFlowDiagram";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import { clearAuth, getToken, isTokenValid } from "@/auth/token";
 import { BASE_URL, GOOGLE_MAPS_API_KEY } from "@/config/api";
 import { appColors, appFont } from "@/config/theme";
 import { AuthContext } from "@/context/AuthContext";
+import {
+  DEMO_PLANT_NAME,
+  deletePlant,
+  isDemoPlant,
+} from "@/services/plantService";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -24,6 +32,7 @@ import {
   Easing,
   Image,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -44,6 +53,7 @@ import Svg, {
   Line,
   LinearGradient,
   Path,
+  Rect,
   Stop,
   Text as SvgText,
 } from "react-native-svg";
@@ -102,18 +112,25 @@ const WEATHER_ICON_SIZE = {
   day: 34,
 };
 const POWER_SERIES_CONFIG = [
-  { key: "production", label: "Production", color: "#1FB7FF" },
-  { key: "load", label: "Load", color: "#FF4646" },
-  { key: "upsLoad", label: "Ups-Load", color: "#FFD54A" },
-  { key: "grid", label: "Grid", color: "#FF9300" },
-  { key: "battery", label: "Battery", color: "#99E500" },
+  { key: "production", label: "PV", color: "#1FB7FF", group: "consumption" },
+  { key: "grid", label: "Grid", color: "#FF9300", group: "consumption" },
+  { key: "battery", label: "Battery", color: "#99E500", group: "consumption" },
+  {
+    key: "pvGenerate",
+    label: "PV Generate",
+    color: "#FF4646",
+    group: "production",
+  },
+  { key: "export", label: "Export", color: "#4F46E5", group: "production" },
+  { key: "charge", label: "Charge", color: "#A855F7", group: "production" },
 ];
 const POWER_SERIES_SWITCH_LABELS = {
   production: "PV",
-  load: "Load",
-  upsLoad: "UPS-load",
   grid: "Grid",
   battery: "Battery",
+  pvGenerate: "PV Generate",
+  export: "Export",
+  charge: "Charge",
 };
 
 // Data/source khusus untuk PowerFlowDiagram bawah.
@@ -125,7 +142,7 @@ const LOWER_POWER_FLOW_DUMMY_DATA = {
   exportKwh: 0.86,
 };
 
-function buildLowerPowerFlowData(sourceData = LOWER_POWER_FLOW_DUMMY_DATA) {
+function buildLowerPowerFlowData(sourceData = {}) {
   const pvGenerateKwh = Number(sourceData.pvGenerateKwh || 0);
   const chargeKwh = Number(sourceData.chargeKwh || 0);
   const exportKwh = Number(sourceData.exportKwh || 0);
@@ -753,7 +770,40 @@ const POWER_CHART_Y_RANGE = {
   maxKw: 8,
   leftTicks: [8, 6, 4, 2, 0, -2, -4, -6],
 };
+const POWER_CHART_MONTH_Y_RANGE = {
+  minMwh: -1.5,
+  maxMwh: 1.5,
+  leftTicks: [1.5, 1, 0.5, 0, -0.5, -1, -1.5],
+};
 const POWER_CHART_TIME_TICKS = [0, 3, 6, 9, 12, 15, 18, 21, 24];
+const POWER_CHART_MONTH_X_TICKS = [
+  1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31,
+];
+const POWER_CHART_YEAR_X_TICKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mei",
+  "Jun",
+  "Jul",
+  "Agu",
+  "Sep",
+  "Okt",
+  "Nov",
+  "Des",
+];
+const POWER_CHART_MARKER = {
+  color: "#F8FAFC",
+  lineColor: "rgba(248,250,252,0.82)",
+  hitSlop: 18,
+  triangleSize: 9,
+};
+const POWER_CHART_IDLE_RETURN_MS = 5 * 60 * 1000;
+const POWER_CHART_DAY_CHIP_STEP = 50;
+const POWER_CHART_MONTH_CHIP_STEP = 104;
+const POWER_CHART_LOADING_DELAY_MS = 1200;
 const POWER_CHART_HISTORY_MAX_POINTS = 720;
 const POWER_CHART_SAMPLE_MIN_GAP_MS = 60 * 1000;
 const POWER_CHART_RESPONSIVE_WIDTH = {
@@ -969,6 +1019,23 @@ function formatRealtimeClock(date) {
 
 function formatChartHour(hour) {
   return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function getJakartaDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const getPart = (type) =>
+    Number(parts.find((item) => item.type === type)?.value || 0);
+
+  return {
+    day: getPart("day"),
+    month: getPart("month"),
+    year: getPart("year"),
+  };
 }
 
 function getResponsiveChartWidth(windowWidth) {
@@ -1456,18 +1523,44 @@ function getLatestEnergyValues(latestResults) {
 }
 
 function normalizeChartSeries(data) {
+  if (Array.isArray(data?.items)) {
+    return POWER_SERIES_CONFIG.reduce((series, item) => {
+      series[item.key] = data.items
+        .map((row) => {
+          const valueKey = item.key === "production" ? "pv" : item.key;
+          const value = Number(row?.[valueKey]);
+
+          if (!Number.isFinite(value)) {
+            return null;
+          }
+
+          return {
+            value: Math.abs(value),
+            day: row?.day,
+            month: row?.month,
+            label: row?.label,
+            date: row?.date,
+            source: data?.source,
+            unit: data?.unit,
+          };
+        })
+        .filter(Boolean);
+
+      return series;
+    }, {});
+  }
+
   const directSeries = {
     production: normalizeSeriesRows(data?.production),
-    load: normalizeSeriesRows(data?.load),
-    upsLoad: normalizeSeriesRows(data?.upsLoad),
     grid: normalizeSeriesRows(data?.grid),
     battery: normalizeSeriesRows(data?.battery),
+    pvGenerate: normalizeSeriesRows(data?.pvGenerate),
+    export: normalizeSeriesRows(data?.export),
+    charge: normalizeSeriesRows(data?.charge),
   };
   const hasDirectSeries = hasChartSeriesRows(directSeries);
   const production = getApiSeries(data, "pv", "chargePower");
   const pvPower = getApiSeries(data, "pv", "power");
-  const outPower = getApiSeries(data, "load", "power");
-  const outVaPower = getApiSeries(data, "load", "vaPower");
 
   if (hasDirectSeries) {
     return directSeries;
@@ -1475,10 +1568,11 @@ function normalizeChartSeries(data) {
 
   return {
     production: production.length ? production : pvPower,
-    load: outPower.length ? outPower : outVaPower,
-    upsLoad: outVaPower.length ? outVaPower : outPower,
     grid: getApiSeries(data, "grid", "power"),
     battery: getApiSeries(data, "battery", "power"),
+    pvGenerate: normalizeSeriesRows(data?.pvGenerate),
+    export: normalizeSeriesRows(data?.export),
+    charge: normalizeSeriesRows(data?.charge),
   };
 }
 
@@ -1735,10 +1829,11 @@ function createRealtimeChartSampleSeries(powerValues, timestamp = new Date()) {
   };
 
   addSample("production", "pv", "chargePower", powerValues.production);
-  addSample("load", "out", "power", powerValues.load);
-  addSample("upsLoad", "out", "vaPower", powerValues.upsLoad);
   addSample("grid", "grid", "power", powerValues.grid);
   addSample("battery", "baterai", "power", powerValues.battery);
+  addSample("pvGenerate", "production", "pvGenerate", powerValues.pvGenerate);
+  addSample("export", "production", "export", powerValues.export);
+  addSample("charge", "production", "charge", powerValues.charge);
 
   return series;
 }
@@ -1765,13 +1860,13 @@ function isSelectedCurrentDay(
   selectedMonth,
   selectedYear,
 ) {
-  const now = new Date();
+  const now = getJakartaDateParts();
 
   return (
     segment === "day" &&
-    selectedDay === now.getDate() &&
-    selectedMonth === now.getMonth() + 1 &&
-    selectedYear === now.getFullYear()
+    selectedDay === now.day &&
+    selectedMonth === now.month &&
+    selectedYear === now.year
   );
 }
 
@@ -1786,6 +1881,22 @@ function buildFallbackSeries(value, index) {
 
 function buildZeroSeries(length = 6) {
   return Array.from({ length }, () => 0);
+}
+
+function getChartFallbackValue(key, plantData) {
+  if (key === "pvGenerate") {
+    return null;
+  }
+
+  if (key === "export") {
+    return null;
+  }
+
+  if (key === "charge") {
+    return null;
+  }
+
+  return plantData?.[key] ?? 0;
 }
 
 function buildLatestPowerRequests(plantId, config) {
@@ -1827,6 +1938,20 @@ function buildChartEndpoint(
 
   if (date) {
     params.date = date;
+  }
+
+  if (segment === "month") {
+    return `${BASE_URL}/api/data/chart/monthly?${buildQueryString({
+      plantId: String(plantId),
+      month: date,
+    })}`;
+  }
+
+  if (segment === "year") {
+    return `${BASE_URL}/api/data/chart/yearly?${buildQueryString({
+      plantId: String(plantId),
+      year: date,
+    })}`;
   }
 
   return `${BASE_URL}/api/data/chart?${buildQueryString(params)}`;
@@ -1915,6 +2040,707 @@ function buildSmoothAreaPath(data, minY, maxY, width, height, pad) {
   return `${linePath} L ${last.x} ${baseY} L ${first.x} ${baseY} Z`;
 }
 
+function getMonthTickDays(selectedYear, selectedMonth) {
+  const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+
+  return POWER_CHART_MONTH_X_TICKS.filter((day) => day <= daysInMonth);
+}
+
+function getAggregateTickValues(segment, selectedYear, selectedMonth) {
+  if (segment === "year") {
+    return POWER_CHART_YEAR_X_TICKS;
+  }
+
+  return getMonthTickDays(selectedYear, selectedMonth);
+}
+
+function getAggregateItemCount(segment, selectedYear, selectedMonth) {
+  if (segment === "year") {
+    return 12;
+  }
+
+  return new Date(selectedYear, selectedMonth, 0).getDate();
+}
+
+function getAggregateRecordIndex(
+  record,
+  fallbackIndex,
+  segment,
+  selectedYear,
+  selectedMonth,
+) {
+  if (segment === "year") {
+    const explicitMonth = Number(record?.month);
+
+    if (
+      Number.isFinite(explicitMonth) &&
+      explicitMonth >= 1 &&
+      explicitMonth <= 12
+    ) {
+      return explicitMonth - 1;
+    }
+
+    return fallbackIndex;
+  }
+
+  const explicitDay = Number(pickValue(record?.day, record?.dateDay));
+
+  if (
+    Number.isFinite(explicitDay) &&
+    explicitDay >= 1 &&
+    explicitDay <= 31
+  ) {
+    return explicitDay - 1;
+  }
+
+  const parsedDate = parseChartTimestamp(getRecordTimestampText(record));
+
+  if (parsedDate) {
+    const recordMonth = parsedDate.getMonth() + 1;
+    const recordYear = parsedDate.getFullYear();
+
+    if (recordMonth === selectedMonth && recordYear === selectedYear) {
+      return parsedDate.getDate() - 1;
+    }
+  }
+
+  return fallbackIndex;
+}
+
+function buildAggregateChartStacks(series, segment, selectedYear, selectedMonth) {
+  const itemCount = getAggregateItemCount(segment, selectedYear, selectedMonth);
+  const values = POWER_SERIES_CONFIG.reduce((items, item) => {
+    items[item.key] = Array.from({ length: itemCount }, () => 0);
+    return items;
+  }, {});
+
+  POWER_SERIES_CONFIG.forEach((item) => {
+    const rows = normalizeSeriesRows(series?.[item.key]);
+
+    rows.forEach((row, index) => {
+      const itemIndex = getAggregateRecordIndex(
+        row,
+        index,
+        segment,
+        selectedYear,
+        selectedMonth,
+      );
+
+      if (itemIndex < 0 || itemIndex >= itemCount) {
+        return;
+      }
+
+      const value = getApiNumber(row);
+
+      if (value === null) {
+        return;
+      }
+
+      values[item.key][itemIndex] = Math.abs(value);
+    });
+  });
+
+  return {
+    itemCount,
+    values,
+  };
+}
+
+function clampSelectedIndex(index, maxIndex) {
+  const safeMaxIndex = Math.max(0, Number(maxIndex) || 0);
+  const safeIndex = Number(index);
+
+  if (!Number.isFinite(safeIndex)) {
+    return 0;
+  }
+
+  return Math.min(Math.max(Math.round(safeIndex), 0), safeMaxIndex);
+}
+
+function getSeriesMaxIndex(
+  series,
+  segment,
+  selectedYear,
+  selectedMonth,
+  dayTimeline = null,
+) {
+  if (segment === "month" || segment === "year") {
+    return Math.max(0, getAggregateItemCount(segment, selectedYear, selectedMonth) - 1);
+  }
+
+  const timeline = dayTimeline ?? buildDayChartTimeline(series);
+
+  if (timeline.length) {
+    return Math.max(0, timeline.length - 1);
+  }
+
+  const maxLength = POWER_SERIES_CONFIG.reduce((length, item) => {
+    const seriesLength = normalizeSeriesRows(series?.[item.key]).length;
+    return Math.max(length, seriesLength);
+  }, 0);
+
+  return Math.max(0, maxLength - 1);
+}
+
+function buildDayChartTimeline(series) {
+  const timestamps = new Map();
+  let fallbackLength = 0;
+
+  POWER_SERIES_CONFIG.forEach((item) => {
+    const rows = normalizeSeriesRows(series?.[item.key]);
+    fallbackLength = Math.max(fallbackLength, rows.length);
+
+    rows.forEach((row) => {
+      const timestamp = getRecordTimestampValue(row);
+
+      if (timestamp !== null) {
+        timestamps.set(timestamp, { timestamp });
+      }
+    });
+  });
+
+  const sortedTimeline = Array.from(timestamps.values()).sort(
+    (left, right) => left.timestamp - right.timestamp,
+  );
+
+  if (sortedTimeline.length) {
+    return sortedTimeline;
+  }
+
+  return Array.from({ length: fallbackLength }, (_, index) => ({
+    timestamp: null,
+    fallbackIndex: index,
+  }));
+}
+
+function getTimeRatioFromTimestamp(timestamp) {
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const ratio =
+    (date.getHours() +
+      date.getMinutes() / 60 +
+      date.getSeconds() / 3600) /
+    24;
+
+  return Math.min(Math.max(ratio, 0), 1);
+}
+
+function getDefaultChartSelectedIndex(
+  segment,
+  maxIndex,
+  selectedYear,
+  selectedMonth,
+  currentTime,
+  dayTimeline = [],
+) {
+  if (maxIndex <= 0) {
+    return 0;
+  }
+
+  const now = getJakartaDateParts(currentTime);
+
+  if (segment === "month") {
+    if (selectedYear === now.year && selectedMonth === now.month) {
+      return clampSelectedIndex(now.day - 1, maxIndex);
+    }
+
+    return 0;
+  }
+
+  if (segment === "year") {
+    if (selectedYear === now.year) {
+      return clampSelectedIndex(now.month - 1, maxIndex);
+    }
+
+    return 0;
+  }
+
+  if (dayTimeline.length) {
+    const currentTimestamp = currentTime.getTime();
+    let nearestIndex = 0;
+    let nearestDistance = Infinity;
+
+    dayTimeline.forEach((item, index) => {
+      if (item.timestamp === null) {
+        return;
+      }
+
+      const distance = Math.abs(item.timestamp - currentTimestamp);
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = index;
+      }
+    });
+
+    if (Number.isFinite(nearestDistance)) {
+      return clampSelectedIndex(nearestIndex, maxIndex);
+    }
+  }
+
+  const hourProgress =
+    currentTime.getHours() / 24 +
+    currentTime.getMinutes() / 1440 +
+    currentTime.getSeconds() / 86400;
+
+  return clampSelectedIndex(hourProgress * maxIndex, maxIndex);
+}
+
+function getSelectedIndexFromX(
+  x,
+  pad,
+  innerWidth,
+  maxIndex,
+  segment = "day",
+  dayTimeline = [],
+) {
+  if (!Number.isFinite(x) || innerWidth <= 0 || maxIndex <= 0) {
+    return 0;
+  }
+
+  const progress = Math.min(Math.max((x - pad.left) / innerWidth, 0), 1);
+
+  if (segment === "month" || segment === "year") {
+    return clampSelectedIndex(progress * (maxIndex + 1) - 0.5, maxIndex);
+  }
+
+  if (dayTimeline.length) {
+    let nearestIndex = 0;
+    let nearestDistance = Infinity;
+
+    dayTimeline.forEach((item, index) => {
+      const ratio =
+        item.timestamp !== null
+          ? getTimeRatioFromTimestamp(item.timestamp)
+          : maxIndex <= 0
+            ? 0
+            : index / maxIndex;
+
+      if (ratio === null) {
+        return;
+      }
+
+      const distance = Math.abs(ratio - progress);
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = index;
+      }
+    });
+
+    return clampSelectedIndex(nearestIndex, maxIndex);
+  }
+
+  return clampSelectedIndex(progress * maxIndex, maxIndex);
+}
+
+function getSelectedMarkerX(
+  selectedIndex,
+  pad,
+  innerWidth,
+  maxIndex,
+  segment = "day",
+  dayTimeline = [],
+) {
+  if (innerWidth <= 0 || maxIndex <= 0) {
+    return pad.left;
+  }
+
+  const safeIndex = clampSelectedIndex(selectedIndex, maxIndex);
+
+  if (segment === "month" || segment === "year") {
+    return pad.left + ((safeIndex + 0.5) / (maxIndex + 1)) * innerWidth;
+  }
+
+  const timelineItem = dayTimeline[safeIndex];
+  const timeRatio =
+    timelineItem?.timestamp !== null && timelineItem?.timestamp !== undefined
+      ? getTimeRatioFromTimestamp(timelineItem.timestamp)
+      : null;
+
+  if (timeRatio !== null) {
+    return pad.left + timeRatio * innerWidth;
+  }
+
+  return pad.left + (safeIndex / maxIndex) * innerWidth;
+}
+
+function getDaySeriesRecordAtIndex(
+  rows,
+  selectedIndex,
+  maxIndex,
+  dayTimeline = [],
+) {
+  const normalizedRows = normalizeSeriesRows(rows);
+
+  if (!normalizedRows.length) {
+    return null;
+  }
+
+  const timelineItem = dayTimeline[clampSelectedIndex(selectedIndex, maxIndex)];
+
+  if (timelineItem?.timestamp !== null && timelineItem?.timestamp !== undefined) {
+    let nearestRecord = null;
+    let nearestDistance = Infinity;
+
+    normalizedRows.forEach((row) => {
+      const rowTimestamp = getRecordTimestampValue(row);
+
+      if (rowTimestamp === null) {
+        return;
+      }
+
+      const distance = Math.abs(rowTimestamp - timelineItem.timestamp);
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestRecord = row;
+      }
+    });
+
+    if (nearestRecord) {
+      return nearestRecord;
+    }
+  }
+
+  if (normalizedRows.length === 1 || maxIndex <= 0) {
+    return normalizedRows[0];
+  }
+
+  const rowIndex = clampSelectedIndex(
+    (selectedIndex / maxIndex) * (normalizedRows.length - 1),
+    normalizedRows.length - 1,
+  );
+
+  return normalizedRows[rowIndex] ?? null;
+}
+
+function getSelectedChartValues({
+  series,
+  segment,
+  selectedIndex,
+  maxIndex,
+  aggregateStacks,
+  dayTimeline = [],
+}) {
+  return POWER_SERIES_CONFIG.reduce((values, item) => {
+    if (segment === "month" || segment === "year") {
+      values[item.key] = Math.abs(
+        Number(aggregateStacks.values[item.key]?.[selectedIndex]) || 0,
+      );
+      return values;
+    }
+
+    const record = getDaySeriesRecordAtIndex(
+      series?.[item.key],
+      selectedIndex,
+      maxIndex,
+      dayTimeline,
+    );
+    const value = getApiNumber(record);
+
+    values[item.key] = Math.abs(Number(value) || 0);
+    return values;
+  }, {});
+}
+
+function getSelectedDayLabel(series, selectedIndex, maxIndex, dayTimeline = []) {
+  const timelineItem = dayTimeline[clampSelectedIndex(selectedIndex, maxIndex)];
+
+  if (timelineItem?.timestamp !== null && timelineItem?.timestamp !== undefined) {
+    const parsedDate = new Date(timelineItem.timestamp);
+
+    if (!Number.isNaN(parsedDate.getTime())) {
+      return `${String(parsedDate.getHours()).padStart(2, "0")}:${String(
+        parsedDate.getMinutes(),
+      ).padStart(2, "0")}`;
+    }
+  }
+
+  for (const item of POWER_SERIES_CONFIG) {
+    const record = getDaySeriesRecordAtIndex(
+      series?.[item.key],
+      selectedIndex,
+      maxIndex,
+      dayTimeline,
+    );
+    const parsedDate = parseChartTimestamp(getRecordTimestampText(record));
+
+    if (parsedDate) {
+      return `${String(parsedDate.getHours()).padStart(2, "0")}:${String(
+        parsedDate.getMinutes(),
+      ).padStart(2, "0")}`;
+    }
+  }
+
+  if (maxIndex <= 0) {
+    return "00:00";
+  }
+
+  const totalMinutes = Math.round((selectedIndex / maxIndex) * 24 * 60);
+  const hour = Math.min(23, Math.floor(totalMinutes / 60));
+  const minute = totalMinutes >= 24 * 60 ? 59 : totalMinutes % 60;
+
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function getSelectedChartLabel({
+  segment,
+  series,
+  selectedIndex,
+  maxIndex,
+  dayTimeline = [],
+}) {
+  if (segment === "month") {
+    return `Tanggal ${selectedIndex + 1}`;
+  }
+
+  if (segment === "year") {
+    const firstSeries = normalizeSeriesRows(series?.production);
+    const label = firstSeries[selectedIndex]?.label;
+
+    return label || MONTH_LABELS[selectedIndex] || `Bulan ${selectedIndex + 1}`;
+  }
+
+  return getSelectedDayLabel(series, selectedIndex, maxIndex, dayTimeline);
+}
+
+function getSafePercent(value, total) {
+  const safeValue = Math.abs(Number(value) || 0);
+  const safeTotal = Math.abs(Number(total) || 0);
+
+  if (!safeTotal) {
+    return 0;
+  }
+
+  const percent = (safeValue / safeTotal) * 100;
+
+  return Number.isFinite(percent) ? percent : 0;
+}
+
+function formatSelectedChartValue(value, unit) {
+  const number = Math.abs(Number(value) || 0);
+
+  if (unit === "MWh") {
+    return number.toFixed(4);
+  }
+
+  return number.toFixed(2);
+}
+
+function formatSelectedChartPercent(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "0.0";
+  }
+
+  return number.toFixed(1);
+}
+
+function getSelectedDateText(selectedDay, selectedMonth, selectedYear) {
+  return `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(
+    selectedDay,
+  ).padStart(2, "0")}`;
+}
+
+function buildFiveMinuteSlots() {
+  return Array.from({ length: 24 * 12 }, (_, index) => {
+    const totalMinutes = index * 5;
+    const hour = Math.floor(totalMinutes / 60);
+    const minute = totalMinutes % 60;
+
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(
+      2,
+      "0",
+    )}`;
+  });
+}
+
+function getSlotLabelFromRecord(record) {
+  const timestamp = getRecordTimestampValue(record);
+
+  if (timestamp === null) {
+    return null;
+  }
+
+  const date = new Date(timestamp);
+  const totalMinutes = date.getHours() * 60 + date.getMinutes();
+  const roundedMinutes = Math.round(totalMinutes / 5) * 5;
+  const safeMinutes = Math.min(roundedMinutes, 23 * 60 + 55);
+  const hour = Math.floor(safeMinutes / 60);
+  const minute = safeMinutes % 60;
+
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function formatPdfCellValue(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "";
+  }
+
+  return Math.abs(number).toFixed(2);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function buildDailyPdfRows(series) {
+  const rowsByTime = buildFiveMinuteSlots().reduce((items, time) => {
+    items[time] = {
+      time,
+      production: "",
+      grid: "",
+      battery: "",
+      pvGenerate: "",
+      export: "",
+      charge: "",
+    };
+    return items;
+  }, {});
+
+  POWER_SERIES_CONFIG.forEach((item) => {
+    normalizeSeriesRows(series?.[item.key]).forEach((record) => {
+      const slotLabel = getSlotLabelFromRecord(record);
+
+      if (!slotLabel || !rowsByTime[slotLabel]) {
+        return;
+      }
+
+      const value = getApiNumber(record);
+
+      if (value === null) {
+        return;
+      }
+
+      rowsByTime[slotLabel][item.key] = formatPdfCellValue(value);
+    });
+  });
+
+  return buildFiveMinuteSlots().map((time) => rowsByTime[time]);
+}
+
+function buildDailyPdfHtml({ series, dateText, plantName }) {
+  const rows = buildDailyPdfRows(series);
+  const tableRows = rows
+    .map(
+      (row) => `
+        <tr>
+          <td>${escapeHtml(row.time)}</td>
+          <td>${escapeHtml(row.production)}</td>
+          <td>${escapeHtml(row.grid)}</td>
+          <td>${escapeHtml(row.battery)}</td>
+          <td>${escapeHtml(row.pvGenerate)}</td>
+          <td>${escapeHtml(row.export)}</td>
+          <td>${escapeHtml(row.charge)}</td>
+        </tr>
+      `,
+    )
+    .join("");
+
+  return `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            color: #111827;
+            padding: 24px;
+          }
+          h1 {
+            margin: 0 0 6px;
+            font-size: 22px;
+          }
+          .meta {
+            margin: 0 0 18px;
+            font-size: 12px;
+            color: #374151;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9px;
+          }
+          th, td {
+            border: 1px solid #D1D5DB;
+            padding: 4px 5px;
+            text-align: right;
+          }
+          th:first-child, td:first-child {
+            text-align: left;
+          }
+          th {
+            background: #E5F7FD;
+            color: #0F172A;
+            font-weight: 700;
+          }
+          tr:nth-child(even) td {
+            background: #F9FAFB;
+          }
+        </style>
+      </head>
+      <body>
+        <h1>Data Grafik Harian</h1>
+        <p class="meta">Tanggal: ${escapeHtml(dateText)}<br />Plant: ${escapeHtml(
+          plantName || "-",
+        )}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Waktu</th>
+              <th>PV</th>
+              <th>Grid</th>
+              <th>Battery</th>
+              <th>PV Generate</th>
+              <th>Export</th>
+              <th>Charge</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </body>
+    </html>
+  `;
+}
+
+async function shareDailyChartPdf({ series, dateText, plantName }) {
+  const html = buildDailyPdfHtml({ series, dateText, plantName });
+  const result = await Print.printToFileAsync({ html });
+  const fileName = `chart-data-${dateText}.pdf`;
+  const targetUri = `${FileSystem.cacheDirectory}${fileName}`;
+
+  await FileSystem.copyAsync({
+    from: result.uri,
+    to: targetUri,
+  });
+
+  const canShare = await Sharing.isAvailableAsync();
+
+  if (!canShare) {
+    throw new Error("Fitur share/save tidak tersedia di perangkat ini.");
+  }
+
+  await Sharing.shareAsync(targetUri, {
+    mimeType: "application/pdf",
+    dialogTitle: `Simpan ${fileName}`,
+    UTI: "com.adobe.pdf",
+  });
+}
+
 function DailyOverviewChart({
   series,
   chartWidth = CHART_WIDTH,
@@ -1926,9 +2752,15 @@ function DailyOverviewChart({
   showCurrentTime = true,
   onFullscreenPress,
   mode = "portrait",
+  segment = "day",
+  selectedDay = 1,
+  selectedMonth = 1,
+  selectedYear = new Date().getFullYear(),
+  plantName = "",
 }) {
   const isCompactChart = chartWidth < 320;
   const isLandscapeMode = mode === "landscape";
+  const isAggregateSegment = segment === "month" || segment === "year";
   const pad = {
     top: isLandscapeMode
       ? LANDSCAPE_CHART_LAYOUT.axisTopPadding
@@ -1949,12 +2781,68 @@ function DailyOverviewChart({
         ? 40
         : POWER_CHART_LAYOUT.paddingLeft,
   };
-  const yTicks = POWER_CHART_Y_RANGE.leftTicks;
-  const minY = POWER_CHART_Y_RANGE.minKw;
-  const maxY = POWER_CHART_Y_RANGE.maxKw;
+  const yTicks = isAggregateSegment
+    ? POWER_CHART_MONTH_Y_RANGE.leftTicks
+    : POWER_CHART_Y_RANGE.leftTicks;
+  const minY = isAggregateSegment
+    ? POWER_CHART_MONTH_Y_RANGE.minMwh
+    : POWER_CHART_Y_RANGE.minKw;
+  const maxY = isAggregateSegment
+    ? POWER_CHART_MONTH_Y_RANGE.maxMwh
+    : POWER_CHART_Y_RANGE.maxKw;
   const innerWidth = Math.max(0, chartWidth - pad.left - pad.right);
   const innerHeight = chartHeight - pad.top - pad.bottom;
   const timeTicks = getResponsiveChartTimeTicks(innerWidth);
+  const aggregateTicks = getAggregateTickValues(
+    segment,
+    selectedYear,
+    selectedMonth,
+  );
+  const aggregateStacks = buildAggregateChartStacks(
+    series,
+    segment,
+    selectedYear,
+    selectedMonth,
+  );
+  const dayTimeline = useMemo(() => buildDayChartTimeline(series), [series]);
+  const selectedMaxIndex = getSeriesMaxIndex(
+    series,
+    segment,
+    selectedYear,
+    selectedMonth,
+    dayTimeline,
+  );
+  const [selectedIndex, setSelectedIndex] = useState(() =>
+    getDefaultChartSelectedIndex(
+      segment,
+      selectedMaxIndex,
+      selectedYear,
+      selectedMonth,
+      currentTime,
+      dayTimeline,
+    ),
+  );
+  const [isSavingPdf, setIsSavingPdf] = useState(false);
+  const selectedDefaultIndex = getDefaultChartSelectedIndex(
+    segment,
+    selectedMaxIndex,
+    selectedYear,
+    selectedMonth,
+    currentTime,
+    dayTimeline,
+  );
+  const chartIdleTimerRef = useRef(null);
+  const hasManualChartSelectionRef = useRef(false);
+  const latestDefaultIndexRef = useRef(selectedDefaultIndex);
+  const latestMaxIndexRef = useRef(selectedMaxIndex);
+  latestDefaultIndexRef.current = selectedDefaultIndex;
+  latestMaxIndexRef.current = selectedMaxIndex;
+  const chartGesturePad = useMemo(() => ({ left: pad.left }), [pad.left]);
+  const zeroY = pad.top + ((maxY - 0) / (maxY - minY)) * innerHeight;
+  const barWidth = Math.max(
+    4,
+    Math.min(14, innerWidth / Math.max(aggregateStacks.itemCount * 2.4, 1)),
+  );
   const timeLabelFontSize = getResponsiveChartTimeFontSize(innerWidth);
   const currentHour =
     currentTime.getHours() +
@@ -1962,12 +2850,220 @@ function DailyOverviewChart({
     currentTime.getSeconds() / 3600;
   const currentTimeX = pad.left + (Math.min(currentHour, 24) / 24) * innerWidth;
   const currentTimeLabel = formatRealtimeClock(currentTime);
+  const selectedMarkerX = getSelectedMarkerX(
+    selectedIndex,
+    pad,
+    innerWidth,
+    selectedMaxIndex,
+    segment,
+    dayTimeline,
+  );
   const datasets = POWER_SERIES_CONFIG.map((item) => ({
     ...item,
     data: series[item.key] || [],
   }));
   const activeDatasets = datasets.filter((item) => visibleSeries[item.key]);
+  const activeConsumptionDatasets = activeDatasets.filter(
+    (item) => item.group === "consumption",
+  );
+  const activeProductionDatasets = activeDatasets.filter(
+    (item) => item.group === "production",
+  );
+  const selectedUnit = isAggregateSegment ? "MWh" : "kW";
+  const selectedValues = getSelectedChartValues({
+    series,
+    segment,
+    selectedIndex,
+    maxIndex: selectedMaxIndex,
+    aggregateStacks,
+    dayTimeline,
+  });
+  const selectedTotalConsumption =
+    selectedValues.production + selectedValues.grid + selectedValues.battery;
+  const selectedTotalProduction =
+    selectedValues.pvGenerate + selectedValues.export + selectedValues.charge;
+  const selectedLabel = getSelectedChartLabel({
+    segment,
+    series,
+    selectedIndex,
+    maxIndex: selectedMaxIndex,
+    dayTimeline,
+  });
+  const selectedInfoRows = POWER_SERIES_CONFIG.filter(
+    (item) => visibleSeries[item.key],
+  ).map((item) => {
+    const value = selectedValues[item.key] || 0;
+    const total =
+      item.group === "production"
+        ? selectedTotalProduction
+        : selectedTotalConsumption;
+
+    return {
+      ...item,
+      value,
+      percent: getSafePercent(value, total),
+    };
+  });
+  const selectedDateText = getSelectedDateText(
+    selectedDay,
+    selectedMonth,
+    selectedYear,
+  );
+  const handleSaveDailyPdf = useCallback(async () => {
+    if (segment !== "day") {
+      Alert.alert(
+        "Save PDF Harian",
+        "Pilih mode Day untuk menyimpan PDF data harian.",
+      );
+      return;
+    }
+
+    try {
+      setIsSavingPdf(true);
+      await shareDailyChartPdf({
+        series,
+        dateText: selectedDateText,
+        plantName,
+      });
+      Alert.alert("Save PDF", "PDF berhasil dibuat.");
+    } catch (error) {
+      Alert.alert(
+        "Save PDF gagal",
+        error?.message || "PDF belum bisa dibuat saat ini.",
+      );
+    } finally {
+      setIsSavingPdf(false);
+    }
+  }, [plantName, segment, selectedDateText, series]);
   const gradientSuffix = isLandscapeMode ? "Landscape" : "Portrait";
+  const clearChartIdleTimer = useCallback(() => {
+    if (chartIdleTimerRef.current) {
+      clearTimeout(chartIdleTimerRef.current);
+      chartIdleTimerRef.current = null;
+    }
+  }, []);
+  const returnChartToDefaultIndex = useCallback(() => {
+    hasManualChartSelectionRef.current = false;
+    setSelectedIndex(
+      clampSelectedIndex(
+        latestDefaultIndexRef.current,
+        latestMaxIndexRef.current,
+      ),
+    );
+  }, []);
+  const scheduleChartIdleReturn = useCallback(() => {
+    clearChartIdleTimer();
+    chartIdleTimerRef.current = setTimeout(() => {
+      chartIdleTimerRef.current = null;
+      returnChartToDefaultIndex();
+    }, POWER_CHART_IDLE_RETURN_MS);
+  }, [clearChartIdleTimer, returnChartToDefaultIndex]);
+  const setSelectedIndexFromUser = useCallback(
+    (nextIndex) => {
+      hasManualChartSelectionRef.current = true;
+      setSelectedIndex(clampSelectedIndex(nextIndex, latestMaxIndexRef.current));
+      scheduleChartIdleReturn();
+    },
+    [scheduleChartIdleReturn],
+  );
+  const chartPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (event) => {
+          setSelectedIndexFromUser(
+            getSelectedIndexFromX(
+              event.nativeEvent.locationX,
+              chartGesturePad,
+              innerWidth,
+              selectedMaxIndex,
+              segment,
+              dayTimeline,
+            ),
+          );
+        },
+        onPanResponderMove: (event) => {
+          setSelectedIndexFromUser(
+            getSelectedIndexFromX(
+              event.nativeEvent.locationX,
+              chartGesturePad,
+              innerWidth,
+              selectedMaxIndex,
+              segment,
+              dayTimeline,
+            ),
+          );
+        },
+        onPanResponderRelease: scheduleChartIdleReturn,
+        onPanResponderTerminate: scheduleChartIdleReturn,
+      }),
+    [
+      chartGesturePad,
+      dayTimeline,
+      innerWidth,
+      scheduleChartIdleReturn,
+      segment,
+      selectedMaxIndex,
+      setSelectedIndexFromUser,
+    ],
+  );
+
+  useEffect(() => {
+    hasManualChartSelectionRef.current = false;
+    clearChartIdleTimer();
+    setSelectedIndex(
+      clampSelectedIndex(
+        latestDefaultIndexRef.current,
+        latestMaxIndexRef.current,
+      ),
+    );
+  }, [clearChartIdleTimer, segment, selectedYear, selectedMonth]);
+
+  useEffect(() => {
+    setSelectedIndex((current) => {
+      if (hasManualChartSelectionRef.current) {
+        return clampSelectedIndex(current, selectedMaxIndex);
+      }
+
+      return clampSelectedIndex(
+        latestDefaultIndexRef.current,
+        selectedMaxIndex,
+      );
+    });
+  }, [selectedMaxIndex]);
+
+  useEffect(() => clearChartIdleTimer, [clearChartIdleTimer]);
+
+  const getYForValue = (value) =>
+    pad.top +
+    ((maxY - clampChartValue(value, minY, maxY)) / (maxY - minY)) *
+      innerHeight;
+  const renderMonthBarSegment = (item, dayIndex, startValue, endValue) => {
+    if (startValue === endValue) {
+      return null;
+    }
+
+    const x =
+      pad.left +
+      ((dayIndex + 0.5) / Math.max(aggregateStacks.itemCount, 1)) *
+        innerWidth -
+      barWidth / 2;
+    const yStart = getYForValue(startValue);
+    const yEnd = getYForValue(endValue);
+
+    return (
+      <Rect
+        key={`${item.key}-month-${dayIndex}`}
+        x={x}
+        y={Math.min(yStart, yEnd)}
+        width={barWidth}
+        height={Math.max(1, Math.abs(yEnd - yStart))}
+        rx={barWidth * 0.18}
+        fill={item.color}
+      />
+    );
+  };
 
   return (
     <View
@@ -2006,19 +3102,21 @@ function DailyOverviewChart({
           fontWeight="500"
           textAnchor="start"
         >
-          kW
+          {isAggregateSegment ? "MWh" : "kW"}
         </SvgText>
 
-        <SvgText
-          x={chartWidth - 4}
-          y={26}
-          fontSize={POWER_CHART_LAYOUT.axisTitleFontSize}
-          fill={appColors.text}
-          fontWeight="500"
-          textAnchor="end"
-        >
-          Percentage
-        </SvgText>
+        {!isAggregateSegment && (
+          <SvgText
+            x={chartWidth - 4}
+            y={26}
+            fontSize={POWER_CHART_LAYOUT.axisTitleFontSize}
+            fill={appColors.text}
+            fontWeight="500"
+            textAnchor="end"
+          >
+            Percentage
+          </SvgText>
+        )}
 
         {yTicks.map((value) => {
           const y = pad.top + ((maxY - value) / (maxY - minY)) * innerHeight;
@@ -2045,24 +3143,30 @@ function DailyOverviewChart({
                 {value.toFixed(1)}
               </SvgText>
 
-              <SvgText
-                x={chartWidth - pad.right + 8}
-                y={y + 5}
-                fontSize={POWER_CHART_LAYOUT.axisLabelFontSize}
-                fill="rgba(248,250,252,0.52)"
-                textAnchor="start"
-              >
-                {percentage}%
-              </SvgText>
+              {!isAggregateSegment && (
+                <SvgText
+                  x={chartWidth - pad.right + 8}
+                  y={y + 5}
+                  fontSize={POWER_CHART_LAYOUT.axisLabelFontSize}
+                  fill="rgba(248,250,252,0.52)"
+                  textAnchor="start"
+                >
+                  {percentage}%
+                </SvgText>
+              )}
             </Fragment>
           );
         })}
 
-        {timeTicks.map((hour) => {
-          const x = pad.left + (hour / 24) * innerWidth;
+        {(isAggregateSegment ? aggregateTicks : timeTicks).map((tick) => {
+          const x = isAggregateSegment
+            ? pad.left +
+              ((tick - 0.5) / Math.max(aggregateStacks.itemCount, 1)) *
+                innerWidth
+            : pad.left + (tick / 24) * innerWidth;
 
           return (
-            <Fragment key={`chart-x-${hour}`}>
+            <Fragment key={`chart-x-${tick}`}>
               <Line
                 x1={x}
                 y1={pad.top}
@@ -2079,23 +3183,80 @@ function DailyOverviewChart({
                 fill="rgba(248,250,252,0.52)"
                 textAnchor="middle"
               >
-                {formatChartHour(hour)}
+                {isAggregateSegment ? tick : formatChartHour(tick)}
               </SvgText>
             </Fragment>
           );
         })}
 
-        <Line
-          x1={currentTimeX}
-          y1={pad.top}
-          x2={currentTimeX}
-          y2={chartHeight - pad.bottom}
-          stroke="rgba(147,197,253,0.62)"
-          strokeWidth="1.4"
-          strokeDasharray="7 7"
-        />
+        {isAggregateSegment && (
+          <Line
+            x1={pad.left}
+            y1={zeroY}
+            x2={chartWidth - pad.right}
+            y2={zeroY}
+            stroke="rgba(248,250,252,0.42)"
+            strokeWidth="1.2"
+          />
+        )}
 
-        {activeDatasets.map((item) => (
+        {!isAggregateSegment && showCurrentTime && (
+          <Line
+            x1={currentTimeX}
+            y1={pad.top}
+            x2={currentTimeX}
+            y2={chartHeight - pad.bottom}
+            stroke="rgba(147,197,253,0.62)"
+            strokeWidth="1.4"
+            strokeDasharray="7 7"
+          />
+        )}
+
+        {isAggregateSegment &&
+          Array.from({ length: aggregateStacks.itemCount }, (_, dayIndex) => {
+            let positiveStack = 0;
+            let negativeStack = 0;
+
+            return (
+              <Fragment key={`month-bars-${dayIndex}`}>
+                {activeConsumptionDatasets.map((item) => {
+                  const value = Math.min(
+                    Math.abs(aggregateStacks.values[item.key]?.[dayIndex] || 0),
+                    POWER_CHART_MONTH_Y_RANGE.maxMwh - positiveStack,
+                  );
+                  const startValue = positiveStack;
+                  const endValue = positiveStack + Math.max(0, value);
+
+                  positiveStack = endValue;
+                  return renderMonthBarSegment(
+                    item,
+                    dayIndex,
+                    startValue,
+                    endValue,
+                  );
+                })}
+                {activeProductionDatasets.map((item) => {
+                  const value = Math.min(
+                    Math.abs(aggregateStacks.values[item.key]?.[dayIndex] || 0),
+                    Math.abs(POWER_CHART_MONTH_Y_RANGE.minMwh) -
+                      Math.abs(negativeStack),
+                  );
+                  const startValue = negativeStack;
+                  const endValue = negativeStack - Math.max(0, value);
+
+                  negativeStack = endValue;
+                  return renderMonthBarSegment(
+                    item,
+                    dayIndex,
+                    startValue,
+                    endValue,
+                  );
+                })}
+              </Fragment>
+            );
+          })}
+
+        {!isAggregateSegment && activeDatasets.map((item) => (
           <Path
             key={`${item.key}-area`}
             d={buildSmoothAreaPath(
@@ -2110,7 +3271,7 @@ function DailyOverviewChart({
           />
         ))}
 
-        {activeDatasets.map((item) => (
+        {!isAggregateSegment && activeDatasets.map((item) => (
           <Path
             key={`${item.key}-line`}
             d={buildSmoothLinePath(
@@ -2129,7 +3290,7 @@ function DailyOverviewChart({
           />
         ))}
 
-        {activeDatasets.map((item) => {
+        {!isAggregateSegment && activeDatasets.map((item) => {
           const point = getLatestChartPoint(
             item.data,
             minY,
@@ -2151,7 +3312,41 @@ function DailyOverviewChart({
             />
           ) : null;
         })}
+        <Line
+          x1={selectedMarkerX}
+          y1={pad.top}
+          x2={selectedMarkerX}
+          y2={chartHeight - pad.bottom}
+          stroke={POWER_CHART_MARKER.lineColor}
+          strokeWidth="1.6"
+          strokeDasharray="5 6"
+        />
         </Svg>
+        <View
+          {...chartPanResponder.panHandlers}
+          style={[
+            styles.chartMarkerTouchArea,
+            {
+              width: chartWidth,
+              height: chartHeight,
+            },
+          ]}
+        >
+          <View
+            pointerEvents="none"
+            style={[
+              styles.chartMarkerTriangle,
+              {
+                left: selectedMarkerX - POWER_CHART_MARKER.triangleSize,
+                top: Math.max(0, pad.top - POWER_CHART_MARKER.triangleSize - 3),
+                borderLeftWidth: POWER_CHART_MARKER.triangleSize,
+                borderRightWidth: POWER_CHART_MARKER.triangleSize,
+                borderTopWidth: POWER_CHART_MARKER.triangleSize + 2,
+                borderTopColor: POWER_CHART_MARKER.color,
+              },
+            ]}
+          />
+        </View>
         {!!onFullscreenPress && (
           <TouchableOpacity
             activeOpacity={0.78}
@@ -2220,6 +3415,64 @@ function DailyOverviewChart({
         })}
         </View>
       )}
+
+      {showSwitches && (
+        <View style={styles.chartSelectedInfo}>
+          <View style={styles.chartSelectedInfoHeader}>
+            <Text style={styles.chartSelectedInfoTitle}>Data Terpilih</Text>
+            <Text style={styles.chartSelectedInfoMeta}>
+              {segment === "day"
+                ? `Waktu: ${selectedLabel}`
+                : segment === "month"
+                  ? `Tanggal: ${selectedLabel.replace("Tanggal ", "")}`
+                  : `Bulan: ${selectedLabel}`}
+            </Text>
+          </View>
+
+          <View style={styles.chartSelectedInfoGrid}>
+            {selectedInfoRows.map((item) => (
+              <View key={item.key} style={styles.chartSelectedInfoItem}>
+                <View
+                  style={[
+                    styles.chartSelectedInfoDot,
+                    { backgroundColor: item.color },
+                  ]}
+                />
+                <Text style={styles.chartSelectedInfoLabel} numberOfLines={1}>
+                  {POWER_SERIES_SWITCH_LABELS[item.key] ?? item.label}
+                </Text>
+                <Text style={styles.chartSelectedInfoValue} numberOfLines={1}>
+                  {formatSelectedChartValue(item.value, selectedUnit)}{" "}
+                  {selectedUnit} ({formatSelectedChartPercent(item.percent)}%)
+                </Text>
+              </View>
+            ))}
+          </View>
+
+          <TouchableOpacity
+            activeOpacity={0.82}
+            disabled={isSavingPdf}
+            onPress={handleSaveDailyPdf}
+            style={[
+              styles.chartSavePdfButton,
+              isSavingPdf && styles.chartSavePdfButtonDisabled,
+            ]}
+          >
+            {isSavingPdf ? (
+              <ActivityIndicator size="small" color={appColors.text} />
+            ) : (
+              <Ionicons
+                name="save-outline"
+                size={16}
+                color={appColors.text}
+              />
+            )}
+            <Text style={styles.chartSavePdfText}>
+              {isSavingPdf ? "Menyimpan..." : "Save PDF"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -2231,19 +3484,17 @@ export default function OverviewScreen() {
   const router = useRouter();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const resolvedPlantId = resolvePlantId(id, selectedDevice?.id);
+  const initialJakartaDate = useMemo(() => getJakartaDateParts(), []);
   const [activeSegment, setActiveSegment] = useState("day");
   const [fetchedData, setFetchedData] = useState(null);
   const [focusRefreshKey, setFocusRefreshKey] = useState(0);
-  const [selectedDay, setSelectedDay] = useState(() => new Date().getDate());
-  const [selectedMonth, setSelectedMonth] = useState(
-    () => new Date().getMonth() + 1,
-  );
-  const [selectedYear, setSelectedYear] = useState(() =>
-    new Date().getFullYear(),
-  );
+  const [selectedDay, setSelectedDay] = useState(initialJakartaDate.day);
+  const [selectedMonth, setSelectedMonth] = useState(initialJakartaDate.month);
+  const [selectedYear, setSelectedYear] = useState(initialJakartaDate.year);
   const [selectedLifetimeRange, setSelectedLifetimeRange] = useState(5);
   const [plantMenuVisible, setPlantMenuVisible] = useState(false);
   const [isRefreshLoading, setIsRefreshLoading] = useState(false);
+  const [isChartLoading, setIsChartLoading] = useState(true);
   const [isChartLandscapeVisible, setIsChartLandscapeVisible] = useState(false);
   const [chartCurrentTime, setChartCurrentTime] = useState(() => new Date());
   const [visiblePowerSeries, setVisiblePowerSeries] = useState(() =>
@@ -2288,10 +3539,13 @@ export default function OverviewScreen() {
   const gridPointerEndRef = useRef(null);
   const pvPointerEndRef = useRef(null);
   const loadPointerEndRef = useRef(null);
-  const now = new Date();
-  const todayDay = now.getDate();
-  const todayMonth = now.getMonth() + 1;
-  const todayYear = now.getFullYear();
+  const dayPickerScrollRef = useRef(null);
+  const monthPickerScrollRef = useRef(null);
+  const chartLoadingTimerRef = useRef(null);
+  const todayParts = getJakartaDateParts();
+  const todayDay = todayParts.day;
+  const todayMonth = todayParts.month;
+  const todayYear = todayParts.year;
 
   const getAuthorizedHeaders = useCallback(async () => {
     const token = await getToken();
@@ -2430,9 +3684,10 @@ export default function OverviewScreen() {
           error: chartResult?.error,
           counts: getChartSeriesCounts(chartSeries),
         });
-        const fallbackChartSeries = chartRequestSucceeded
-          ? createEmptyChartSeries()
-          : await loadStoredChartSeries(chartSelectionKey);
+        const fallbackChartSeries =
+          chartRequestSucceeded || activeSegment !== "day"
+            ? createEmptyChartSeries()
+            : await loadStoredChartSeries(chartSelectionKey);
         const apiPowerValues = mergePowerValues(
           ...latestResults.map((item, index) =>
             normalizeLatestPowerValues(
@@ -2637,6 +3892,7 @@ export default function OverviewScreen() {
 
   useEffect(() => {
     if (
+      activeSegment !== "day" ||
       !fetchedData?.chartSelectionKey ||
       !hasChartSeriesRows(fetchedData.chartSeries)
     ) {
@@ -2647,7 +3903,7 @@ export default function OverviewScreen() {
       fetchedData.chartSelectionKey,
       fetchedData.chartSeries,
     );
-  }, [fetchedData?.chartSelectionKey, fetchedData?.chartSeries]);
+  }, [activeSegment, fetchedData?.chartSelectionKey, fetchedData?.chartSeries]);
 
   const plantData = useMemo(
     () => ({
@@ -2731,7 +3987,14 @@ export default function OverviewScreen() {
     }),
     [fetchedData, selectedDevice],
   );
-  const lowerPowerFlowData = useMemo(() => buildLowerPowerFlowData(), []);
+  const isCurrentDemoPlant = isDemoPlant({ name: plantData.plantName });
+  const lowerPowerFlowData = useMemo(
+    () =>
+      buildLowerPowerFlowData(
+        isCurrentDemoPlant ? LOWER_POWER_FLOW_DUMMY_DATA : {},
+      ),
+    [isCurrentDemoPlant],
+  );
   const weatherLocation = getWeatherLocation(plantData.address);
   const currentTemperature = pickNumber(
     plantData.weatherTemperature,
@@ -2781,9 +4044,40 @@ export default function OverviewScreen() {
 
   const handleDeletePlant = () => {
     setPlantMenuVisible(false);
+
+    if (isCurrentDemoPlant) {
+      Alert.alert(
+        "Tidak bisa dihapus",
+        `${DEMO_PLANT_NAME} tidak bisa dihapus karena digunakan sebagai contoh/demo.`,
+      );
+      return;
+    }
+
     Alert.alert("Delete plant", `Hapus ${plantData.plantName}?`, [
       { text: "Batal", style: "cancel" },
-      { text: "Delete", style: "destructive" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deletePlant(resolvedPlantId);
+            Alert.alert("Berhasil", "Plant berhasil dihapus.");
+            router.replace("/(home)/plant");
+          } catch (error) {
+            if (error.code === "AUTH_EXPIRED") {
+              Alert.alert(
+                "Error",
+                "Sesi Anda telah habis atau token tidak valid. Silakan login kembali.",
+              );
+              router.replace("/(auth)/login");
+              return;
+            }
+
+            Alert.alert("Gagal", error.message || "Gagal menghapus plant.");
+            console.error(error);
+          }
+        },
+      },
     ]);
   };
 
@@ -2811,14 +4105,22 @@ export default function OverviewScreen() {
         return items;
       }
 
+      if (activeSegment !== "day") {
+        items[item.key] = Array.isArray(apiSeries) ? apiSeries : [];
+        return items;
+      }
+
       items[item.key] =
         Array.isArray(apiSeries) && apiSeries.length
           ? apiSeries
-          : buildFallbackSeries(plantData[item.key], index);
+          : buildFallbackSeries(
+              getChartFallbackValue(item.key, plantData),
+              index,
+            );
 
       return items;
     }, {});
-  }, [isFutureSelection, plantData]);
+  }, [activeSegment, isFutureSelection, plantData]);
 
   const togglePowerSeries = (key) => {
     setVisiblePowerSeries((current) => ({
@@ -2853,6 +4155,63 @@ export default function OverviewScreen() {
       setSelectedDay(daysInMonth);
     }
   }, [selectedMonth, selectedYear, daysInMonth, selectedDay]);
+
+  useEffect(() => {
+    if (activeSegment !== "day") {
+      return;
+    }
+
+    const offsetX = Math.max(0, (selectedDay - 1) * POWER_CHART_DAY_CHIP_STEP);
+    const frame = requestAnimationFrame(() => {
+      dayPickerScrollRef.current?.scrollTo({
+        x: offsetX,
+        animated: false,
+      });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [activeSegment, selectedDay, selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    if (chartLoadingTimerRef.current) {
+      clearTimeout(chartLoadingTimerRef.current);
+    }
+
+    if (!chartSelectionKey) {
+      setIsChartLoading(false);
+      return undefined;
+    }
+
+    setIsChartLoading(true);
+    chartLoadingTimerRef.current = setTimeout(() => {
+      setIsChartLoading(false);
+    }, POWER_CHART_LOADING_DELAY_MS);
+
+    return () => {
+      if (chartLoadingTimerRef.current) {
+        clearTimeout(chartLoadingTimerRef.current);
+      }
+    };
+  }, [chartSelectionKey]);
+
+  useEffect(() => {
+    if (activeSegment !== "month") {
+      return;
+    }
+
+    const offsetX = Math.max(
+      0,
+      (selectedMonth - 1) * POWER_CHART_MONTH_CHIP_STEP,
+    );
+    const frame = requestAnimationFrame(() => {
+      monthPickerScrollRef.current?.scrollTo({
+        x: offsetX,
+        animated: false,
+      });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [activeSegment, selectedMonth, selectedYear]);
 
   useEffect(() => {
     Animated.timing(weatherCardAnim, {
@@ -3520,16 +4879,18 @@ export default function OverviewScreen() {
                 <Text style={styles.menuItemText}>Edit name</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.menuItem}
-                activeOpacity={0.75}
-                onPress={handleDeletePlant}
-              >
-                <Ionicons name="trash-outline" size={19} color="#EF4444" />
-                <Text style={[styles.menuItemText, styles.menuItemDanger]}>
-                  Delete plant
-                </Text>
-              </TouchableOpacity>
+              {!isCurrentDemoPlant && (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  activeOpacity={0.75}
+                  onPress={handleDeletePlant}
+                >
+                  <Ionicons name="trash-outline" size={19} color="#EF4444" />
+                  <Text style={[styles.menuItemText, styles.menuItemDanger]}>
+                    Delete plant
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </Pressable>
         </Modal>
@@ -4032,7 +5393,11 @@ export default function OverviewScreen() {
                   styles.segmentButton,
                   activeSegment === "month" && styles.segmentButtonActive,
                 ]}
-                onPress={() => setActiveSegment("month")}
+                onPress={() => {
+                  setSelectedMonth(todayMonth);
+                  setSelectedYear(todayYear);
+                  setActiveSegment("month");
+                }}
               >
                 <Text
                   style={[
@@ -4082,6 +5447,7 @@ export default function OverviewScreen() {
             {activeSegment === "day" ? (
               <View style={styles.dayPickerWrap}>
                 <ScrollView
+                  ref={dayPickerScrollRef}
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.dayPickerContent}
@@ -4118,6 +5484,7 @@ export default function OverviewScreen() {
             ) : activeSegment === "month" ? (
               <View style={styles.dayPickerWrap}>
                 <ScrollView
+                  ref={monthPickerScrollRef}
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.dayPickerContent}
@@ -4229,14 +5596,35 @@ export default function OverviewScreen() {
               activeSegment === "month" ||
               activeSegment === "year" ||
               activeSegment === "lifetime") && (
-              <DailyOverviewChart
-                series={dailySeries}
-                chartWidth={overviewChartWidth}
-                visibleSeries={visiblePowerSeries}
-                onToggleSeries={togglePowerSeries}
-                currentTime={chartCurrentTime}
-                onFullscreenPress={() => setIsChartLandscapeVisible(true)}
-              />
+              <>
+                {isChartLoading ? (
+                  <View
+                    style={[
+                      styles.chartLoadingWrap,
+                      { width: overviewChartWidth },
+                    ]}
+                  >
+                    <ActivityIndicator size="large" color={appColors.accent} />
+                    <Text style={styles.chartLoadingText}>
+                      Memuat data grafik...
+                    </Text>
+                  </View>
+                ) : (
+                  <DailyOverviewChart
+                    series={dailySeries}
+                    chartWidth={overviewChartWidth}
+                    visibleSeries={visiblePowerSeries}
+                    onToggleSeries={togglePowerSeries}
+                    currentTime={chartCurrentTime}
+                    onFullscreenPress={() => setIsChartLandscapeVisible(true)}
+                    segment={activeSegment}
+                    selectedDay={selectedDay}
+                    selectedMonth={selectedMonth}
+                    selectedYear={selectedYear}
+                    plantName={plantData.plantName}
+                  />
+                )}
+              </>
             )}
           </View>
         </View>
@@ -4279,17 +5667,39 @@ export default function OverviewScreen() {
                 },
               ]}
             >
-              <DailyOverviewChart
-                series={dailySeries}
-                chartWidth={landscapeChartWidth}
-                chartHeight={landscapeChartHeight}
-                visibleSeries={visiblePowerSeries}
-                onToggleSeries={togglePowerSeries}
-                currentTime={chartCurrentTime}
-                showCurrentTime={false}
-                showSwitches={false}
-                mode="landscape"
-              />
+              {isChartLoading ? (
+                <View
+                  style={[
+                    styles.chartLoadingWrap,
+                    {
+                      width: landscapeChartWidth,
+                      minHeight: landscapeChartHeight,
+                    },
+                  ]}
+                >
+                  <ActivityIndicator size="large" color={appColors.accent} />
+                  <Text style={styles.chartLoadingText}>
+                    Memuat data grafik...
+                  </Text>
+                </View>
+              ) : (
+                <DailyOverviewChart
+                  series={dailySeries}
+                  chartWidth={landscapeChartWidth}
+                  chartHeight={landscapeChartHeight}
+                  visibleSeries={visiblePowerSeries}
+                  onToggleSeries={togglePowerSeries}
+                  currentTime={chartCurrentTime}
+                  showCurrentTime={false}
+                  showSwitches={false}
+                  mode="landscape"
+                  segment={activeSegment}
+                  selectedDay={selectedDay}
+                  selectedMonth={selectedMonth}
+                  selectedYear={selectedYear}
+                  plantName={plantData.plantName}
+                />
+              )}
             </View>
           </View>
         </SafeAreaView>
@@ -4830,10 +6240,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  chartMarkerTouchArea: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    zIndex: 2,
+  },
+  chartMarkerTriangle: {
+    position: "absolute",
+    width: 0,
+    height: 0,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    backgroundColor: "transparent",
+    shadowColor: "#FFFFFF",
+    shadowOpacity: 0.32,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
   chartFullscreenButton: {
     position: "absolute",
     right: 4,
     bottom: 10,
+    zIndex: 4,
     width: 34,
     height: 34,
     borderRadius: 17,
@@ -4857,6 +6287,22 @@ const styles = StyleSheet.create({
     color: appColors.textMuted,
     fontFamily: appFont,
     fontSize: 13,
+    textAlign: "center",
+  },
+  chartLoadingWrap: {
+    minHeight: CHART_HEIGHT,
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 14,
+    paddingVertical: 26,
+  },
+  chartLoadingText: {
+    marginTop: 12,
+    color: appColors.textSoft,
+    fontFamily: appFont,
+    fontSize: 13,
+    fontWeight: "600",
     textAlign: "center",
   },
   chartSwitchRow: {
@@ -4898,6 +6344,85 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0,
     textAlign: "center",
+  },
+  chartSelectedInfo: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: "rgba(2,7,19,0.38)",
+    borderWidth: 1,
+    borderColor: "rgba(248,250,252,0.1)",
+  },
+  chartSelectedInfoHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 9,
+  },
+  chartSelectedInfoTitle: {
+    color: appColors.text,
+    fontFamily: appFont,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  chartSelectedInfoMeta: {
+    flexShrink: 1,
+    color: appColors.textSoft,
+    fontFamily: appFont,
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "right",
+  },
+  chartSelectedInfoGrid: {
+    gap: 7,
+  },
+  chartSelectedInfoItem: {
+    minHeight: 22,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  chartSelectedInfoDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    marginRight: 7,
+  },
+  chartSelectedInfoLabel: {
+    flex: 1,
+    minWidth: 0,
+    color: appColors.textMuted,
+    fontFamily: appFont,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  chartSelectedInfoValue: {
+    flexShrink: 0,
+    color: appColors.text,
+    fontFamily: appFont,
+    fontSize: 11,
+    fontWeight: "800",
+    textAlign: "right",
+  },
+  chartSavePdfButton: {
+    minHeight: 38,
+    marginTop: 12,
+    borderRadius: 11,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: appColors.accent,
+  },
+  chartSavePdfButtonDisabled: {
+    opacity: 0.68,
+  },
+  chartSavePdfText: {
+    color: appColors.text,
+    fontFamily: appFont,
+    fontSize: 13,
+    fontWeight: "800",
   },
   chartLandscapeSafeArea: {
     flex: 1,

@@ -8,13 +8,14 @@ import {
   View,
   Modal,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
-import { useContext, useState } from 'react';
-import { router } from 'expo-router';
+import { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { AuthContext } from '@/context/AuthContext';
 import { appColors, appFont } from '@/config/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { createPlant, updatePlant } from '@/services/plantService';
 
 const TIMEZONE_OPTIONS = [
   'Etc/GMT+12',
@@ -131,24 +132,47 @@ const CURRENCY_OPTIONS = [
   'PEN',
 ];
 
-export default function AddDeviceScreen() {
-  const { devices, setDevices } = useContext(AuthContext);
+function getParamValue(value) {
+  return Array.isArray(value) ? value[0] : value;
+}
 
-  const [name, setName] = useState('');
-  const [address, setAddress] = useState('');
-  const [longitude, setLongitude] = useState('');
-  const [latitude, setLatitude] = useState('');
-  const [timezone, setTimezone] = useState('');
-  const [systemType, setSystemType] = useState('');
-  const [installedCapacity, setInstalledCapacity] = useState('');
-  const [batteryCapacity, setBatteryCapacity] = useState('');
-  const [currency, setCurrency] = useState('');
+function getInitialText(value) {
+  const item = getParamValue(value);
+
+  if (item == null) {
+    return '';
+  }
+
+  return String(item);
+}
+
+export default function AddDeviceScreen() {
+  const params = useLocalSearchParams();
+  const editPlantId = getParamValue(params.plantId);
+  const isEditMode = getParamValue(params.mode) === 'edit' && Boolean(editPlantId);
+
+  const [name, setName] = useState(() => getInitialText(params.name));
+  const [address, setAddress] = useState(() => getInitialText(params.location));
+  const [longitude, setLongitude] = useState(() => getInitialText(params.longitude));
+  const [latitude, setLatitude] = useState(() => getInitialText(params.latitude));
+  const [timezone, setTimezone] = useState(() => getInitialText(params.timezone));
+  const [systemType, setSystemType] = useState(() =>
+    getInitialText(params.systemType),
+  );
+  const [installedCapacity, setInstalledCapacity] = useState(() =>
+    getInitialText(params.pvCapacity),
+  );
+  const [batteryCapacity, setBatteryCapacity] = useState(() =>
+    getInitialText(params.batteryCapacity),
+  );
+  const [currency, setCurrency] = useState(() => getInitialText(params.currency));
 
   const [timezoneModalVisible, setTimezoneModalVisible] = useState(false);
   const [systemTypeModalVisible, setSystemTypeModalVisible] = useState(false);
   const [currencyModalVisible, setCurrencyModalVisible] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name || !address || !longitude || !latitude || !systemType || !timezone) {
       Alert.alert(
         'Peringatan',
@@ -157,24 +181,83 @@ export default function AddDeviceScreen() {
       return;
     }
 
-    const newDevice = {
-      id: Date.now(),
-      name,
-      address,
-      longitude,
-      latitude,
+    const longitudeNumber = Number(longitude);
+    const latitudeNumber = Number(latitude);
+    const installedCapacityNumber = installedCapacity
+      ? Number(installedCapacity)
+      : null;
+    const batteryCapacityNumber = batteryCapacity ? Number(batteryCapacity) : null;
+
+    if (!Number.isFinite(longitudeNumber) || !Number.isFinite(latitudeNumber)) {
+      Alert.alert('Peringatan', 'Longitude dan latitude harus berupa angka.');
+      return;
+    }
+
+    if (installedCapacity && !Number.isFinite(installedCapacityNumber)) {
+      Alert.alert('Peringatan', 'Kapasitas terpasang harus berupa angka.');
+      return;
+    }
+
+    if (
+      systemType === 'Sistem penyimpanan' &&
+      batteryCapacity &&
+      !Number.isFinite(batteryCapacityNumber)
+    ) {
+      Alert.alert('Peringatan', 'Kapasitas baterai harus berupa angka.');
+      return;
+    }
+
+    const payload = {
+      name: name.trim(),
+      location: address.trim(),
+      longitude: longitudeNumber,
+      latitude: latitudeNumber,
       timezone,
-      systemType,
-      installedCapacity,
-      batteryCapacity:
-        systemType === 'Sistem penyimpanan' ? batteryCapacity : '',
-      currency,
+      system_type: systemType,
+      pv_capacity: installedCapacityNumber || 0,
+      battery_capacity:
+        systemType === 'Sistem penyimpanan' ? batteryCapacityNumber || 0 : 0,
     };
 
-    setDevices([...devices, newDevice]);
+    if (currency) {
+      payload.currency = currency;
+    }
 
-    Alert.alert('Berhasil', 'Plant berhasil ditambahkan.');
-    router.back();
+    setIsSaving(true);
+
+    try {
+      if (isEditMode) {
+        await updatePlant(editPlantId, payload);
+      } else {
+        await createPlant(payload);
+      }
+
+      Alert.alert(
+        'Berhasil',
+        isEditMode
+          ? 'Perubahan plant berhasil disimpan.'
+          : 'Plant berhasil ditambahkan.',
+      );
+      router.back();
+    } catch (error) {
+      if (error.code === 'AUTH_EXPIRED') {
+        Alert.alert(
+          'Error',
+          'Sesi Anda telah habis atau token tidak valid. Silakan login kembali.',
+        );
+        router.replace('/(auth)/login');
+        return;
+      }
+
+      Alert.alert(
+        'Gagal',
+        error.message ||
+          (isEditMode ? 'Gagal menyimpan perubahan plant.' : 'Gagal menyimpan plant.'),
+      );
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSelectTimezone = (selectedTimezone) => {
@@ -219,7 +302,7 @@ export default function AddDeviceScreen() {
             <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
           </TouchableOpacity>
 
-          <Text style={styles.title}>Tambah Plant</Text>
+          <Text style={styles.title}>{isEditMode ? 'Edit Plant' : 'Tambah Plant'}</Text>
 
           <View style={styles.headerSpacer} />
         </View>
@@ -351,11 +434,18 @@ export default function AddDeviceScreen() {
         </View>
 
         <TouchableOpacity
-          style={styles.saveButton}
+          style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
           onPress={handleSave}
           activeOpacity={0.85}
+          disabled={isSaving}
         >
-          <Text style={styles.saveButtonText}>Simpan Plant</Text>
+          {isSaving ? (
+            <ActivityIndicator color={appColors.text} />
+          ) : (
+            <Text style={styles.saveButtonText}>
+              {isEditMode ? 'Simpan Perubahan' : 'Simpan Plant'}
+            </Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
 
@@ -571,6 +661,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.16)',
+  },
+  saveButtonDisabled: {
+    opacity: 0.7,
   },
   saveButtonText: {
     color: appColors.text,

@@ -11,12 +11,26 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-export default function DeviceCard({ device, onPress, onEdit, onDelete }) {
+export default function DeviceCard({
+  device,
+  onPress,
+  onPinToggle,
+  onEdit,
+  onDelete,
+  isPinned = false,
+  canEdit = true,
+  canDelete = true,
+}) {
   const [menuVisible, setMenuVisible] = useState(false);
 
   const handleEdit = () => {
     setMenuVisible(false);
     onEdit?.(device);
+  };
+
+  const handlePinToggle = () => {
+    setMenuVisible(false);
+    onPinToggle?.(device);
   };
 
   const handleDelete = () => {
@@ -62,15 +76,28 @@ export default function DeviceCard({ device, onPress, onEdit, onDelete }) {
       >
         <Pressable style={styles.modalOverlay} onPress={() => setMenuVisible(false)}>
           <View style={styles.popupMenu}>
-            <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
-              <Ionicons name="create-outline" size={18} color={appColors.accent} />
-              <Text style={styles.menuText}>Edit</Text>
+            <TouchableOpacity style={styles.menuItem} onPress={handlePinToggle}>
+              <Ionicons
+                name={isPinned ? "pin" : "pin-outline"}
+                size={18}
+                color={appColors.accent}
+              />
+              <Text style={styles.menuText}>{isPinned ? "Unpin" : "Pin"}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.menuItem} onPress={handleDelete}>
-              <Ionicons name="trash-outline" size={18} color="#DC2626" />
-              <Text style={[styles.menuText, styles.deleteText]}>Delete</Text>
-            </TouchableOpacity>
+            {canEdit && (
+              <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
+                <Ionicons name="create-outline" size={18} color={appColors.accent} />
+                <Text style={styles.menuText}>Edit</Text>
+              </TouchableOpacity>
+            )}
+
+            {canDelete && (
+              <TouchableOpacity style={styles.menuItem} onPress={handleDelete}>
+                <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                <Text style={[styles.menuText, styles.deleteText]}>Delete</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </Pressable>
       </Modal>
