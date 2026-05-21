@@ -7,11 +7,7 @@ import { clearAuth, getToken, isTokenValid } from "@/auth/token";
 import { BASE_URL, GOOGLE_MAPS_API_KEY } from "@/config/api";
 import { appColors, appFont } from "@/config/theme";
 import { AuthContext } from "@/context/AuthContext";
-import {
-  DEMO_PLANT_NAME,
-  deletePlant,
-  isDemoPlant,
-} from "@/services/plantService";
+import { isDemoPlant } from "@/services/plantService";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -4032,53 +4028,23 @@ export default function OverviewScreen() {
     ],
   };
 
-  const handleEditPlantName = () => {
-    setPlantMenuVisible(false);
-    Alert.alert("Edit name", "Fitur edit nama plant belum tersedia.");
-  };
-
   const handleRefreshOverview = async () => {
     setPlantMenuVisible(false);
     await fetchOverviewData({ showLoading: true });
   };
 
-  const handleDeletePlant = () => {
+  const handleAddDatalogger = () => {
     setPlantMenuVisible(false);
 
-    if (isCurrentDemoPlant) {
-      Alert.alert(
-        "Tidak bisa dihapus",
-        `${DEMO_PLANT_NAME} tidak bisa dihapus karena digunakan sebagai contoh/demo.`,
-      );
+    if (!resolvedPlantId) {
+      Alert.alert("Peringatan", "Plant belum siap. Silakan coba lagi.");
       return;
     }
 
-    Alert.alert("Delete plant", `Hapus ${plantData.plantName}?`, [
-      { text: "Batal", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deletePlant(resolvedPlantId);
-            Alert.alert("Berhasil", "Plant berhasil dihapus.");
-            router.replace("/(home)/plant");
-          } catch (error) {
-            if (error.code === "AUTH_EXPIRED") {
-              Alert.alert(
-                "Error",
-                "Sesi Anda telah habis atau token tidak valid. Silakan login kembali.",
-              );
-              router.replace("/(auth)/login");
-              return;
-            }
-
-            Alert.alert("Gagal", error.message || "Gagal menghapus plant.");
-            console.error(error);
-          }
-        },
-      },
-    ]);
+    router.push({
+      pathname: "/plant/[id]/Add-device",
+      params: { id: resolvedPlantId },
+    });
   };
 
   const isFutureDaySelection =
@@ -4869,28 +4835,15 @@ export default function OverviewScreen() {
               <TouchableOpacity
                 style={styles.menuItem}
                 activeOpacity={0.75}
-                onPress={handleEditPlantName}
+                onPress={handleAddDatalogger}
               >
                 <Ionicons
-                  name="create-outline"
+                  name="hardware-chip-outline"
                   size={19}
                   color={appColors.accent}
                 />
-                <Text style={styles.menuItemText}>Edit name</Text>
+                <Text style={styles.menuItemText}>Add Datalogger</Text>
               </TouchableOpacity>
-
-              {!isCurrentDemoPlant && (
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  activeOpacity={0.75}
-                  onPress={handleDeletePlant}
-                >
-                  <Ionicons name="trash-outline" size={19} color="#EF4444" />
-                  <Text style={[styles.menuItemText, styles.menuItemDanger]}>
-                    Delete plant
-                  </Text>
-                </TouchableOpacity>
-              )}
             </View>
           </Pressable>
         </Modal>
@@ -5953,9 +5906,6 @@ const styles = StyleSheet.create({
     fontFamily: appFont,
     fontSize: 15,
     fontWeight: "600",
-  },
-  menuItemDanger: {
-    color: "#EF4444",
   },
   refreshLoadingOverlay: {
     flex: 1,

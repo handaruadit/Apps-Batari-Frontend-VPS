@@ -5,6 +5,8 @@ import { appColors } from "@/config/theme";
 const hiddenScreens = [
   "data",
   "eksperimen",
+  "Add-device",
+  "qr-scanner",
   "index",
   "sub-plant/data-battery",
   "sub-plant/data-grid",

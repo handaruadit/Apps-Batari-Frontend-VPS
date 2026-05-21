@@ -196,3 +196,32 @@ export async function deletePlant(plantId) {
 
   return body;
 }
+
+export async function linkDeviceToPlant(plantId, deviceId) {
+  if (plantId == null || String(plantId).trim() === "") {
+    throw new Error("ID plant tidak valid.");
+  }
+
+  const normalizedDeviceId = String(deviceId || "").trim();
+
+  if (!normalizedDeviceId) {
+    throw new Error("Device ID tidak boleh kosong.");
+  }
+
+  const headers = await getAuthHeaders();
+  const response = await fetch(
+    `${BASE_URL}/api/plant/${encodeURIComponent(plantId)}/device`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ device_id: normalizedDeviceId }),
+    },
+  );
+  const body = await parseResponse(response);
+
+  if (!response.ok) {
+    throwApiError(response, body, "Gagal menyimpan device. Coba lagi.");
+  }
+
+  return body;
+}
