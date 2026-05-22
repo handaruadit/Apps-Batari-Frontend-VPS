@@ -179,6 +179,10 @@ function getSeriesTotalValue(series) {
 }
 
 function buildProductionPowerFlowData(plantData, useDemoData) {
+  if (plantData?.isDeviceOnline === false) {
+    return buildLowerPowerFlowData();
+  }
+
   if (useDemoData) {
     return buildLowerPowerFlowData(LOWER_POWER_FLOW_DUMMY_DATA);
   }
@@ -928,6 +932,28 @@ const POWER_CHART_MONTH_CHIP_STEP = 104;
 const POWER_CHART_LOADING_DELAY_MS = 1200;
 const POWER_CHART_HISTORY_MAX_POINTS = 720;
 const POWER_CHART_SAMPLE_MIN_GAP_MS = 60 * 1000;
+const MONITORING_ONLINE_THRESHOLD_MS = 15 * 60 * 1000;
+const ZERO_ENERGY_VALUES = {
+  energy: {
+    consumptionKwh: 0,
+    batteryKwh: 0,
+    gridKwh: 0,
+    totalKwh: 0,
+  },
+  energyPercent: {
+    batteryPercent: 0,
+    consumptionPercent: 0,
+    gridPercent: 0,
+  },
+};
+const ZERO_POWER_VALUES = {
+  production: 0,
+  pv: 0,
+  grid: 0,
+  battery: 0,
+  upsLoad: 0,
+  load: 0,
+};
 const POWER_CHART_RESPONSIVE_WIDTH = {
   min: 240,
   max: 520,
@@ -1510,6 +1536,92 @@ function getRecordTimestampValue(record) {
   const parsed = parseChartTimestamp(getRecordTimestampText(record));
 
   return parsed ? parsed.getTime() : null;
+}
+
+function collectMonitoringTimestamps(source, timestamps = []) {
+  if (!source) {
+    return timestamps;
+  }
+
+  if (Array.isArray(source)) {
+    source.forEach((item) => collectMonitoringTimestamps(item, timestamps));
+    return timestamps;
+  }
+
+  if (typeof source !== "object") {
+    return timestamps;
+  }
+
+  const timestamp = getRecordTimestampValue(source);
+
+  if (timestamp !== null) {
+    timestamps.push(timestamp);
+  }
+
+  Object.values(source).forEach((value) => {
+    if (value && typeof value === "object") {
+      collectMonitoringTimestamps(value, timestamps);
+    }
+  });
+
+  return timestamps;
+}
+
+function hasOfflineStatus(source) {
+  if (!source || typeof source !== "object") {
+    return false;
+  }
+
+  if (Array.isArray(source)) {
+    return source.some(hasOfflineStatus);
+  }
+
+  const statusText = normalizeApiText(
+    pickValue(
+      source.status,
+      source.deviceStatus,
+      source.device_status,
+      source.connectionStatus,
+      source.connection_status,
+      source.message,
+      "",
+    ),
+  );
+
+  if (
+    statusText.includes("offline") ||
+    statusText.includes("disconnected") ||
+    statusText.includes("notconnected")
+  ) {
+    return true;
+  }
+
+  return Object.values(source).some((value) =>
+    value && typeof value === "object" ? hasOfflineStatus(value) : false,
+  );
+}
+
+function getMonitoringOnlineState(latestResults) {
+  const successfulJson = latestResults
+    .filter((item) => item?.ok)
+    .map((item) => item?.json)
+    .filter(Boolean);
+
+  if (!successfulJson.length || successfulJson.some(hasOfflineStatus)) {
+    return { isOnline: false, latestTimestamp: null };
+  }
+
+  const timestamps = successfulJson.flatMap((json) =>
+    collectMonitoringTimestamps(json?.data),
+  );
+  const latestTimestamp = timestamps.length ? Math.max(...timestamps) : null;
+
+  return {
+    isOnline:
+      latestTimestamp !== null &&
+      Date.now() - latestTimestamp <= MONITORING_ONLINE_THRESHOLD_MS,
+    latestTimestamp,
+  };
 }
 
 function normalizeSeriesRows(record) {
@@ -3902,13 +4014,20 @@ export default function OverviewScreen() {
           ),
         );
         const apiEnergyValues = getLatestEnergyValues(latestResults);
+        const monitoringState = getMonitoringOnlineState(latestResults);
+        const displayPowerValues = monitoringState.isOnline
+          ? apiPowerValues
+          : ZERO_POWER_VALUES;
+        const displayEnergyValues = monitoringState.isOnline
+          ? apiEnergyValues
+          : ZERO_ENERGY_VALUES;
         const realtimeChartSampleSeries = isSelectedCurrentDay(
           activeSegment,
           selectedDay,
           selectedMonth,
           selectedYear,
-        )
-          ? createRealtimeChartSampleSeries(apiPowerValues)
+        ) && monitoringState.isOnline
+          ? createRealtimeChartSampleSeries(displayPowerValues)
           : createEmptyChartSeries();
 
         setFetchedData((current) => {
@@ -4008,53 +4127,56 @@ export default function OverviewScreen() {
               null,
             ),
             productionToday: pickNumber(
-              apiPowerValues.production,
+              displayPowerValues.production,
               plantInfo.productionToday,
               plantInfo.production,
-              current?.productionToday,
-              current?.production,
+              monitoringState.isOnline ? current?.productionToday : 0,
+              monitoringState.isOnline ? current?.production : 0,
               selectedDevice?.productionToday,
               selectedDevice?.production,
             ),
             production:
-              apiPowerValues.production ??
-              current?.production ??
+              displayPowerValues.production ??
+              (monitoringState.isOnline ? current?.production : 0) ??
               plantInfo.production ??
               selectedDevice?.production ??
               0,
             pv:
-              apiPowerValues.pv ??
-              current?.pv ??
+              displayPowerValues.pv ??
+              (monitoringState.isOnline ? current?.pv : 0) ??
               plantInfo.pv ??
               selectedDevice?.pv ??
               0,
             grid:
-              apiPowerValues.grid ??
-              current?.grid ??
+              displayPowerValues.grid ??
+              (monitoringState.isOnline ? current?.grid : 0) ??
               plantInfo.grid ??
               selectedDevice?.grid ??
               0,
             battery:
-              apiPowerValues.battery ??
-              current?.battery ??
+              displayPowerValues.battery ??
+              (monitoringState.isOnline ? current?.battery : 0) ??
               plantInfo.battery ??
               selectedDevice?.battery ??
               0,
             upsLoad:
-              apiPowerValues.upsLoad ??
-              current?.upsLoad ??
+              displayPowerValues.upsLoad ??
+              (monitoringState.isOnline ? current?.upsLoad : 0) ??
               plantInfo.upsLoad ??
               selectedDevice?.upsLoad ??
               0,
             load:
-              apiPowerValues.load ??
-              current?.load ??
+              displayPowerValues.load ??
+              (monitoringState.isOnline ? current?.load : 0) ??
               plantInfo.load ??
               selectedDevice?.load ??
               0,
-            energy: apiEnergyValues.energy,
-            energyPercent: apiEnergyValues.energyPercent,
+            energy: displayEnergyValues.energy,
+            energyPercent: displayEnergyValues.energyPercent,
+            isDeviceOnline: monitoringState.isOnline,
+            latestDataTimestamp: monitoringState.latestTimestamp,
             status: pickValue(
+              monitoringState.isOnline ? "online" : "offline",
               plantInfo.status,
               current?.status,
               selectedDevice?.status,
@@ -4110,18 +4232,20 @@ export default function OverviewScreen() {
     );
   }, [activeSegment, fetchedData?.chartSelectionKey, fetchedData?.chartSeries]);
 
-  const plantData = useMemo(
-    () => ({
+  const plantData = useMemo(() => {
+    const isDeviceOnline = fetchedData?.isDeviceOnline === true;
+
+    return {
       plantName: pickValue(
         fetchedData?.name,
         selectedDevice?.name,
         "No Device Selected",
       ),
       productionToday: pickNumber(
-        fetchedData?.productionToday,
-        fetchedData?.production,
-        selectedDevice?.productionToday,
-        selectedDevice?.production,
+        isDeviceOnline ? fetchedData?.productionToday : 0,
+        isDeviceOnline ? fetchedData?.production : 0,
+        isDeviceOnline ? selectedDevice?.productionToday : 0,
+        isDeviceOnline ? selectedDevice?.production : 0,
       ),
       weather: pickValue(fetchedData?.weather, selectedDevice?.weather, null),
       weatherTemperature: pickFiniteNumber(
@@ -4174,30 +4298,26 @@ export default function OverviewScreen() {
         null,
       ),
       production: pickNumber(
-        fetchedData?.production,
-        selectedDevice?.production,
+        isDeviceOnline ? fetchedData?.production : 0,
+        isDeviceOnline ? selectedDevice?.production : 0,
       ),
-      pv: pickNumber(fetchedData?.pv, selectedDevice?.pv),
-      grid: pickNumber(fetchedData?.grid, selectedDevice?.grid),
-      battery: pickNumber(fetchedData?.battery, selectedDevice?.battery),
-      upsLoad: pickNumber(fetchedData?.upsLoad, selectedDevice?.upsLoad),
-      load: pickNumber(fetchedData?.load, selectedDevice?.load),
-      energy: fetchedData?.energy ?? {
-        consumptionKwh: 0,
-        batteryKwh: 0,
-        gridKwh: 0,
-        totalKwh: 0,
-      },
-      energyPercent: fetchedData?.energyPercent ?? {
-        batteryPercent: 0,
-        consumptionPercent: 0,
-        gridPercent: 0,
-      },
+      pv: pickNumber(isDeviceOnline ? fetchedData?.pv : 0),
+      grid: pickNumber(isDeviceOnline ? fetchedData?.grid : 0),
+      battery: pickNumber(isDeviceOnline ? fetchedData?.battery : 0),
+      upsLoad: pickNumber(isDeviceOnline ? fetchedData?.upsLoad : 0),
+      load: pickNumber(isDeviceOnline ? fetchedData?.load : 0),
+      energy: isDeviceOnline
+        ? fetchedData?.energy ?? ZERO_ENERGY_VALUES.energy
+        : ZERO_ENERGY_VALUES.energy,
+      energyPercent: isDeviceOnline
+        ? fetchedData?.energyPercent ?? ZERO_ENERGY_VALUES.energyPercent
+        : ZERO_ENERGY_VALUES.energyPercent,
       status: pickValue(fetchedData?.status, selectedDevice?.status, "--"),
+      isDeviceOnline,
+      latestDataTimestamp: fetchedData?.latestDataTimestamp ?? null,
       chartSeries: fetchedData?.chartSeries ?? createEmptyChartSeries(),
-    }),
-    [fetchedData, selectedDevice],
-  );
+    };
+  }, [fetchedData, selectedDevice]);
   const isCurrentDemoPlant = isDemoPlant({ name: plantData.plantName });
   const lowerPowerFlowData = useMemo(
     () => buildProductionPowerFlowData(plantData, isCurrentDemoPlant),
@@ -4598,10 +4718,14 @@ export default function OverviewScreen() {
     getLoadPointerCoordinates(houseOverlayLayout, loadBubbleLayout, bubbleScale),
     loadPointerEndRef,
   );
-  const shouldAnimateGridPointer = hasActivePowerFlowValue(plantData.grid);
-  const shouldAnimateBatteryPointer = hasActivePowerFlowValue(plantData.battery);
-  const shouldAnimatePvPointer = hasActivePowerFlowValue(plantData.production);
-  const shouldAnimateLoadPointer = hasActivePowerFlowValue(plantData.load);
+  const shouldAnimateGridPointer =
+    plantData.isDeviceOnline && hasActivePowerFlowValue(plantData.grid);
+  const shouldAnimateBatteryPointer =
+    plantData.isDeviceOnline && hasActivePowerFlowValue(plantData.battery);
+  const shouldAnimatePvPointer =
+    plantData.isDeviceOnline && hasActivePowerFlowValue(plantData.production);
+  const shouldAnimateLoadPointer =
+    plantData.isDeviceOnline && hasActivePowerFlowValue(plantData.load);
   const isBatteryPointerReverse = Number(plantData.battery) < 0;
   const gridPointerDotSize = GRID_POINTER_CONFIG.dotSize * bubbleScale;
   const gridPointerGlowSize = GRID_POINTER_CONFIG.dotSize * 2.8 * bubbleScale;

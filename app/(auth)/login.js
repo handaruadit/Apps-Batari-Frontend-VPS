@@ -80,6 +80,7 @@ const LoginScreen = () => {
 
     setLoading(true);
     let loginSuccess = false;
+    let redirectPath = "/(home)/plant";
 
     try {
       const response = await fetch(endpoint, {
@@ -109,6 +110,10 @@ const LoginScreen = () => {
           getUserFromToken(userToken) ?? { email };
         await saveUserInfo(userInfo);
         setUser(userInfo);
+        redirectPath =
+          String(userInfo?.role || "").toLowerCase() === "admin"
+            ? "/admin/device-access"
+            : "/(home)/plant";
 
         loginSuccess = true;
       } else {
@@ -126,7 +131,7 @@ const LoginScreen = () => {
     } finally {
       setLoading(false);
       if (loginSuccess) {
-        router.replace("/(home)/plant");
+        router.replace(redirectPath);
       }
     }
   };

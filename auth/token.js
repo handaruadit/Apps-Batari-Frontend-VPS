@@ -21,8 +21,8 @@ const decodeBase64 = (encoded) => {
       return atob(normalized);
     }
 
-    if (typeof Buffer !== 'undefined') {
-      return Buffer.from(normalized, 'base64').toString('utf-8');
+    if (typeof globalThis?.Buffer !== 'undefined') {
+      return globalThis.Buffer.from(normalized, 'base64').toString('utf-8');
     }
 
     return null;
@@ -117,8 +117,10 @@ export const getUserFromToken = (token) => {
   }
 
   return {
+    id: payload.id ?? payload.userId ?? payload.sub ?? null,
     email: payload.email ?? null,
     phone: payload.phone ?? null,
+    role: payload.role ?? 'user',
   };
 };
 
