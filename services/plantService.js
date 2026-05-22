@@ -197,6 +197,103 @@ export async function deletePlant(plantId) {
   return body;
 }
 
+export async function fetchPlantAccess(plantId) {
+  if (plantId == null || String(plantId).trim() === "") {
+    throw new Error("ID plant tidak valid.");
+  }
+
+  const headers = await getAuthHeaders();
+  const response = await fetch(
+    `${BASE_URL}/api/plant/${encodeURIComponent(plantId)}/access`,
+    {
+      method: "GET",
+      headers,
+    },
+  );
+  const body = await parseResponse(response);
+
+  if (!response.ok) {
+    throwApiError(response, body, "Gagal mengambil access plant.");
+  }
+
+  return Array.isArray(body?.data) ? body.data : [];
+}
+
+export async function searchPlantAccessUsers(plantId, query) {
+  const headers = await getAuthHeaders();
+  const response = await fetch(
+    `${BASE_URL}/api/plant/${encodeURIComponent(plantId)}/access/search`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ query }),
+    },
+  );
+  const body = await parseResponse(response);
+
+  if (!response.ok) {
+    throwApiError(response, body, "Gagal mencari user.");
+  }
+
+  return Array.isArray(body?.data) ? body.data : [];
+}
+
+export async function addPlantAccessUser(plantId, userId, role = "only_view") {
+  const headers = await getAuthHeaders();
+  const response = await fetch(
+    `${BASE_URL}/api/plant/${encodeURIComponent(plantId)}/access`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ userId, role }),
+    },
+  );
+  const body = await parseResponse(response);
+
+  if (!response.ok) {
+    throwApiError(response, body, "Gagal menambahkan akses user.");
+  }
+
+  return Array.isArray(body?.data) ? body.data : [];
+}
+
+export async function updatePlantAccessUser(plantId, userId, role) {
+  const headers = await getAuthHeaders();
+  const response = await fetch(
+    `${BASE_URL}/api/plant/${encodeURIComponent(plantId)}/access/${encodeURIComponent(userId)}`,
+    {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ role }),
+    },
+  );
+  const body = await parseResponse(response);
+
+  if (!response.ok) {
+    throwApiError(response, body, "Gagal mengubah akses user.");
+  }
+
+  return Array.isArray(body?.data) ? body.data : [];
+}
+
+export async function removePlantAccessUser(plantId, userId) {
+  const headers = await getAuthHeaders();
+  const response = await fetch(
+    `${BASE_URL}/api/plant/${encodeURIComponent(plantId)}/access/${encodeURIComponent(userId)}`,
+    {
+      method: "DELETE",
+      headers,
+    },
+  );
+  const body = await parseResponse(response);
+
+  if (!response.ok) {
+    throwApiError(response, body, "Gagal menghapus akses user.");
+  }
+
+  return Array.isArray(body?.data) ? body.data : [];
+}
+
 export async function linkDeviceToPlant(plantId, deviceId) {
   if (plantId == null || String(plantId).trim() === "") {
     throw new Error("ID plant tidak valid.");

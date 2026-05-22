@@ -76,20 +76,6 @@ function getLatestStatusTimestamp(source) {
   return Math.max(0, ...collectStatusTimestamps(source));
 }
 
-function isAllowedValue(value) {
-  return value === true || value === "true";
-}
-
-function getPlantDeviceId(plant) {
-  return (
-    plant?.device_id ??
-    plant?.deviceId ??
-    plant?.latestDeviceId ??
-    plant?.latest_device_id ??
-    null
-  );
-}
-
 function getDeviceLatestDataTimestamp(device) {
   return Math.max(
     0,
@@ -107,18 +93,14 @@ async function attachLatestDeviceTimestamps(plants) {
       try {
         const result = await fetchPlantDevices(plant.id);
         const devices = Array.isArray(result?.devices) ? result.devices : [];
-        const allowedDevices = devices.filter((device) =>
-          isAllowedValue(device?.allowed),
-        );
         const latestDataTimestamp = Math.max(
           0,
-          ...allowedDevices.map(getDeviceLatestDataTimestamp),
+          ...devices.map(getDeviceLatestDataTimestamp),
         );
 
         return {
           ...plant,
           hasDeviceId: devices.length > 0,
-          hasAllowedDevice: allowedDevices.length > 0,
           latestDataStatusTimestamp: latestDataTimestamp || null,
         };
       } catch (error) {
@@ -130,10 +112,6 @@ async function attachLatestDeviceTimestamps(plants) {
 
         return {
           ...plant,
-          hasDeviceId: Boolean(getPlantDeviceId(plant)),
-          hasAllowedDevice: isAllowedValue(
-            plant?.allowed ?? plant?.deviceAllowed ?? plant?.device_allowed,
-          ),
           latestDataStatusTimestamp: getLatestStatusTimestamp(plant) || null,
         };
       }
@@ -369,6 +347,23 @@ export default function PlantScreen() {
     router.push("/(main)/add-device");
   };
 
+  const handleAddDatalogger = (device) => {
+    router.push({
+      pathname: "/plant/[id]/Add-device",
+      params: { id: String(device.id) },
+    });
+  };
+
+  const handleManageAccess = (device) => {
+    router.push({
+      pathname: "/plant/[id]/manage-access",
+      params: {
+        id: String(device.id),
+        name: device.name || "",
+      },
+    });
+  };
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.screen }]}>
       <View style={styles.header}>
@@ -427,10 +422,17 @@ export default function PlantScreen() {
               device={item}
               onPress={() => handleSelectDevice(item)}
               onPinToggle={(device) => handlePinToggle(device)}
+              onAddDatalogger={(device) => handleAddDatalogger(device)}
               onEdit={(device) => handleEditDevice(device)}
               onDelete={(device) => handleDeleteDevice(device)}
+              onManageAccess={(device) => handleManageAccess(device)}
               isPinned={pinnedPlantIds.includes(String(item.id))}
-              canDelete={!isDemoPlant(item)}
+              canEdit={item.canEdit === true && !isDemoPlant(item)}
+              canAddDatalogger={
+                item.canAddDatalogger === true && !isDemoPlant(item)
+              }
+              canManageAccess={item.canManage === true && !isDemoPlant(item)}
+              canDelete={item.canDelete === true && !isDemoPlant(item)}
             />
           )}
           contentContainerStyle={{ paddingBottom: 120 }}

@@ -4315,6 +4315,7 @@ export default function OverviewScreen() {
       status: pickValue(fetchedData?.status, selectedDevice?.status, "--"),
       isDeviceOnline,
       latestDataTimestamp: fetchedData?.latestDataTimestamp ?? null,
+      canAddDatalogger: selectedDevice?.canAddDatalogger === true,
       chartSeries: fetchedData?.chartSeries ?? createEmptyChartSeries(),
     };
   }, [fetchedData, selectedDevice]);
@@ -4367,6 +4368,11 @@ export default function OverviewScreen() {
 
   const handleAddDatalogger = () => {
     setPlantMenuVisible(false);
+
+    if (!plantData.canAddDatalogger) {
+      Alert.alert("Access denied", "Anda tidak memiliki izin menambah datalogger.");
+      return;
+    }
 
     if (!resolvedPlantId) {
       Alert.alert("Peringatan", "Plant belum siap. Silakan coba lagi.");
@@ -5241,20 +5247,22 @@ export default function OverviewScreen() {
                 </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.menuItem}
-                activeOpacity={0.75}
-                onPress={handleAddDatalogger}
-              >
-                <Ionicons
-                  name="hardware-chip-outline"
-                  size={19}
-                  color={colors.accent}
-                />
-                <Text style={[styles.menuItemText, { color: colors.text }]}>
-                  {t("addDatalogger")}
-                </Text>
-              </TouchableOpacity>
+              {plantData.canAddDatalogger && (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  activeOpacity={0.75}
+                  onPress={handleAddDatalogger}
+                >
+                  <Ionicons
+                    name="hardware-chip-outline"
+                    size={19}
+                    color={colors.accent}
+                  />
+                  <Text style={[styles.menuItemText, { color: colors.text }]}>
+                    {t("addDatalogger")}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </Pressable>
         </Modal>

@@ -63,7 +63,6 @@ function RootLayoutContent() {
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(main)" />
           <Stack.Screen name="(home)" />
-          <Stack.Screen name="admin" />
           <Stack.Screen name="plant/[id]" />
         </Stack>
         {showBootSplash && (

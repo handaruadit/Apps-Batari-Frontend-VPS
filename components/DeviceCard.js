@@ -44,37 +44,7 @@ function getLatestDataTimestamp(device) {
   );
 }
 
-function getPlantDeviceId(device) {
-  return (
-    device?.device_id ??
-    device?.deviceId ??
-    device?.latestDeviceId ??
-    device?.latest_device_id ??
-    null
-  );
-}
-
 function getPlantConnectionStatus(device) {
-  const hasDeviceId =
-    device?.hasDeviceId === true || Boolean(getPlantDeviceId(device));
-  const hasAllowedDevice =
-    device?.hasAllowedDevice === true ||
-    device?.allowed === true ||
-    device?.allowed === "true" ||
-    device?.deviceAllowed === true ||
-    device?.deviceAllowed === "true" ||
-    device?.device_allowed === true ||
-    device?.device_allowed === "true";
-
-  if (!hasDeviceId || !hasAllowedDevice) {
-    return {
-      key: "comissioning",
-      isOnline: false,
-      label: "Comissioning",
-      timestamp: null,
-    };
-  }
-
   const latestTimestamp = getLatestDataTimestamp(device);
   const isOnline =
     latestTimestamp > 0 && Date.now() - latestTimestamp <= ONLINE_THRESHOLD_MS;
@@ -99,22 +69,21 @@ export default function DeviceCard({
   device,
   onPress,
   onPinToggle,
+  onAddDatalogger,
   onEdit,
   onDelete,
+  onManageAccess,
   isPinned = false,
   canEdit = true,
   canDelete = true,
+  canAddDatalogger = false,
+  canManageAccess = false,
 }) {
   const { colors, themeMode } = useAppSettings();
   const [menuVisible, setMenuVisible] = useState(false);
   const pulseAnim = useRef(new Animated.Value(0.45)).current;
   const connectionStatus = getPlantConnectionStatus(device);
-  const statusColor =
-    connectionStatus.key === "comissioning"
-      ? "#F97316"
-      : connectionStatus.isOnline
-        ? "#16A34A"
-        : "#DC2626";
+  const statusColor = connectionStatus.isOnline ? "#16A34A" : "#DC2626";
   const cityProvinceText = formatCityProvince(device);
 
   useEffect(() => {
@@ -146,6 +115,16 @@ export default function DeviceCard({
   const handlePinToggle = () => {
     setMenuVisible(false);
     onPinToggle?.(device);
+  };
+
+  const handleAddDatalogger = () => {
+    setMenuVisible(false);
+    onAddDatalogger?.(device);
+  };
+
+  const handleManageAccess = () => {
+    setMenuVisible(false);
+    onManageAccess?.(device);
   };
 
   const handleDelete = () => {
@@ -261,6 +240,32 @@ export default function DeviceCard({
               <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
                 <Ionicons name="create-outline" size={18} color={colors.accent} />
                 <Text style={[styles.menuText, { color: colors.text }]}>Edit</Text>
+              </TouchableOpacity>
+            )}
+
+            {canAddDatalogger && (
+              <TouchableOpacity style={styles.menuItem} onPress={handleAddDatalogger}>
+                <Ionicons
+                  name="hardware-chip-outline"
+                  size={18}
+                  color={colors.accent}
+                />
+                <Text style={[styles.menuText, { color: colors.text }]}>
+                  Add Datalogger
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {canManageAccess && (
+              <TouchableOpacity style={styles.menuItem} onPress={handleManageAccess}>
+                <Ionicons
+                  name="people-outline"
+                  size={18}
+                  color={colors.accent}
+                />
+                <Text style={[styles.menuText, { color: colors.text }]}>
+                  Manage Access
+                </Text>
               </TouchableOpacity>
             )}
 

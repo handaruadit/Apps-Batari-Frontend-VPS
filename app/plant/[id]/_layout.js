@@ -7,6 +7,7 @@ const hiddenScreens = [
   "data",
   "eksperimen",
   "Add-device",
+  "manage-access",
   "qr-scanner",
   "index",
   "sub-plant/data-battery",

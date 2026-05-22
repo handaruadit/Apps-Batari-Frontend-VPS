@@ -110,10 +110,7 @@ const LoginScreen = () => {
           getUserFromToken(userToken) ?? { email };
         await saveUserInfo(userInfo);
         setUser(userInfo);
-        redirectPath =
-          String(userInfo?.role || "").toLowerCase() === "admin"
-            ? "/admin/device-access"
-            : "/(home)/plant";
+        redirectPath = "/(home)/plant";
 
         loginSuccess = true;
       } else {
