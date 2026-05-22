@@ -43,8 +43,12 @@ export default function AddDataloggerScreen() {
     setIsSaving(true);
 
     try {
-      await linkDeviceToPlant(plantId, trimmedDeviceId);
-      Alert.alert("Berhasil", "Device berhasil disimpan.", [
+      const result = await linkDeviceToPlant(plantId, trimmedDeviceId);
+      const successMessage = result?.data?.alreadyLinked
+        ? "Device sudah terhubung."
+        : "Device berhasil disimpan.";
+
+      Alert.alert("Berhasil", successMessage, [
         {
           text: "OK",
           onPress: () =>
@@ -68,6 +72,11 @@ export default function AddDataloggerScreen() {
 
       if (error.status === 404 || message.includes("tidak ditemukan")) {
         Alert.alert("Gagal", "Device ID tidak ditemukan.");
+        return;
+      }
+
+      if (error.status === 409 || message.includes("sudah terhubung")) {
+        Alert.alert("Gagal", message);
         return;
       }
 

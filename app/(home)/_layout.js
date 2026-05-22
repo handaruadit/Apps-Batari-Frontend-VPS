@@ -2,9 +2,10 @@ import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { View, useWindowDimensions } from "react-native";
 import SolarIcon from "@/components/SolarIcon";
-import { appColors } from "@/config/theme";
+import { useAppSettings } from "@/context/AppSettingsContext";
 
 export default function MainLayout() {
+  const { colors, t } = useAppSettings();
   const { width, height } = useWindowDimensions();
 
   const isSmallScreen = width < 380;
@@ -25,7 +26,7 @@ export default function MainLayout() {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarHideOnKeyboard: true,
-        sceneStyle: { backgroundColor: appColors.screen },
+        sceneStyle: { backgroundColor: colors.screen },
 
         tabBarStyle: {
           position: "absolute",
@@ -33,15 +34,15 @@ export default function MainLayout() {
           right: tabHorizontalMargin,
           bottom: tabBottom,
           height: tabHeight,
-          backgroundColor: appColors.bubble,
+          backgroundColor: colors.bubble,
           borderRadius: tabRadius,
           paddingHorizontal: 0,
           paddingTop: 8,
           paddingBottom: 8,
           borderTopWidth: 0,
           borderWidth: 1,
-          borderColor: "rgba(0,170,255,0.45)",
-          shadowColor: "#00AEEF",
+          borderColor: colors.accent,
+          shadowColor: colors.accent,
           shadowOffset: { width: 0, height: 0 },
           shadowOpacity: 0.35,
           shadowRadius: 10,
@@ -49,7 +50,7 @@ export default function MainLayout() {
         },
 
         tabBarActiveTintColor: "#2F80FF",
-        tabBarInactiveTintColor: "rgba(255,255,255,0.65)",
+        tabBarInactiveTintColor: colors.textMuted,
         tabBarActiveBackgroundColor: "transparent",
         tabBarInactiveBackgroundColor: "transparent",
 
@@ -100,7 +101,7 @@ export default function MainLayout() {
       <Tabs.Screen
         name="me"
         options={{
-          title: "Me",
+          title: t("me"),
           tabBarIcon: ({ color }) => (
             <View
               style={{

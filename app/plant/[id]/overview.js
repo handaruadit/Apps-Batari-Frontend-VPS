@@ -1,12 +1,12 @@
 import PowerFlowDiagram from "@/components/PowerFlowDiagram";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
-import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { clearAuth, getToken, isTokenValid } from "@/auth/token";
 import { BASE_URL, GOOGLE_MAPS_API_KEY } from "@/config/api";
 import { appColors, appFont } from "@/config/theme";
 import { AuthContext } from "@/context/AuthContext";
+import { useAppSettings } from "@/context/AppSettingsContext";
 import { isDemoPlant } from "@/services/plantService";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -128,6 +128,14 @@ const POWER_SERIES_SWITCH_LABELS = {
   export: "Export",
   charge: "Charge",
 };
+const OVERVIEW_CHART_SWITCH_STORAGE_KEY = "overviewChartSwitchSettings";
+const getDefaultVisiblePowerSeries = () =>
+  POWER_SERIES_CONFIG.reduce((items, item) => {
+    items[item.key] = true;
+    return items;
+  }, {});
+const MENU_TOP_OFFSET = 58;
+const MENU_RIGHT_OFFSET = 24;
 
 // Data/source khusus untuk PowerFlowDiagram bawah.
 // Ubah nilai dummy ini kalau ingin mengatur PV Generate, Charge, dan Export.
@@ -161,6 +169,36 @@ function buildLowerPowerFlowData(sourceData = {}) {
       exportPercent: hasTotal ? (exportKwh / totalProductionKwh) * 100 : 0,
     },
   };
+}
+
+function getSeriesTotalValue(series) {
+  return normalizeSeriesRows(series).reduce((total, row) => {
+    const value = Number(getApiNumber(row));
+    return Number.isFinite(value) ? total + Math.abs(value) : total;
+  }, 0);
+}
+
+function buildProductionPowerFlowData(plantData, useDemoData) {
+  if (useDemoData) {
+    return buildLowerPowerFlowData(LOWER_POWER_FLOW_DUMMY_DATA);
+  }
+
+  const chartSeries = plantData?.chartSeries || {};
+  const pvGenerateKwh =
+    getSeriesTotalValue(chartSeries.pvGenerate) ||
+    Math.abs(Number(plantData?.pv ?? plantData?.production ?? 0));
+  const chargeKwh =
+    getSeriesTotalValue(chartSeries.charge) ||
+    Math.max(0, Number(plantData?.battery || 0));
+  const exportKwh =
+    getSeriesTotalValue(chartSeries.export) ||
+    Math.max(0, -Number(plantData?.grid || 0));
+
+  return buildLowerPowerFlowData({
+    pvGenerateKwh,
+    chargeKwh,
+    exportKwh,
+  });
 }
 
 const BUBBLE_POSITION_CONFIG = {
@@ -211,21 +249,100 @@ const MANUAL_BUBBLE_OFFSET = {
   },
 };
 
+// Atur panjang dan posisi garis masing-masing bubble dari satu tempat.
+// Ubah length/verticalLength untuk memperpanjang/memperpendek garis,
+// dan offsetX/offsetY/startOffset*/bendOffset*/endOffset* untuk menggeser garis.
+const BUBBLE_LINE_CONFIG = {
+  grid: {
+    offsetX: 0,
+    offsetY: 5,
+    startOffsetX: 0,
+    startOffsetY: -5,
+    bendOffsetX: 0,
+    bendOffsetY: -25,
+    endOffsetX: 0,
+    endOffsetY: -10,
+    leadLength: 70,
+    length: 1,
+    verticalLength: 103,
+    endAnchorPctX: 1,
+    endAnchorPctY: 0.85,
+    showEndHorizontalLine: false,
+  },
+  pv: {
+    offsetX: 0,
+    offsetY: 0,
+    startOffsetX: 0,
+    startOffsetY: 0,
+    bendOffsetX: 0,
+    bendOffsetY: 0,
+    endOffsetX: 0,
+    endOffsetY: 0,
+    length: 70,
+    verticalLength: 86,
+    endAnchorPctX: 0.5,
+    endAnchorPctY: 0.5,
+  },
+  battery: {
+    offsetX: 0,
+    offsetY: 0,
+    startOffsetX: 0,
+    startOffsetY: 0,
+    bendOffsetX: 0,
+    bendOffsetY: 0,
+    endOffsetX: 0,
+    endOffsetY: 0,
+    length: 85,
+    verticalLength: 80,
+    endAnchorPctX: 0.4,
+    endAnchorPctY: 0.59,
+  },
+  load: {
+    offsetX: 0,
+    offsetY: 0,
+    startOffsetX: 0,
+    startOffsetY: 0,
+    bendOffsetX: 0,
+    bendOffsetY: 0,
+    endOffsetX: 0,
+    endOffsetY: 0,
+    length: 25,
+    verticalLength: 85,
+    endAnchorPctX: 0.5,
+    endAnchorPctY: 0.5,
+  },
+  upsLoad: {
+    offsetX: 0,
+    offsetY: 0,
+    startOffsetX: 0,
+    startOffsetY: 0,
+    bendOffsetX: 0,
+    bendOffsetY: 0,
+    endOffsetX: 0,
+    endOffsetY: 0,
+    length: 25,
+    verticalLength: 80,
+    endAnchorPctX: 0.5,
+    endAnchorPctY: 0.5,
+  },
+};
+
 // Atur garis Grid ke tower dari sini.
 const GRID_POINTER_CONFIG = {
-  lineOffsetX: 0,
-  lineOffsetY: 0,
-  lineStartOffsetX: 0,
-  lineStartOffsetY: -5,
-  startLeadLength: 50,
-  lineBendOffsetX: 0,
-  lineBendOffsetY: 0,
-  lineEndOffsetX: -87,
-  lineEndOffsetY: 0,
-  verticalLineLength: 100,
-  horizontalLineLength: 150,
-  lineEndAnchorPctX: 0.25,
-  lineEndAnchorPctY: 0.85,
+  lineOffsetX: BUBBLE_LINE_CONFIG.grid.offsetX,
+  lineOffsetY: BUBBLE_LINE_CONFIG.grid.offsetY,
+  lineStartOffsetX: BUBBLE_LINE_CONFIG.grid.startOffsetX,
+  lineStartOffsetY: BUBBLE_LINE_CONFIG.grid.startOffsetY,
+  startLeadLength: BUBBLE_LINE_CONFIG.grid.leadLength,
+  lineBendOffsetX: BUBBLE_LINE_CONFIG.grid.bendOffsetX,
+  lineBendOffsetY: BUBBLE_LINE_CONFIG.grid.bendOffsetY,
+  lineEndOffsetX: BUBBLE_LINE_CONFIG.grid.endOffsetX,
+  lineEndOffsetY: BUBBLE_LINE_CONFIG.grid.endOffsetY,
+  verticalLineLength: BUBBLE_LINE_CONFIG.grid.verticalLength,
+  horizontalLineLength: BUBBLE_LINE_CONFIG.grid.length,
+  lineEndAnchorPctX: BUBBLE_LINE_CONFIG.grid.endAnchorPctX,
+  lineEndAnchorPctY: BUBBLE_LINE_CONFIG.grid.endAnchorPctY,
+  showEndHorizontalLine: BUBBLE_LINE_CONFIG.grid.showEndHorizontalLine,
   lineThickness: 1,
   lineColor: "#FFFFFF",
   dotColor: "#FF1F1F",
@@ -244,20 +361,18 @@ const GRID_POINTER_CONFIG = {
 
 // Atur garis Battery ke image dari sini.
 const BATTERY_POINTER_CONFIG = {
-  // Ubah nilai di bawah ini untuk mengatur garis Battery.
-  // verticalLineLength mengatur jarak vertikal ke atas dari ujung garis.
-  lineOffsetX: 0,
-  lineOffsetY: 0,
-  lineStartOffsetX: 0,
-  lineStartOffsetY: 0,
-  lineBendOffsetX: 0,
-  lineBendOffsetY: 0,
-  lineEndOffsetX: 0,
-  lineEndOffsetY: 0,
-  horizontalLineLength: 85,
-  verticalLineLength: 80,
-  lineEndAnchorPctX: 0.4,
-  lineEndAnchorPctY: 0.59,
+  lineOffsetX: BUBBLE_LINE_CONFIG.battery.offsetX,
+  lineOffsetY: BUBBLE_LINE_CONFIG.battery.offsetY,
+  lineStartOffsetX: BUBBLE_LINE_CONFIG.battery.startOffsetX,
+  lineStartOffsetY: BUBBLE_LINE_CONFIG.battery.startOffsetY,
+  lineBendOffsetX: BUBBLE_LINE_CONFIG.battery.bendOffsetX,
+  lineBendOffsetY: BUBBLE_LINE_CONFIG.battery.bendOffsetY,
+  lineEndOffsetX: BUBBLE_LINE_CONFIG.battery.endOffsetX,
+  lineEndOffsetY: BUBBLE_LINE_CONFIG.battery.endOffsetY,
+  horizontalLineLength: BUBBLE_LINE_CONFIG.battery.length,
+  verticalLineLength: BUBBLE_LINE_CONFIG.battery.verticalLength,
+  lineEndAnchorPctX: BUBBLE_LINE_CONFIG.battery.endAnchorPctX,
+  lineEndAnchorPctY: BUBBLE_LINE_CONFIG.battery.endAnchorPctY,
   lineThickness: GRID_POINTER_CONFIG.lineThickness,
   lineColor: GRID_POINTER_CONFIG.lineColor,
   dotColor: GRID_POINTER_CONFIG.dotColor,
@@ -276,18 +391,18 @@ const BATTERY_POINTER_CONFIG = {
 
 // Atur garis PV ke solar panel dari sini.
 const PV_POINTER_CONFIG = {
-  lineOffsetX: 0,
-  lineOffsetY: 0,
-  lineStartOffsetX: 0,
-  lineStartOffsetY: 0,
-  lineBendOffsetX: 0,
-  lineBendOffsetY: 0,
-  lineEndOffsetX: 0,
-  lineEndOffsetY: 0,
-  horizontalLineLength: 70,
-  verticalLineLength: 86,
-  lineEndAnchorPctX: 0.5,
-  lineEndAnchorPctY: 0.5,
+  lineOffsetX: BUBBLE_LINE_CONFIG.pv.offsetX,
+  lineOffsetY: BUBBLE_LINE_CONFIG.pv.offsetY,
+  lineStartOffsetX: BUBBLE_LINE_CONFIG.pv.startOffsetX,
+  lineStartOffsetY: BUBBLE_LINE_CONFIG.pv.startOffsetY,
+  lineBendOffsetX: BUBBLE_LINE_CONFIG.pv.bendOffsetX,
+  lineBendOffsetY: BUBBLE_LINE_CONFIG.pv.bendOffsetY,
+  lineEndOffsetX: BUBBLE_LINE_CONFIG.pv.endOffsetX,
+  lineEndOffsetY: BUBBLE_LINE_CONFIG.pv.endOffsetY,
+  horizontalLineLength: BUBBLE_LINE_CONFIG.pv.length,
+  verticalLineLength: BUBBLE_LINE_CONFIG.pv.verticalLength,
+  lineEndAnchorPctX: BUBBLE_LINE_CONFIG.pv.endAnchorPctX,
+  lineEndAnchorPctY: BUBBLE_LINE_CONFIG.pv.endAnchorPctY,
   lineThickness: GRID_POINTER_CONFIG.lineThickness,
   lineColor: GRID_POINTER_CONFIG.lineColor,
   dotColor: GRID_POINTER_CONFIG.dotColor,
@@ -306,18 +421,18 @@ const PV_POINTER_CONFIG = {
 
 // Atur garis Load ke image dari sini.
 const LOAD_POINTER_CONFIG = {
-  lineOffsetX: 0,
-  lineOffsetY: 0,
-  lineStartOffsetX: 0,
-  lineStartOffsetY: 0,
-  lineBendOffsetX: 0,
-  lineBendOffsetY: 0,
-  lineEndOffsetX: 0,
-  lineEndOffsetY: 0,
-  horizontalLineLength: 25, // space ke kiri dulu
-  verticalLineLength: 80, // lalu naik ke atas
-  lineEndAnchorPctX: 0.5,
-  lineEndAnchorPctY: 0.5,
+  lineOffsetX: BUBBLE_LINE_CONFIG.load.offsetX,
+  lineOffsetY: BUBBLE_LINE_CONFIG.load.offsetY,
+  lineStartOffsetX: BUBBLE_LINE_CONFIG.load.startOffsetX,
+  lineStartOffsetY: BUBBLE_LINE_CONFIG.load.startOffsetY,
+  lineBendOffsetX: BUBBLE_LINE_CONFIG.load.bendOffsetX,
+  lineBendOffsetY: BUBBLE_LINE_CONFIG.load.bendOffsetY,
+  lineEndOffsetX: BUBBLE_LINE_CONFIG.load.endOffsetX,
+  lineEndOffsetY: BUBBLE_LINE_CONFIG.load.endOffsetY,
+  horizontalLineLength: BUBBLE_LINE_CONFIG.load.length,
+  verticalLineLength: BUBBLE_LINE_CONFIG.load.verticalLength,
+  lineEndAnchorPctX: BUBBLE_LINE_CONFIG.load.endAnchorPctX,
+  lineEndAnchorPctY: BUBBLE_LINE_CONFIG.load.endAnchorPctY,
   lineThickness: GRID_POINTER_CONFIG.lineThickness,
   lineColor: GRID_POINTER_CONFIG.lineColor,
   dotColor: GRID_POINTER_CONFIG.dotColor,
@@ -443,13 +558,17 @@ function getGridPointerCoordinates(containerLayout, gridBubbleLayout, scale) {
       ? targetEndY - startY
       : config.verticalLineLength * scale;
   const bendY = leadY + verticalLength + (config.lineBendOffsetY || 0) * scale;
-  const endX =
-    config.horizontalLineLength == null
+  const showEndHorizontalLine = config.showEndHorizontalLine !== false;
+  const endX = showEndHorizontalLine
+    ? config.horizontalLineLength == null
       ? targetEndX + (config.lineOffsetX + config.lineEndOffsetX) * scale
       : startX +
         config.horizontalLineLength * scale +
-        config.lineEndOffsetX * scale;
-  const endY = bendY + (config.lineEndOffsetY || 0) * scale;
+        config.lineEndOffsetX * scale
+    : bendX;
+  const endY = showEndHorizontalLine
+    ? bendY + (config.lineEndOffsetY || 0) * scale
+    : bendY;
   const firstSegmentLength = Math.hypot(leadX - startX, leadY - startY);
   const secondSegmentLength = Math.hypot(bendX - leadX, bendY - leadY);
   const thirdSegmentLength = Math.hypot(endX - bendX, endY - bendY);
@@ -476,9 +595,12 @@ function getGridPointerCoordinates(containerLayout, gridBubbleLayout, scale) {
     bendY,
     endX,
     endY,
-    path: `M ${startX} ${startY} L ${leadX} ${leadY} L ${bendX} ${bendY} L ${endX} ${endY}`,
+    path: showEndHorizontalLine
+      ? `M ${startX} ${startY} L ${leadX} ${leadY} L ${bendX} ${bendY} L ${endX} ${endY}`
+      : `M ${startX} ${startY} L ${leadX} ${leadY} L ${bendX} ${bendY}`,
     leadProgress,
     bendProgress,
+    showEndHorizontalLine,
   };
 }
 
@@ -687,8 +809,12 @@ function lockPointerEndpoint(coordinates, endpointRef) {
     lockedCoordinates.path =
       `M ${lockedCoordinates.startX} ${lockedCoordinates.startY} ` +
       `L ${lockedCoordinates.leadX} ${lockedCoordinates.leadY} ` +
-      `L ${lockedCoordinates.bendX} ${lockedCoordinates.bendY} ` +
-      `L ${lockedCoordinates.endX} ${lockedCoordinates.endY}`;
+      `L ${lockedCoordinates.bendX} ${lockedCoordinates.bendY}`;
+
+    if (lockedCoordinates.showEndHorizontalLine !== false) {
+      lockedCoordinates.path +=
+        ` L ${lockedCoordinates.endX} ${lockedCoordinates.endY}`;
+    }
   } else {
     lockedCoordinates.path =
       `M ${lockedCoordinates.startX} ${lockedCoordinates.startY} ` +
@@ -893,22 +1019,9 @@ const environmentImpactItems = [
   },
 ];
 
-function getWeatherLocation(address) {
-  if (!address || address === "-") {
-    return "Jakarta";
-  }
-
-  return String(address).split(",")[0]?.trim() || "Jakarta";
-}
-
 function getTemperatureNumber(value) {
   const match = String(value || "").match(/\d+/);
   return match ? Number(match[0]) : 26;
-}
-
-function formatCoordinate(value) {
-  const text = String(value ?? "-").trim();
-  return text && text !== "-" ? `${text}\u00B0` : "-\u00B0";
 }
 
 function pickValue(...values) {
@@ -1003,6 +1116,10 @@ function formatCompactNumber(value) {
 
 function formatKwValue(value) {
   return `${formatCompactNumber(value)} kW`;
+}
+
+function hasActivePowerFlowValue(value) {
+  return Math.abs(Number(value) || 0) > 0;
 }
 
 function formatRealtimeClock(date) {
@@ -1409,6 +1526,51 @@ function getApiSeries(data, category, type) {
   return normalizeSeriesRows(getApiRecord(data, category, type));
 }
 
+function splitBatteryChargeValue(value, targetKey) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return null;
+  }
+
+  if (targetKey === "charge") {
+    return number > 0 ? number : 0;
+  }
+
+  if (targetKey === "battery") {
+    return number < 0 ? number : 0;
+  }
+
+  return number;
+}
+
+function getChargeChartValue(chargeValue, batteryValue) {
+  const chargeNumber = splitBatteryChargeValue(chargeValue, "charge");
+
+  if (chargeNumber > 0) {
+    return chargeNumber;
+  }
+
+  return splitBatteryChargeValue(batteryValue, "charge");
+}
+
+function splitBatteryChargeSeries(series, targetKey) {
+  return normalizeSeriesRows(series)
+    .map((row) => {
+      const value = splitBatteryChargeValue(getApiNumber(row), targetKey);
+
+      if (value === null) {
+        return null;
+      }
+
+      return {
+        ...row,
+        value,
+      };
+    })
+    .filter(Boolean);
+}
+
 function normalizePowerValues(data) {
   const pvPower = getApiLatestValue(data, "pv", "power");
   const pvChargePower = getApiLatestValue(data, "pv", "chargePower");
@@ -1524,7 +1686,14 @@ function normalizeChartSeries(data) {
       series[item.key] = data.items
         .map((row) => {
           const valueKey = item.key === "production" ? "pv" : item.key;
-          const value = Number(row?.[valueKey]);
+          const rawValue =
+            item.key === "charge"
+              ? getChargeChartValue(row?.charge, row?.battery)
+              : row?.[valueKey];
+          const value =
+            item.key === "battery" || item.key === "charge"
+              ? splitBatteryChargeValue(rawValue, item.key)
+              : Number(rawValue);
 
           if (!Number.isFinite(value)) {
             return null;
@@ -1549,14 +1718,18 @@ function normalizeChartSeries(data) {
   const directSeries = {
     production: normalizeSeriesRows(data?.production),
     grid: normalizeSeriesRows(data?.grid),
-    battery: normalizeSeriesRows(data?.battery),
+    battery: splitBatteryChargeSeries(data?.battery, "battery"),
     pvGenerate: normalizeSeriesRows(data?.pvGenerate),
     export: normalizeSeriesRows(data?.export),
-    charge: normalizeSeriesRows(data?.charge),
+    charge: mergeSeriesRows(
+      splitBatteryChargeSeries(data?.charge, "charge"),
+      splitBatteryChargeSeries(data?.battery, "charge"),
+    ),
   };
   const hasDirectSeries = hasChartSeriesRows(directSeries);
   const production = getApiSeries(data, "pv", "chargePower");
   const pvPower = getApiSeries(data, "pv", "power");
+  const batteryPower = getApiSeries(data, "battery", "power");
 
   if (hasDirectSeries) {
     return directSeries;
@@ -1565,10 +1738,13 @@ function normalizeChartSeries(data) {
   return {
     production: production.length ? production : pvPower,
     grid: getApiSeries(data, "grid", "power"),
-    battery: getApiSeries(data, "battery", "power"),
+    battery: splitBatteryChargeSeries(batteryPower, "battery"),
     pvGenerate: normalizeSeriesRows(data?.pvGenerate),
     export: normalizeSeriesRows(data?.export),
-    charge: normalizeSeriesRows(data?.charge),
+    charge: mergeSeriesRows(
+      splitBatteryChargeSeries(data?.charge, "charge"),
+      splitBatteryChargeSeries(batteryPower, "charge"),
+    ),
   };
 }
 
@@ -1808,6 +1984,10 @@ function createRealtimeChartSampleSeries(powerValues, timestamp = new Date()) {
   const series = createEmptyChartSeries();
 
   const addSample = (key, category, type, value) => {
+    if (value === null || value === undefined || value === "") {
+      return;
+    }
+
     const number = Number(value);
 
     if (!Number.isFinite(number)) {
@@ -1826,10 +2006,20 @@ function createRealtimeChartSampleSeries(powerValues, timestamp = new Date()) {
 
   addSample("production", "pv", "chargePower", powerValues.production);
   addSample("grid", "grid", "power", powerValues.grid);
-  addSample("battery", "baterai", "power", powerValues.battery);
+  addSample(
+    "battery",
+    "baterai",
+    "power",
+    splitBatteryChargeValue(powerValues.battery, "battery"),
+  );
   addSample("pvGenerate", "production", "pvGenerate", powerValues.pvGenerate);
   addSample("export", "production", "export", powerValues.export);
-  addSample("charge", "production", "charge", powerValues.charge);
+  addSample(
+    "charge",
+    "production",
+    "charge",
+    getChargeChartValue(powerValues.charge, powerValues.battery),
+  );
 
   return series;
 }
@@ -2574,7 +2764,7 @@ function getSlotLabelFromRecord(record) {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
-function formatPdfCellValue(value) {
+function formatCsvCellValue(value) {
   const number = Number(value);
 
   if (!Number.isFinite(number)) {
@@ -2584,16 +2774,17 @@ function formatPdfCellValue(value) {
   return Math.abs(number).toFixed(2);
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+function escapeCsvCell(value) {
+  const text = String(value ?? "");
+
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
+  return text;
 }
 
-function buildDailyPdfRows(series) {
+function buildDailyCsvRows(series) {
   const rowsByTime = buildFiveMinuteSlots().reduce((items, time) => {
     items[time] = {
       time,
@@ -2621,119 +2812,60 @@ function buildDailyPdfRows(series) {
         return;
       }
 
-      rowsByTime[slotLabel][item.key] = formatPdfCellValue(value);
+      rowsByTime[slotLabel][item.key] = formatCsvCellValue(value);
     });
   });
 
   return buildFiveMinuteSlots().map((time) => rowsByTime[time]);
 }
 
-function buildDailyPdfHtml({ series, dateText, plantName }) {
-  const rows = buildDailyPdfRows(series);
-  const tableRows = rows
-    .map(
-      (row) => `
-        <tr>
-          <td>${escapeHtml(row.time)}</td>
-          <td>${escapeHtml(row.production)}</td>
-          <td>${escapeHtml(row.grid)}</td>
-          <td>${escapeHtml(row.battery)}</td>
-          <td>${escapeHtml(row.pvGenerate)}</td>
-          <td>${escapeHtml(row.export)}</td>
-          <td>${escapeHtml(row.charge)}</td>
-        </tr>
-      `,
-    )
-    .join("");
+function buildDailyCsv({ series }) {
+  const rows = buildDailyCsvRows(series);
+  const header = [
+    "Waktu",
+    "PV",
+    "Grid",
+    "Battery",
+    "PV Generate",
+    "Export",
+    "Charge",
+  ];
+  const csvRows = rows.map((row) =>
+    [
+      row.time,
+      row.production,
+      row.grid,
+      row.battery,
+      row.pvGenerate,
+      row.export,
+      row.charge,
+    ]
+      .map(escapeCsvCell)
+      .join(","),
+  );
 
-  return `
-    <!doctype html>
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <style>
-          body {
-            font-family: Arial, sans-serif;
-            color: #111827;
-            padding: 24px;
-          }
-          h1 {
-            margin: 0 0 6px;
-            font-size: 22px;
-          }
-          .meta {
-            margin: 0 0 18px;
-            font-size: 12px;
-            color: #374151;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 9px;
-          }
-          th, td {
-            border: 1px solid #D1D5DB;
-            padding: 4px 5px;
-            text-align: right;
-          }
-          th:first-child, td:first-child {
-            text-align: left;
-          }
-          th {
-            background: #E5F7FD;
-            color: #0F172A;
-            font-weight: 700;
-          }
-          tr:nth-child(even) td {
-            background: #F9FAFB;
-          }
-        </style>
-      </head>
-      <body>
-        <h1>Data Grafik Harian</h1>
-        <p class="meta">Tanggal: ${escapeHtml(dateText)}<br />Plant: ${escapeHtml(
-          plantName || "-",
-        )}</p>
-        <table>
-          <thead>
-            <tr>
-              <th>Waktu</th>
-              <th>PV</th>
-              <th>Grid</th>
-              <th>Battery</th>
-              <th>PV Generate</th>
-              <th>Export</th>
-              <th>Charge</th>
-            </tr>
-          </thead>
-          <tbody>${tableRows}</tbody>
-        </table>
-      </body>
-    </html>
-  `;
+  return [header.join(","), ...csvRows].join("\n");
 }
 
-async function shareDailyChartPdf({ series, dateText, plantName }) {
-  const html = buildDailyPdfHtml({ series, dateText, plantName });
-  const result = await Print.printToFileAsync({ html });
-  const fileName = `chart-data-${dateText}.pdf`;
+async function shareDailyChartCsv({ series, dateText, unavailableMessage }) {
+  const csv = buildDailyCsv({ series });
+  const fileName = `chart-data-${dateText}.csv`;
   const targetUri = `${FileSystem.cacheDirectory}${fileName}`;
 
-  await FileSystem.copyAsync({
-    from: result.uri,
-    to: targetUri,
+  await FileSystem.writeAsStringAsync(targetUri, csv, {
+    encoding: FileSystem.EncodingType.UTF8,
   });
 
   const canShare = await Sharing.isAvailableAsync();
 
   if (!canShare) {
-    throw new Error("Fitur share/save tidak tersedia di perangkat ini.");
+    throw new Error(unavailableMessage);
   }
 
   await Sharing.shareAsync(targetUri, {
-    mimeType: "application/pdf",
+    mimeType: "text/csv",
     dialogTitle: `Simpan ${fileName}`,
-    UTI: "com.adobe.pdf",
+    UTI: "public.comma-separated-values-text",
   });
 }
 
@@ -2752,8 +2884,14 @@ function DailyOverviewChart({
   selectedDay = 1,
   selectedMonth = 1,
   selectedYear = new Date().getFullYear(),
-  plantName = "",
 }) {
+  const { colors, t, themeMode } = useAppSettings();
+  const isLightMode = themeMode === "light";
+  const chartTextColor = isLightMode ? colors.text : appColors.text;
+  const chartMutedColor = isLightMode ? colors.textMuted : "rgba(248,250,252,0.52)";
+  const chartGridColor = isLightMode ? "rgba(8,174,234,0.18)" : "rgba(248,250,252,0.12)";
+  const chartSubGridColor = isLightMode ? "rgba(8,174,234,0.12)" : "rgba(248,250,252,0.1)";
+  const chartStrongLineColor = isLightMode ? colors.text : "rgba(248,250,252,0.42)";
   const isCompactChart = chartWidth < 320;
   const isLandscapeMode = mode === "landscape";
   const isAggregateSegment = segment === "month" || segment === "year";
@@ -2818,7 +2956,7 @@ function DailyOverviewChart({
       dayTimeline,
     ),
   );
-  const [isSavingPdf, setIsSavingPdf] = useState(false);
+  const [isSavingCsv, setIsSavingCsv] = useState(false);
   const selectedDefaultIndex = getDefaultChartSelectedIndex(
     segment,
     selectedMaxIndex,
@@ -2905,32 +3043,29 @@ function DailyOverviewChart({
     selectedMonth,
     selectedYear,
   );
-  const handleSaveDailyPdf = useCallback(async () => {
+  const handleSaveDailyCsv = useCallback(async () => {
     if (segment !== "day") {
-      Alert.alert(
-        "Save PDF Harian",
-        "Pilih mode Day untuk menyimpan PDF data harian.",
-      );
+      Alert.alert(t("saveAsCsv"), t("dailyCsvOnly"));
       return;
     }
 
     try {
-      setIsSavingPdf(true);
-      await shareDailyChartPdf({
+      setIsSavingCsv(true);
+      await shareDailyChartCsv({
         series,
         dateText: selectedDateText,
-        plantName,
+        unavailableMessage: t("csvUnavailable"),
       });
-      Alert.alert("Save PDF", "PDF berhasil dibuat.");
+      Alert.alert(t("saveAsCsv"), t("csvSaved"));
     } catch (error) {
       Alert.alert(
-        "Save PDF gagal",
-        error?.message || "PDF belum bisa dibuat saat ini.",
+        t("csvFailed"),
+        error?.message || "CSV belum bisa dibuat saat ini.",
       );
     } finally {
-      setIsSavingPdf(false);
+      setIsSavingCsv(false);
     }
-  }, [plantName, segment, selectedDateText, series]);
+  }, [segment, selectedDateText, series, t]);
   const gradientSuffix = isLandscapeMode ? "Landscape" : "Portrait";
   const clearChartIdleTimer = useCallback(() => {
     if (chartIdleTimerRef.current) {
@@ -3069,7 +3204,9 @@ function DailyOverviewChart({
       ]}
     >
       {showCurrentTime && (
-        <Text style={styles.chartCurrentTimeText}>{currentTimeLabel}</Text>
+        <Text style={[styles.chartCurrentTimeText, { color: colors.textSoft }]}>
+          {currentTimeLabel}
+        </Text>
       )}
 
       <View style={styles.chartCanvasWrap}>
@@ -3094,7 +3231,7 @@ function DailyOverviewChart({
           x={4}
           y={26}
           fontSize={POWER_CHART_LAYOUT.axisTitleFontSize}
-          fill={appColors.text}
+          fill={chartTextColor}
           fontWeight="500"
           textAnchor="start"
         >
@@ -3106,7 +3243,7 @@ function DailyOverviewChart({
             x={chartWidth - 4}
             y={26}
             fontSize={POWER_CHART_LAYOUT.axisTitleFontSize}
-            fill={appColors.text}
+            fill={chartTextColor}
             fontWeight="500"
             textAnchor="end"
           >
@@ -3125,7 +3262,7 @@ function DailyOverviewChart({
                 y1={y}
                 x2={chartWidth - pad.right}
                 y2={y}
-                stroke="rgba(248,250,252,0.12)"
+                stroke={chartGridColor}
                 strokeWidth="1"
               />
 
@@ -3133,7 +3270,7 @@ function DailyOverviewChart({
                 x={pad.left - 8}
                 y={y + 5}
                 fontSize={POWER_CHART_LAYOUT.axisLabelFontSize}
-                fill="rgba(248,250,252,0.52)"
+                fill={chartMutedColor}
                 textAnchor="end"
               >
                 {value.toFixed(1)}
@@ -3144,7 +3281,7 @@ function DailyOverviewChart({
                   x={chartWidth - pad.right + 8}
                   y={y + 5}
                   fontSize={POWER_CHART_LAYOUT.axisLabelFontSize}
-                  fill="rgba(248,250,252,0.52)"
+                  fill={chartMutedColor}
                   textAnchor="start"
                 >
                   {percentage}%
@@ -3168,7 +3305,7 @@ function DailyOverviewChart({
                 y1={pad.top}
                 x2={x}
                 y2={chartHeight - pad.bottom}
-                stroke="rgba(248,250,252,0.1)"
+                stroke={chartSubGridColor}
                 strokeWidth="1"
               />
 
@@ -3176,7 +3313,7 @@ function DailyOverviewChart({
                 x={x}
                 y={chartHeight - 12}
                 fontSize={timeLabelFontSize}
-                fill="rgba(248,250,252,0.52)"
+                fill={chartMutedColor}
                 textAnchor="middle"
               >
                 {isAggregateSegment ? tick : formatChartHour(tick)}
@@ -3191,7 +3328,7 @@ function DailyOverviewChart({
             y1={zeroY}
             x2={chartWidth - pad.right}
             y2={zeroY}
-            stroke="rgba(248,250,252,0.42)"
+            stroke={chartStrongLineColor}
             strokeWidth="1.2"
           />
         )}
@@ -3303,7 +3440,7 @@ function DailyOverviewChart({
               cy={point.y}
               r={POWER_CHART_LAYOUT.pointRadius + 1}
               fill={item.color}
-              stroke="rgba(248,250,252,0.82)"
+              stroke={isLightMode ? colors.bubble : "rgba(248,250,252,0.82)"}
               strokeWidth="1.4"
             />
           ) : null;
@@ -3313,7 +3450,7 @@ function DailyOverviewChart({
           y1={pad.top}
           x2={selectedMarkerX}
           y2={chartHeight - pad.bottom}
-          stroke={POWER_CHART_MARKER.lineColor}
+          stroke={isLightMode ? colors.accent : POWER_CHART_MARKER.lineColor}
           strokeWidth="1.6"
           strokeDasharray="5 6"
         />
@@ -3338,7 +3475,7 @@ function DailyOverviewChart({
                 borderLeftWidth: POWER_CHART_MARKER.triangleSize,
                 borderRightWidth: POWER_CHART_MARKER.triangleSize,
                 borderTopWidth: POWER_CHART_MARKER.triangleSize + 2,
-                borderTopColor: POWER_CHART_MARKER.color,
+                borderTopColor: isLightMode ? colors.accent : POWER_CHART_MARKER.color,
               },
             ]}
           />
@@ -3348,12 +3485,18 @@ function DailyOverviewChart({
             activeOpacity={0.78}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             onPress={onFullscreenPress}
-            style={styles.chartFullscreenButton}
+            style={[
+              styles.chartFullscreenButton,
+              isLightMode && {
+                backgroundColor: colors.bubble,
+                borderColor: colors.bubbleBorder,
+              },
+            ]}
           >
             <Ionicons
               name="expand-outline"
               size={18}
-              color={appColors.accent}
+              color={colors.accent}
             />
           </TouchableOpacity>
         )}
@@ -3375,7 +3518,11 @@ function DailyOverviewChart({
                   {
                     backgroundColor: isActive
                       ? `${item.color}35`
-                      : "rgba(248,250,252,0.18)",
+                      : isLightMode
+                        ? `${item.color}18`
+                        : "rgba(248,250,252,0.18)",
+                    borderWidth: isLightMode ? 1 : 0,
+                    borderColor: isLightMode ? colors.bubbleBorder : "transparent",
                   },
                 ]}
               >
@@ -3385,7 +3532,9 @@ function DailyOverviewChart({
                     {
                       backgroundColor: isActive
                         ? `${item.color}CC`
-                        : "rgba(248,250,252,0.45)",
+                        : isLightMode
+                          ? `${item.color}8A`
+                          : "rgba(248,250,252,0.45)",
                       transform: [
                         {
                           translateX: isActive
@@ -3413,15 +3562,25 @@ function DailyOverviewChart({
       )}
 
       {showSwitches && (
-        <View style={styles.chartSelectedInfo}>
+        <View
+          style={[
+            styles.chartSelectedInfo,
+            isLightMode && {
+              backgroundColor: colors.bubble,
+              borderColor: colors.bubbleBorder,
+            },
+          ]}
+        >
           <View style={styles.chartSelectedInfoHeader}>
-            <Text style={styles.chartSelectedInfoTitle}>Data Terpilih</Text>
-            <Text style={styles.chartSelectedInfoMeta}>
+            <Text style={[styles.chartSelectedInfoTitle, { color: chartTextColor }]}>
+              {t("selectedData")}
+            </Text>
+            <Text style={[styles.chartSelectedInfoMeta, { color: colors.textSoft }]}>
               {segment === "day"
-                ? `Waktu: ${selectedLabel}`
+                ? `${t("time")}: ${selectedLabel}`
                 : segment === "month"
-                  ? `Tanggal: ${selectedLabel.replace("Tanggal ", "")}`
-                  : `Bulan: ${selectedLabel}`}
+                  ? `${t("date")}: ${selectedLabel.replace("Tanggal ", "")}`
+                  : `${t("month")}: ${selectedLabel}`}
             </Text>
           </View>
 
@@ -3434,10 +3593,16 @@ function DailyOverviewChart({
                     { backgroundColor: item.color },
                   ]}
                 />
-                <Text style={styles.chartSelectedInfoLabel} numberOfLines={1}>
+                <Text
+                  style={[styles.chartSelectedInfoLabel, { color: colors.textMuted }]}
+                  numberOfLines={1}
+                >
                   {POWER_SERIES_SWITCH_LABELS[item.key] ?? item.label}
                 </Text>
-                <Text style={styles.chartSelectedInfoValue} numberOfLines={1}>
+                <Text
+                  style={[styles.chartSelectedInfoValue, { color: colors.text }]}
+                  numberOfLines={1}
+                >
                   {formatSelectedChartValue(item.value, selectedUnit)}{" "}
                   {selectedUnit} ({formatSelectedChartPercent(item.percent)}%)
                 </Text>
@@ -3447,24 +3612,25 @@ function DailyOverviewChart({
 
           <TouchableOpacity
             activeOpacity={0.82}
-            disabled={isSavingPdf}
-            onPress={handleSaveDailyPdf}
+            disabled={isSavingCsv}
+            onPress={handleSaveDailyCsv}
             style={[
               styles.chartSavePdfButton,
-              isSavingPdf && styles.chartSavePdfButtonDisabled,
+              { backgroundColor: colors.accent },
+              isSavingCsv && styles.chartSavePdfButtonDisabled,
             ]}
           >
-            {isSavingPdf ? (
-              <ActivityIndicator size="small" color={appColors.text} />
+            {isSavingCsv ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <Ionicons
                 name="save-outline"
                 size={16}
-                color={appColors.text}
+                color="#FFFFFF"
               />
             )}
-            <Text style={styles.chartSavePdfText}>
-              {isSavingPdf ? "Menyimpan..." : "Save PDF"}
+            <Text style={[styles.chartSavePdfText, { color: "#FFFFFF" }]}>
+              {isSavingCsv ? t("saving") : t("saveAsCsv")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -3475,6 +3641,10 @@ function DailyOverviewChart({
 
 export default function OverviewScreen() {
   const insets = useSafeAreaInsets();
+  const { colors, t, themeMode } = useAppSettings();
+  const isLightMode = themeMode === "light";
+  const navigationColor = isLightMode ? appColors.screen : "rgba(248,250,252,0.88)";
+  const pointerLineColor = isLightMode ? colors.accent : GRID_POINTER_CONFIG.lineColor;
   const { selectedDevice } = useContext(AuthContext);
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -3487,17 +3657,13 @@ export default function OverviewScreen() {
   const [selectedDay, setSelectedDay] = useState(initialJakartaDate.day);
   const [selectedMonth, setSelectedMonth] = useState(initialJakartaDate.month);
   const [selectedYear, setSelectedYear] = useState(initialJakartaDate.year);
-  const [selectedLifetimeRange, setSelectedLifetimeRange] = useState(5);
   const [plantMenuVisible, setPlantMenuVisible] = useState(false);
   const [isRefreshLoading, setIsRefreshLoading] = useState(false);
   const [isChartLoading, setIsChartLoading] = useState(true);
   const [isChartLandscapeVisible, setIsChartLandscapeVisible] = useState(false);
   const [chartCurrentTime, setChartCurrentTime] = useState(() => new Date());
-  const [visiblePowerSeries, setVisiblePowerSeries] = useState(() =>
-    POWER_SERIES_CONFIG.reduce((items, item) => {
-      items[item.key] = true;
-      return items;
-    }, {}),
+  const [visiblePowerSeries, setVisiblePowerSeries] = useState(
+    getDefaultVisiblePowerSeries,
   );
   const [houseOverlayLayout, setHouseOverlayLayout] = useState(null);
   const [gridBubbleLayout, setGridBubbleLayout] = useState(null);
@@ -3542,6 +3708,49 @@ export default function OverviewScreen() {
   const todayDay = todayParts.day;
   const todayMonth = todayParts.month;
   const todayYear = todayParts.year;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadVisiblePowerSeries = async () => {
+      try {
+        const storedValue = await AsyncStorage.getItem(
+          OVERVIEW_CHART_SWITCH_STORAGE_KEY,
+        );
+
+        if (!storedValue) {
+          return;
+        }
+
+        const parsedValue = JSON.parse(storedValue);
+
+        if (!parsedValue || typeof parsedValue !== "object") {
+          return;
+        }
+
+        const defaults = getDefaultVisiblePowerSeries();
+        const nextVisibleSeries = POWER_SERIES_CONFIG.reduce((items, item) => {
+          items[item.key] =
+            typeof parsedValue[item.key] === "boolean"
+              ? parsedValue[item.key]
+              : defaults[item.key];
+          return items;
+        }, {});
+
+        if (isMounted) {
+          setVisiblePowerSeries(nextVisibleSeries);
+        }
+      } catch (error) {
+        console.warn("Failed to load overview chart switch settings:", error);
+      }
+    };
+
+    loadVisiblePowerSeries();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const getAuthorizedHeaders = useCallback(async () => {
     const token = await getToken();
@@ -3943,6 +4152,12 @@ export default function OverviewScreen() {
         null,
       ),
       address: pickValue(fetchedData?.location, selectedDevice?.location, null),
+      city: pickValue(fetchedData?.city, selectedDevice?.city, null),
+      province: pickValue(
+        fetchedData?.province,
+        selectedDevice?.province,
+        null,
+      ),
       longitude: pickValue(
         fetchedData?.longitude,
         selectedDevice?.longitude,
@@ -3985,13 +4200,13 @@ export default function OverviewScreen() {
   );
   const isCurrentDemoPlant = isDemoPlant({ name: plantData.plantName });
   const lowerPowerFlowData = useMemo(
-    () =>
-      buildLowerPowerFlowData(
-        isCurrentDemoPlant ? LOWER_POWER_FLOW_DUMMY_DATA : {},
-      ),
-    [isCurrentDemoPlant],
+    () => buildProductionPowerFlowData(plantData, isCurrentDemoPlant),
+    [isCurrentDemoPlant, plantData],
   );
-  const weatherLocation = getWeatherLocation(plantData.address);
+  const weatherLocation = [plantData.city, plantData.province]
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .join(", ") || "-";
   const currentTemperature = pickNumber(
     plantData.weatherTemperature,
     getTemperatureNumber(plantData.weather),
@@ -4007,9 +4222,6 @@ export default function OverviewScreen() {
     plantData.weatherIsDaytime,
   );
   const productionMeta = `${formatCompactNumber(plantData.productionToday)}kW`;
-  const coordinateMeta = `${formatCoordinate(plantData.latitude)} ${formatCoordinate(
-    plantData.longitude,
-  )}`;
   const weatherCardAnimatedStyle = {
     opacity: weatherCardAnim,
     transform: [
@@ -4089,10 +4301,22 @@ export default function OverviewScreen() {
   }, [activeSegment, isFutureSelection, plantData]);
 
   const togglePowerSeries = (key) => {
-    setVisiblePowerSeries((current) => ({
-      ...current,
-      [key]: !current[key],
-    }));
+    setVisiblePowerSeries((current) => {
+      const nextVisibleSeries = {
+        ...getDefaultVisiblePowerSeries(),
+        ...current,
+        [key]: !current[key],
+      };
+
+      AsyncStorage.setItem(
+        OVERVIEW_CHART_SWITCH_STORAGE_KEY,
+        JSON.stringify(nextVisibleSeries),
+      ).catch((error) => {
+        console.warn("Failed to save overview chart switch settings:", error);
+      });
+
+      return nextVisibleSeries;
+    });
   };
 
   const monthOptions = [
@@ -4374,6 +4598,11 @@ export default function OverviewScreen() {
     getLoadPointerCoordinates(houseOverlayLayout, loadBubbleLayout, bubbleScale),
     loadPointerEndRef,
   );
+  const shouldAnimateGridPointer = hasActivePowerFlowValue(plantData.grid);
+  const shouldAnimateBatteryPointer = hasActivePowerFlowValue(plantData.battery);
+  const shouldAnimatePvPointer = hasActivePowerFlowValue(plantData.production);
+  const shouldAnimateLoadPointer = hasActivePowerFlowValue(plantData.load);
+  const isBatteryPointerReverse = Number(plantData.battery) < 0;
   const gridPointerDotSize = GRID_POINTER_CONFIG.dotSize * bubbleScale;
   const gridPointerGlowSize = GRID_POINTER_CONFIG.dotSize * 2.8 * bubbleScale;
   const batteryPointerDotSize = BATTERY_POINTER_CONFIG.dotSize * bubbleScale;
@@ -4451,41 +4680,65 @@ export default function OverviewScreen() {
   const batteryPointerDotX = batteryPointerCoordinates
     ? batteryPointerProgress.interpolate({
         inputRange: [0, batteryPointerCoordinates.bendProgress, 1],
-        outputRange: [
-          batteryPointerCoordinates.startX - batteryPointerDotSize / 2,
-          batteryPointerCoordinates.bendX - batteryPointerDotSize / 2,
-          batteryPointerCoordinates.endX - batteryPointerDotSize / 2,
-        ],
+        outputRange: isBatteryPointerReverse
+          ? [
+              batteryPointerCoordinates.endX - batteryPointerDotSize / 2,
+              batteryPointerCoordinates.bendX - batteryPointerDotSize / 2,
+              batteryPointerCoordinates.startX - batteryPointerDotSize / 2,
+            ]
+          : [
+              batteryPointerCoordinates.startX - batteryPointerDotSize / 2,
+              batteryPointerCoordinates.bendX - batteryPointerDotSize / 2,
+              batteryPointerCoordinates.endX - batteryPointerDotSize / 2,
+            ],
       })
     : null;
   const batteryPointerDotY = batteryPointerCoordinates
     ? batteryPointerProgress.interpolate({
         inputRange: [0, batteryPointerCoordinates.bendProgress, 1],
-        outputRange: [
-          batteryPointerCoordinates.startY - batteryPointerDotSize / 2,
-          batteryPointerCoordinates.bendY - batteryPointerDotSize / 2,
-          batteryPointerCoordinates.endY - batteryPointerDotSize / 2,
-        ],
+        outputRange: isBatteryPointerReverse
+          ? [
+              batteryPointerCoordinates.endY - batteryPointerDotSize / 2,
+              batteryPointerCoordinates.bendY - batteryPointerDotSize / 2,
+              batteryPointerCoordinates.startY - batteryPointerDotSize / 2,
+            ]
+          : [
+              batteryPointerCoordinates.startY - batteryPointerDotSize / 2,
+              batteryPointerCoordinates.bendY - batteryPointerDotSize / 2,
+              batteryPointerCoordinates.endY - batteryPointerDotSize / 2,
+            ],
       })
     : null;
   const batteryPointerGlowX = batteryPointerCoordinates
     ? batteryPointerProgress.interpolate({
         inputRange: [0, batteryPointerCoordinates.bendProgress, 1],
-        outputRange: [
-          batteryPointerCoordinates.startX - batteryPointerGlowSize / 2,
-          batteryPointerCoordinates.bendX - batteryPointerGlowSize / 2,
-          batteryPointerCoordinates.endX - batteryPointerGlowSize / 2,
-        ],
+        outputRange: isBatteryPointerReverse
+          ? [
+              batteryPointerCoordinates.endX - batteryPointerGlowSize / 2,
+              batteryPointerCoordinates.bendX - batteryPointerGlowSize / 2,
+              batteryPointerCoordinates.startX - batteryPointerGlowSize / 2,
+            ]
+          : [
+              batteryPointerCoordinates.startX - batteryPointerGlowSize / 2,
+              batteryPointerCoordinates.bendX - batteryPointerGlowSize / 2,
+              batteryPointerCoordinates.endX - batteryPointerGlowSize / 2,
+            ],
       })
     : null;
   const batteryPointerGlowY = batteryPointerCoordinates
     ? batteryPointerProgress.interpolate({
         inputRange: [0, batteryPointerCoordinates.bendProgress, 1],
-        outputRange: [
-          batteryPointerCoordinates.startY - batteryPointerGlowSize / 2,
-          batteryPointerCoordinates.bendY - batteryPointerGlowSize / 2,
-          batteryPointerCoordinates.endY - batteryPointerGlowSize / 2,
-        ],
+        outputRange: isBatteryPointerReverse
+          ? [
+              batteryPointerCoordinates.endY - batteryPointerGlowSize / 2,
+              batteryPointerCoordinates.bendY - batteryPointerGlowSize / 2,
+              batteryPointerCoordinates.startY - batteryPointerGlowSize / 2,
+            ]
+          : [
+              batteryPointerCoordinates.startY - batteryPointerGlowSize / 2,
+              batteryPointerCoordinates.bendY - batteryPointerGlowSize / 2,
+              batteryPointerCoordinates.endY - batteryPointerGlowSize / 2,
+            ],
       })
     : null;
   const pvPointerDotX = pvPointerCoordinates
@@ -4649,7 +4902,6 @@ export default function OverviewScreen() {
         })
       : 1;
 
-  const lifetimeOptions = Array.from({ length: 40 }, (_, i) => (i + 1) * 5);
   useEffect(() => {
     let isMounted = true;
 
@@ -4690,12 +4942,15 @@ export default function OverviewScreen() {
   return (
     <SafeAreaView
       edges={["left", "right"]}
-      style={[styles.safeArea, { paddingTop: overviewSafeTopPadding }]}
+      style={[
+        styles.safeArea,
+        { paddingTop: overviewSafeTopPadding, backgroundColor: colors.bubble },
+      ]}
     >
       <StatusBar
         translucent={false}
-        backgroundColor={appColors.bubble}
-        barStyle="light-content"
+        backgroundColor={isLightMode ? colors.bubble : appColors.bubble}
+        barStyle={isLightMode ? "dark-content" : "light-content"}
       />
 
       <Animated.View
@@ -4704,6 +4959,11 @@ export default function OverviewScreen() {
           {
             paddingHorizontal: windowWidth < 380 ? 18 : 24,
             minHeight: windowWidth < 380 ? 62 : PLANT_HEADER_BOX.minHeight,
+          },
+          isLightMode && {
+            backgroundColor: colors.bubble,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.bubbleBorder,
           },
           weatherCardAnimatedStyle,
         ]}
@@ -4718,17 +4978,22 @@ export default function OverviewScreen() {
             <Ionicons
               name="chevron-back"
               size={PLANT_HEADER_BUTTON.backIconSize}
-              color="rgba(248,250,252,0.88)"
+              color={navigationColor}
             />
           </TouchableOpacity>
 
           <View style={styles.plantTitleBlock}>
-            <Text style={styles.plantName} numberOfLines={1}>
+            <Text
+              style={[styles.plantName, isLightMode && { color: colors.text }]}
+              numberOfLines={1}
+            >
               {plantData.plantName}
             </Text>
 
             <View style={styles.plantMetaRow}>
-              <Text style={styles.plantProductionMeta}>{productionMeta}</Text>
+              <Text style={[styles.plantProductionMeta, { color: colors.accent }]}>
+                {productionMeta}
+              </Text>
             </View>
           </View>
         </View>
@@ -4742,22 +5007,30 @@ export default function OverviewScreen() {
           <Ionicons
             name="ellipsis-vertical"
             size={PLANT_HEADER_BUTTON.menuIconSize}
-            color="rgba(248,250,252,0.82)"
+            color={navigationColor}
           />
         </TouchableOpacity>
       </Animated.View>
 
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <Animated.View style={[styles.headerCard, weatherCardAnimatedStyle]}>
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.screen }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View
+          style={[
+            styles.headerCard,
+            { backgroundColor: colors.bubble, borderColor: colors.bubbleBorder },
+            weatherCardAnimatedStyle,
+          ]}
+        >
           <View style={styles.weatherTopRow}>
             <View style={styles.weatherMainInfo}>
-              <Text style={styles.weatherCity}>{weatherLocation}</Text>
-              <Text style={styles.weatherTemp}>
+              <Text style={[styles.weatherCity, { color: colors.text }]}>
+                {weatherLocation}
+              </Text>
+              <Text style={[styles.weatherTemp, { color: colors.text }]}>
                 {currentTemperature}
                 {"\u00B0"}
-              </Text>
-              <Text style={styles.weatherCoordinates} numberOfLines={1}>
-                {coordinateMeta}
               </Text>
             </View>
 
@@ -4766,14 +5039,17 @@ export default function OverviewScreen() {
                 <Ionicons
                   name={weatherIconName}
                   size={WEATHER_ICON_SIZE.current}
-                  color={appColors.accent}
+                  color={colors.accent}
                 />
               </View>
-              <Text style={styles.weatherCondition} numberOfLines={1}>
+              <Text
+                style={[styles.weatherCondition, { color: colors.text }]}
+                numberOfLines={1}
+              >
                 {weatherCondition}
               </Text>
               <Text
-                style={styles.weatherRange}
+                style={[styles.weatherRange, { color: colors.text }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.82}
@@ -4792,14 +5068,16 @@ export default function OverviewScreen() {
           >
             {weatherForecastDays.map((item) => (
               <View key={item.day} style={styles.weatherDayItem}>
-                <Text style={styles.weatherDayNumber}>{item.day}</Text>
+                <Text style={[styles.weatherDayNumber, { color: colors.textMuted }]}>
+                  {item.day}
+                </Text>
                 <Ionicons
                   name={item.icon}
                   size={WEATHER_ICON_SIZE.day}
-                  color={appColors.accent}
+                  color={colors.accent}
                   style={styles.weatherDayIcon}
                 />
-                <Text style={styles.weatherDayTemp}>
+                <Text style={[styles.weatherDayTemp, { color: colors.text }]}>
                   {item.temp}
                   {"\u00B0"}
                 </Text>
@@ -4818,7 +5096,12 @@ export default function OverviewScreen() {
             style={styles.menuOverlay}
             onPress={() => setPlantMenuVisible(false)}
           >
-            <View style={styles.menuPopup}>
+            <View
+              style={[
+                styles.menuPopup,
+                { backgroundColor: colors.bubble, borderColor: colors.accent },
+              ]}
+            >
               <TouchableOpacity
                 style={styles.menuItem}
                 activeOpacity={0.75}
@@ -4827,9 +5110,11 @@ export default function OverviewScreen() {
                 <Ionicons
                   name="refresh-outline"
                   size={19}
-                  color={appColors.accent}
+                  color={colors.accent}
                 />
-                <Text style={styles.menuItemText}>Refresh</Text>
+                <Text style={[styles.menuItemText, { color: colors.text }]}>
+                  {t("refresh")}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -4840,9 +5125,11 @@ export default function OverviewScreen() {
                 <Ionicons
                   name="hardware-chip-outline"
                   size={19}
-                  color={appColors.accent}
+                  color={colors.accent}
                 />
-                <Text style={styles.menuItemText}>Add Datalogger</Text>
+                <Text style={[styles.menuItemText, { color: colors.text }]}>
+                  {t("addDatalogger")}
+                </Text>
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -4854,10 +5141,25 @@ export default function OverviewScreen() {
           animationType="fade"
           onRequestClose={() => {}}
         >
-          <View style={styles.refreshLoadingOverlay}>
-            <View style={styles.refreshLoadingCard}>
-              <ActivityIndicator size="large" color={appColors.accent} />
-              <Text style={styles.refreshLoadingTitle}>Loading . . .</Text>
+          <View
+            style={[
+              styles.refreshLoadingOverlay,
+              isLightMode && { backgroundColor: "rgba(247,251,255,0.82)" },
+            ]}
+          >
+            <View
+              style={[
+                styles.refreshLoadingCard,
+                isLightMode && {
+                  backgroundColor: colors.bubble,
+                  borderColor: colors.bubbleBorder,
+                },
+              ]}
+            >
+              <ActivityIndicator size="large" color={colors.accent} />
+              <Text style={[styles.refreshLoadingTitle, { color: colors.text }]}>
+                Loading . . .
+              </Text>
             </View>
           </View>
         </Modal>
@@ -4890,7 +5192,7 @@ export default function OverviewScreen() {
                     >
                       <Path
                         d={gridPointerCoordinates.path}
-                        stroke={GRID_POINTER_CONFIG.lineColor}
+                        stroke={pointerLineColor}
                         strokeWidth={getScaledLineThickness(
                           GRID_POINTER_CONFIG,
                           bubbleScale,
@@ -4900,7 +5202,8 @@ export default function OverviewScreen() {
                         fill="none"
                       />
                     </Svg>
-                    {GRID_POINTER_CONFIG.enableGlow &&
+                    {shouldAnimateGridPointer &&
+                      GRID_POINTER_CONFIG.enableGlow &&
                       GRID_POINTER_CONFIG.animationEffect !== "plain" && (
                         <Animated.View
                           style={[
@@ -4920,22 +5223,24 @@ export default function OverviewScreen() {
                           ]}
                         />
                       )}
-                    <Animated.View
-                      style={[
-                        styles.gridPointerDot,
-                        {
-                          width: gridPointerDotSize,
-                          height: gridPointerDotSize,
-                          borderRadius: gridPointerDotSize / 2,
-                          backgroundColor: GRID_POINTER_CONFIG.dotColor,
-                          opacity: gridPointerDotOpacity,
-                          transform: [
-                            { translateX: gridPointerDotX },
-                            { translateY: gridPointerDotY },
-                          ],
-                        },
-                      ]}
-                    />
+                    {shouldAnimateGridPointer && (
+                      <Animated.View
+                        style={[
+                          styles.gridPointerDot,
+                          {
+                            width: gridPointerDotSize,
+                            height: gridPointerDotSize,
+                            borderRadius: gridPointerDotSize / 2,
+                            backgroundColor: GRID_POINTER_CONFIG.dotColor,
+                            opacity: gridPointerDotOpacity,
+                            transform: [
+                              { translateX: gridPointerDotX },
+                              { translateY: gridPointerDotY },
+                            ],
+                          },
+                        ]}
+                      />
+                    )}
                   </View>
                 )}
 
@@ -4949,7 +5254,7 @@ export default function OverviewScreen() {
                     >
                       <Path
                         d={batteryPointerCoordinates.path}
-                        stroke={BATTERY_POINTER_CONFIG.lineColor}
+                        stroke={pointerLineColor}
                         strokeWidth={getScaledLineThickness(
                           BATTERY_POINTER_CONFIG,
                           bubbleScale,
@@ -4959,7 +5264,8 @@ export default function OverviewScreen() {
                         fill="none"
                       />
                     </Svg>
-                    {BATTERY_POINTER_CONFIG.enableGlow &&
+                    {shouldAnimateBatteryPointer &&
+                      BATTERY_POINTER_CONFIG.enableGlow &&
                       BATTERY_POINTER_CONFIG.animationEffect !== "plain" && (
                         <Animated.View
                           style={[
@@ -4980,22 +5286,24 @@ export default function OverviewScreen() {
                           ]}
                         />
                       )}
-                    <Animated.View
-                      style={[
-                        styles.gridPointerDot,
-                        {
-                          width: batteryPointerDotSize,
-                          height: batteryPointerDotSize,
-                          borderRadius: batteryPointerDotSize / 2,
-                          backgroundColor: BATTERY_POINTER_CONFIG.dotColor,
-                          opacity: batteryPointerDotOpacity,
-                          transform: [
-                            { translateX: batteryPointerDotX },
-                            { translateY: batteryPointerDotY },
-                          ],
-                        },
-                      ]}
-                    />
+                    {shouldAnimateBatteryPointer && (
+                      <Animated.View
+                        style={[
+                          styles.gridPointerDot,
+                          {
+                            width: batteryPointerDotSize,
+                            height: batteryPointerDotSize,
+                            borderRadius: batteryPointerDotSize / 2,
+                            backgroundColor: BATTERY_POINTER_CONFIG.dotColor,
+                            opacity: batteryPointerDotOpacity,
+                            transform: [
+                              { translateX: batteryPointerDotX },
+                              { translateY: batteryPointerDotY },
+                            ],
+                          },
+                        ]}
+                      />
+                    )}
                   </View>
                 )}
 
@@ -5009,7 +5317,7 @@ export default function OverviewScreen() {
                     >
                       <Path
                         d={pvPointerCoordinates.path}
-                        stroke={PV_POINTER_CONFIG.lineColor}
+                        stroke={pointerLineColor}
                         strokeWidth={getScaledLineThickness(
                           PV_POINTER_CONFIG,
                           bubbleScale,
@@ -5019,7 +5327,8 @@ export default function OverviewScreen() {
                         fill="none"
                       />
                     </Svg>
-                    {PV_POINTER_CONFIG.enableGlow &&
+                    {shouldAnimatePvPointer &&
+                      PV_POINTER_CONFIG.enableGlow &&
                       PV_POINTER_CONFIG.animationEffect !== "plain" && (
                         <Animated.View
                           style={[
@@ -5039,22 +5348,24 @@ export default function OverviewScreen() {
                           ]}
                         />
                       )}
-                    <Animated.View
-                      style={[
-                        styles.gridPointerDot,
-                        {
-                          width: pvPointerDotSize,
-                          height: pvPointerDotSize,
-                          borderRadius: pvPointerDotSize / 2,
-                          backgroundColor: PV_POINTER_CONFIG.dotColor,
-                          opacity: pvPointerDotOpacity,
-                          transform: [
-                            { translateX: pvPointerDotX },
-                            { translateY: pvPointerDotY },
-                          ],
-                        },
-                      ]}
-                    />
+                    {shouldAnimatePvPointer && (
+                      <Animated.View
+                        style={[
+                          styles.gridPointerDot,
+                          {
+                            width: pvPointerDotSize,
+                            height: pvPointerDotSize,
+                            borderRadius: pvPointerDotSize / 2,
+                            backgroundColor: PV_POINTER_CONFIG.dotColor,
+                            opacity: pvPointerDotOpacity,
+                            transform: [
+                              { translateX: pvPointerDotX },
+                              { translateY: pvPointerDotY },
+                            ],
+                          },
+                        ]}
+                      />
+                    )}
                   </View>
                 )}
 
@@ -5068,7 +5379,7 @@ export default function OverviewScreen() {
                     >
                       <Path
                         d={loadPointerCoordinates.path}
-                        stroke={LOAD_POINTER_CONFIG.lineColor}
+                        stroke={pointerLineColor}
                         strokeWidth={getScaledLineThickness(
                           LOAD_POINTER_CONFIG,
                           bubbleScale,
@@ -5078,7 +5389,8 @@ export default function OverviewScreen() {
                         fill="none"
                       />
                     </Svg>
-                    {LOAD_POINTER_CONFIG.enableGlow &&
+                    {shouldAnimateLoadPointer &&
+                      LOAD_POINTER_CONFIG.enableGlow &&
                       LOAD_POINTER_CONFIG.animationEffect !== "plain" && (
                         <Animated.View
                           style={[
@@ -5098,22 +5410,24 @@ export default function OverviewScreen() {
                           ]}
                         />
                       )}
-                    <Animated.View
-                      style={[
-                        styles.gridPointerDot,
-                        {
-                          width: loadPointerDotSize,
-                          height: loadPointerDotSize,
-                          borderRadius: loadPointerDotSize / 2,
-                          backgroundColor: LOAD_POINTER_CONFIG.dotColor,
-                          opacity: loadPointerDotOpacity,
-                          transform: [
-                            { translateX: loadPointerDotX },
-                            { translateY: loadPointerDotY },
-                          ],
-                        },
-                      ]}
-                    />
+                    {shouldAnimateLoadPointer && (
+                      <Animated.View
+                        style={[
+                          styles.gridPointerDot,
+                          {
+                            width: loadPointerDotSize,
+                            height: loadPointerDotSize,
+                            borderRadius: loadPointerDotSize / 2,
+                            backgroundColor: LOAD_POINTER_CONFIG.dotColor,
+                            opacity: loadPointerDotOpacity,
+                            transform: [
+                              { translateX: loadPointerDotX },
+                              { translateY: loadPointerDotY },
+                            ],
+                          },
+                        ]}
+                      />
+                    )}
                   </View>
                 )}
 
@@ -5121,6 +5435,7 @@ export default function OverviewScreen() {
                   style={[
                     styles.infoBubble,
                     responsiveBubbleStyle,
+                    isLightMode && styles.infoBubbleLight,
                     styles.pvBubble,
                     getResponsiveBubblePositionStyle(
                       "pv",
@@ -5134,7 +5449,11 @@ export default function OverviewScreen() {
                   }
                 >
                   <Text
-                    style={[styles.infoBubbleLabel, responsiveBubbleLabelStyle]}
+                    style={[
+                      styles.infoBubbleLabel,
+                      responsiveBubbleLabelStyle,
+                      isLightMode && { color: colors.accent },
+                    ]}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.78}
@@ -5142,7 +5461,11 @@ export default function OverviewScreen() {
                     PV
                   </Text>
                   <Text
-                    style={[styles.infoBubbleValue, responsiveBubbleValueStyle]}
+                    style={[
+                      styles.infoBubbleValue,
+                      responsiveBubbleValueStyle,
+                      isLightMode && { color: colors.text },
+                    ]}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.62}
@@ -5155,6 +5478,7 @@ export default function OverviewScreen() {
                   style={[
                     styles.infoBubble,
                     responsiveBubbleStyle,
+                    isLightMode && styles.infoBubbleLight,
                     styles.gridBubble,
                     getResponsiveBubblePositionStyle(
                       "grid",
@@ -5168,7 +5492,11 @@ export default function OverviewScreen() {
                   }
                 >
                   <Text
-                    style={[styles.infoBubbleLabel, responsiveBubbleLabelStyle]}
+                    style={[
+                      styles.infoBubbleLabel,
+                      responsiveBubbleLabelStyle,
+                      isLightMode && { color: colors.accent },
+                    ]}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.78}
@@ -5176,7 +5504,11 @@ export default function OverviewScreen() {
                     Grid
                   </Text>
                   <Text
-                    style={[styles.infoBubbleValue, responsiveBubbleValueStyle]}
+                    style={[
+                      styles.infoBubbleValue,
+                      responsiveBubbleValueStyle,
+                      isLightMode && { color: colors.text },
+                    ]}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.62}
@@ -5189,6 +5521,7 @@ export default function OverviewScreen() {
                   style={[
                     styles.infoBubble,
                     responsiveBubbleStyle,
+                    isLightMode && styles.infoBubbleLight,
                     styles.batteryBubble,
                     {
                       width:
@@ -5210,7 +5543,11 @@ export default function OverviewScreen() {
                   }
                 >
                   <Text
-                    style={[styles.batteryLabel, responsiveBatteryLabelStyle]}
+                    style={[
+                      styles.batteryLabel,
+                      responsiveBatteryLabelStyle,
+                      isLightMode && { color: colors.accent },
+                    ]}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.78}
@@ -5218,7 +5555,11 @@ export default function OverviewScreen() {
                     Battery
                   </Text>
                   <Text
-                    style={[styles.batteryValue, responsiveBatteryValueStyle]}
+                    style={[
+                      styles.batteryValue,
+                      responsiveBatteryValueStyle,
+                      isLightMode && { color: colors.text },
+                    ]}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.72}
@@ -5231,6 +5572,7 @@ export default function OverviewScreen() {
                   style={[
                     styles.infoBubble,
                     responsiveBubbleStyle,
+                    isLightMode && styles.infoBubbleLight,
                     styles.loadBubble,
                     getResponsiveBubblePositionStyle(
                       "load",
@@ -5244,7 +5586,11 @@ export default function OverviewScreen() {
                   }
                 >
                   <Text
-                    style={[styles.infoBubbleLabel, responsiveBubbleLabelStyle]}
+                    style={[
+                      styles.infoBubbleLabel,
+                      responsiveBubbleLabelStyle,
+                      isLightMode && { color: colors.accent },
+                    ]}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.78}
@@ -5252,7 +5598,11 @@ export default function OverviewScreen() {
                     Load
                   </Text>
                   <Text
-                    style={[styles.infoBubbleValue, responsiveBubbleValueStyle]}
+                    style={[
+                      styles.infoBubbleValue,
+                      responsiveBubbleValueStyle,
+                      isLightMode && { color: colors.text },
+                    ]}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.62}
@@ -5263,10 +5613,18 @@ export default function OverviewScreen() {
               </View>
             </View>
 
-            <Text style={styles.powerFlowTitle}>
+            <Text style={[styles.powerFlowTitle, { color: colors.text }]}>
               Self Consumption-Production Ratio
             </Text>
-            <View style={styles.powerFlowWrapper}>
+            <View
+              style={[
+                styles.powerFlowWrapper,
+                isLightMode && {
+                  backgroundColor: colors.bubble,
+                  borderColor: colors.bubbleBorder,
+                },
+              ]}
+            >
               <PowerFlowDiagram data={plantData} />
               <PowerFlowDiagram
                 data={lowerPowerFlowData}
@@ -5277,10 +5635,10 @@ export default function OverviewScreen() {
 
           <View style={styles.dashboardSection}>
             <View style={styles.monthlySavingsSection}>
-              <Text style={styles.dashboardSectionTitle}>
+              <Text style={[styles.dashboardSectionTitle, { color: colors.text }]}>
                 Penghematan Bulanan
               </Text>
-              <Text style={styles.dashboardSectionMeta}>
+              <Text style={[styles.dashboardSectionMeta, { color: colors.textMuted }]}>
                 Diperbaharui 10 menit yang lalu
               </Text>
 
@@ -5290,31 +5648,54 @@ export default function OverviewScreen() {
                 contentContainerStyle={styles.monthlySavingsContent}
               >
                 {monthlySavingItems.map((item) => (
-                  <View key={item.key} style={styles.monthlySavingCard}>
-                    <Text style={styles.monthlySavingMonth}>{item.month}</Text>
+                  <View
+                    key={item.key}
+                    style={[
+                      styles.monthlySavingCard,
+                      isLightMode && {
+                        backgroundColor: colors.bubble,
+                        borderColor: colors.bubbleBorder,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.monthlySavingMonth, { color: colors.text }]}>
+                      {item.month}
+                    </Text>
                     <Ionicons
                       name="sunny-outline"
                       size={DASHBOARD_LAYOUT.monthlyIconSize}
-                      color="rgba(248,250,252,0.36)"
+                      color={colors.accent}
                     />
-                    <Text style={styles.monthlySavingValue}>{item.value}</Text>
+                    <Text style={[styles.monthlySavingValue, { color: colors.text }]}>
+                      {item.value}
+                    </Text>
                   </View>
                 ))}
               </ScrollView>
             </View>
 
-            <View style={styles.environmentImpactCard}>
+            <View
+              style={[
+                styles.environmentImpactCard,
+                isLightMode && {
+                  backgroundColor: colors.bubble,
+                  borderColor: colors.bubbleBorder,
+                },
+              ]}
+            >
               {environmentImpactItems.map((item) => (
                 <View key={item.key} style={styles.environmentImpactItem}>
                   <Ionicons
                     name={item.icon}
                     size={DASHBOARD_LAYOUT.impactIconSize}
-                    color={appColors.accent}
+                  color={colors.accent}
                   />
-                  <Text style={styles.environmentImpactValue}>
+                  <Text style={[styles.environmentImpactValue, { color: colors.text }]}>
                     {item.value}
                   </Text>
-                  <Text style={styles.environmentImpactLabel}>
+                  <Text
+                    style={[styles.environmentImpactLabel, { color: colors.textMuted }]}
+                  >
                     {item.label}
                   </Text>
                 </View>
@@ -5322,8 +5703,25 @@ export default function OverviewScreen() {
             </View>
           </View>
 
-          <View style={styles.segmentCard}>
-            <View style={styles.segmentRow}>
+          <View
+            style={[
+              styles.segmentCard,
+              isLightMode && {
+                backgroundColor: colors.bubble,
+                borderColor: colors.bubbleBorder,
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.segmentRow,
+                isLightMode && {
+                  backgroundColor: colors.bubble,
+                  borderWidth: 1,
+                  borderColor: colors.bubbleBorder,
+                },
+              ]}
+            >
               <TouchableOpacity
                 style={[
                   styles.segmentButton,
@@ -5335,6 +5733,9 @@ export default function OverviewScreen() {
                   style={[
                     styles.segmentText,
                     activeSegment === "day" && styles.segmentTextActive,
+                    isLightMode && {
+                      color: activeSegment === "day" ? colors.bubble : colors.textMuted,
+                    },
                   ]}
                 >
                   Day
@@ -5356,6 +5757,10 @@ export default function OverviewScreen() {
                   style={[
                     styles.segmentText,
                     activeSegment === "month" && styles.segmentTextActive,
+                    isLightMode && {
+                      color:
+                        activeSegment === "month" ? colors.bubble : colors.textMuted,
+                    },
                   ]}
                 >
                   Month
@@ -5373,26 +5778,12 @@ export default function OverviewScreen() {
                   style={[
                     styles.segmentText,
                     activeSegment === "year" && styles.segmentTextActive,
+                    isLightMode && {
+                      color: activeSegment === "year" ? colors.bubble : colors.textMuted,
+                    },
                   ]}
                 >
                   Year
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.segmentButton,
-                  activeSegment === "lifetime" && styles.segmentButtonActive,
-                ]}
-                onPress={() => setActiveSegment("lifetime")}
-              >
-                <Text
-                  style={[
-                    styles.segmentText,
-                    activeSegment === "lifetime" && styles.segmentTextActive,
-                  ]}
-                >
-                  Lifetime
                 </Text>
               </TouchableOpacity>
             </View>
@@ -5413,6 +5804,10 @@ export default function OverviewScreen() {
                         key={day}
                         style={[
                           styles.dayChip,
+                          isLightMode && {
+                            borderColor: colors.bubbleBorder,
+                            backgroundColor: colors.bubble,
+                          },
                           isSelected && styles.dayChipActive,
                         ]}
                         onPress={() => setSelectedDay(day)}
@@ -5421,6 +5816,9 @@ export default function OverviewScreen() {
                           style={[
                             styles.dayChipText,
                             isSelected && styles.dayChipTextActive,
+                            isLightMode && {
+                              color: isSelected ? colors.bubble : colors.text,
+                            },
                           ]}
                         >
                           {day}
@@ -5430,7 +5828,7 @@ export default function OverviewScreen() {
                   })}
                 </ScrollView>
 
-                <Text style={styles.dateText}>
+                <Text style={[styles.dateText, { color: colors.textSoft }]}>
                   {`${selectedDay} ${selectedMonthLabel} ${selectedYear}`}
                 </Text>
               </View>
@@ -5450,6 +5848,10 @@ export default function OverviewScreen() {
                         key={month.value}
                         style={[
                           styles.monthChip,
+                          isLightMode && {
+                            borderColor: colors.bubbleBorder,
+                            backgroundColor: colors.bubble,
+                          },
                           isSelected && styles.monthChipActive,
                         ]}
                         onPress={() => setSelectedMonth(month.value)}
@@ -5458,6 +5860,9 @@ export default function OverviewScreen() {
                           style={[
                             styles.monthChipText,
                             isSelected && styles.monthChipTextActive,
+                            isLightMode && {
+                              color: isSelected ? colors.bubble : colors.text,
+                            },
                           ]}
                         >
                           {month.label}
@@ -5467,7 +5872,7 @@ export default function OverviewScreen() {
                   })}
                 </ScrollView>
 
-                <Text style={styles.dateText}>
+                <Text style={[styles.dateText, { color: colors.textSoft }]}>
                   {`${selectedDay} ${selectedMonthLabel} ${selectedYear}`}
                 </Text>
               </View>
@@ -5486,6 +5891,10 @@ export default function OverviewScreen() {
                         key={year}
                         style={[
                           styles.yearChip,
+                          isLightMode && {
+                            borderColor: colors.bubbleBorder,
+                            backgroundColor: colors.bubble,
+                          },
                           isSelected && styles.yearChipActive,
                         ]}
                         onPress={() => setSelectedYear(year)}
@@ -5494,6 +5903,9 @@ export default function OverviewScreen() {
                           style={[
                             styles.yearChipText,
                             isSelected && styles.yearChipTextActive,
+                            isLightMode && {
+                              color: isSelected ? colors.bubble : colors.text,
+                            },
                           ]}
                         >
                           {year}
@@ -5503,52 +5915,15 @@ export default function OverviewScreen() {
                   })}
                 </ScrollView>
 
-                <Text style={styles.dateText}>
+                <Text style={[styles.dateText, { color: colors.textSoft }]}>
                   {`${selectedDay} ${selectedMonthLabel} ${selectedYear}`}
                 </Text>
               </View>
-            ) : (
-              <View style={styles.dayPickerWrap}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.dayPickerContent}
-                >
-                  {lifetimeOptions.map((range) => {
-                    const isSelected = range === selectedLifetimeRange;
-
-                    return (
-                      <TouchableOpacity
-                        key={range}
-                        style={[
-                          styles.yearChip,
-                          isSelected && styles.yearChipActive,
-                        ]}
-                        onPress={() => setSelectedLifetimeRange(range)}
-                      >
-                        <Text
-                          style={[
-                            styles.yearChipText,
-                            isSelected && styles.yearChipTextActive,
-                          ]}
-                        >
-                          {range}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-
-                <Text style={styles.dateText}>
-                  {`${selectedLifetimeRange} Years`}
-                </Text>
-              </View>
-            )}
+            ) : null}
 
             {(activeSegment === "day" ||
               activeSegment === "month" ||
-              activeSegment === "year" ||
-              activeSegment === "lifetime") && (
+              activeSegment === "year") && (
               <>
                 {isChartLoading ? (
                   <View
@@ -5557,8 +5932,8 @@ export default function OverviewScreen() {
                       { width: overviewChartWidth },
                     ]}
                   >
-                    <ActivityIndicator size="large" color={appColors.accent} />
-                    <Text style={styles.chartLoadingText}>
+                    <ActivityIndicator size="large" color={colors.accent} />
+                    <Text style={[styles.chartLoadingText, { color: colors.textSoft }]}>
                       Memuat data grafik...
                     </Text>
                   </View>
@@ -5592,9 +5967,17 @@ export default function OverviewScreen() {
       >
         <SafeAreaView
           edges={["top", "left", "right", "bottom"]}
-          style={styles.chartLandscapeSafeArea}
+          style={[
+            styles.chartLandscapeSafeArea,
+            isLightMode && { backgroundColor: colors.screen },
+          ]}
         >
-          <View style={styles.chartLandscapeHeader}>
+          <View
+            style={[
+              styles.chartLandscapeHeader,
+              isLightMode && { backgroundColor: colors.screen },
+            ]}
+          >
             <TouchableOpacity
               activeOpacity={0.75}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -5604,12 +5987,17 @@ export default function OverviewScreen() {
               <Ionicons
                 name="chevron-back"
                 size={32}
-                color="rgba(248,250,252,0.9)"
+                color={navigationColor}
               />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.chartLandscapeBody}>
+          <View
+            style={[
+              styles.chartLandscapeBody,
+              isLightMode && { backgroundColor: colors.screen },
+            ]}
+          >
             <View
               style={[
                 styles.chartLandscapeFrame,
@@ -5630,8 +6018,8 @@ export default function OverviewScreen() {
                     },
                   ]}
                 >
-                  <ActivityIndicator size="large" color={appColors.accent} />
-                  <Text style={styles.chartLoadingText}>
+                  <ActivityIndicator size="large" color={colors.accent} />
+                  <Text style={[styles.chartLoadingText, { color: colors.textSoft }]}>
                     Memuat data grafik...
                   </Text>
                 </View>
@@ -5876,10 +6264,10 @@ const styles = StyleSheet.create({
   },
   menuOverlay: {
     flex: 1,
-    backgroundColor: "rgba(2,7,19,0.38)",
+    backgroundColor: "transparent",
     alignItems: "flex-end",
-    paddingTop: 112,
-    paddingRight: 24,
+    paddingTop: MENU_TOP_OFFSET,
+    paddingRight: MENU_RIGHT_OFFSET,
   },
   menuPopup: {
     width: 176,
@@ -6572,6 +6960,13 @@ const styles = StyleSheet.create({
     elevation: 4,
     alignItems: "center",
     justifyContent: "center",
+  },
+  infoBubbleLight: {
+    backgroundColor: "#FFFFFF",
+    borderColor: "rgba(8,174,234,0.34)",
+    shadowColor: "#08AEEA",
+    shadowOpacity: 0.1,
+    elevation: 3,
   },
   infoBubbleLabel: {
     fontSize: 14,

@@ -1,57 +1,63 @@
 import { clearAuth } from '@/auth/token';
-import { appColors } from '@/config/theme';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import {
+  Image,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+} from 'react-native';
 import { AuthProvider } from '../context/AuthContext';
+import { AppSettingsProvider, useAppSettings } from '../context/AppSettingsContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const BOOT_SPLASH_DURATION_MS = 1000;
-const BATARI_LOGO = require('../assets/images/Asset App Batari Alternative.png');
+const BATARI_LOGO = require('../assets/images/batari-logo.jpeg');
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
 
 export default function Layout() {
+  return (
+    <AppSettingsProvider>
+      <RootLayoutContent />
+    </AppSettingsProvider>
+  );
+}
+
+function RootLayoutContent() {
   const router = useRouter();
+  const { colors } = useAppSettings();
+  const { width, height } = useWindowDimensions();
   const [showBootSplash, setShowBootSplash] = useState(true);
+  const isCompactHeight = height < 720;
+  const logoSize = clamp(width * 0.24, isCompactHeight ? 72 : 84, 100);
 
   useEffect(() => {
-    let isMounted = true;
-    let timer;
-
     const prepareApp = async () => {
       try {
         await clearAuth();
       } catch {
         // Tetap lanjut ke login meskipun storage gagal dibersihkan.
       }
-
-      timer = setTimeout(() => {
-        if (!isMounted) {
-          return;
-        }
-
-        setShowBootSplash(false);
-        router.replace('/(auth)/login');
-      }, BOOT_SPLASH_DURATION_MS);
     };
 
     prepareApp();
+  }, []);
 
-    return () => {
-      isMounted = false;
-      if (timer) {
-        clearTimeout(timer);
-      }
-    };
-  }, [router]);
+  const handleBootSplashPress = () => {
+    setShowBootSplash(false);
+    router.replace('/(auth)/login');
+  };
 
   return (
     <AuthProvider>
-      <SafeAreaView style={{ flex: 1, backgroundColor: appColors.screen }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.screen }}>
         <Stack
           screenOptions={{
             headerShown: false,
             animation: 'fade',
-            contentStyle: { backgroundColor: appColors.screen },
+            contentStyle: { backgroundColor: colors.screen },
           }}
         >
           <Stack.Screen name="(auth)" />
@@ -60,13 +66,23 @@ export default function Layout() {
           <Stack.Screen name="plant/[id]" />
         </Stack>
         {showBootSplash && (
-          <View style={styles.bootSplash}>
+          <Pressable
+            style={[styles.bootSplash, { backgroundColor: colors.screen }]}
+            onPress={handleBootSplashPress}
+          >
             <Image
               source={BATARI_LOGO}
-              style={styles.bootSplashLogo}
-              resizeMode="contain"
+              style={[
+                styles.bootSplashLogo,
+                {
+                  width: logoSize,
+                  height: logoSize,
+                  borderRadius: logoSize / 2,
+                },
+              ]}
+              resizeMode="cover"
             />
-          </View>
+          </Pressable>
         )}
       </SafeAreaView>
     </AuthProvider>
@@ -80,12 +96,8 @@ const styles = StyleSheet.create({
     elevation: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: appColors.screen,
   },
   bootSplashLogo: {
-    width: '42%',
-    maxWidth: 180,
-    minWidth: 104,
-    aspectRatio: 1,
+    backgroundColor: 'transparent',
   },
 });

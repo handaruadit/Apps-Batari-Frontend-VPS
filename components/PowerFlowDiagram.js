@@ -12,6 +12,7 @@ import {
   MaterialCommunityIcons,
   FontAwesome5,
 } from "@expo/vector-icons";
+import { useAppSettings } from "@/context/AppSettingsContext";
 
 // Atur layout PowerFlowDiagram dari sini.
 const POWER_FLOW_LAYOUT = {
@@ -254,6 +255,17 @@ function getRingSegmentRatios(values) {
   }, {});
 }
 
+function getSectionPercent(value, total) {
+  const safeValue = getSafeRingValue(value);
+  const safeTotal = getSafeRingValue(total);
+
+  if (safeTotal <= 0) {
+    return 0;
+  }
+
+  return (safeValue / safeTotal) * 100;
+}
+
 function getRingSegmentLength(segmentKey, segmentRatios) {
   const segment = POWER_FLOW_SEGMENTS[segmentKey] || POWER_FLOW_SEGMENTS.pv;
   const ratio = Number(segmentRatios?.[segmentKey]);
@@ -318,6 +330,8 @@ function MetricBlock({
   fontScale,
   selected = false,
   onPress,
+  textColor = "#FFFFFF",
+  mutedTextColor = "#D7DDE6",
 }) {
   const labelConfig =
     POWER_FLOW_SEGMENT_LABEL_CONFIG[segmentKey] ||
@@ -369,6 +383,7 @@ function MetricBlock({
           style={[
             styles.metricTitle,
             {
+              color: textColor,
               fontSize: labelConfig.nameFontSize * fontScale,
               lineHeight: font.titleLineHeight * fontScale,
               transform: [
@@ -433,7 +448,7 @@ function MetricBlock({
         style={[
           styles.metricPercent,
           {
-            color: "#FFFFFF",
+            color: textColor,
             fontSize: labelConfig.percentFontSize * fontScale,
             lineHeight: (labelConfig.percentFontSize + 4) * fontScale,
             transform: [
@@ -447,12 +462,17 @@ function MetricBlock({
         {percent}
       </Text>
 
-      {!!subtitle && <Text style={styles.metricSubtitle}>{subtitle}</Text>}
+      {!!subtitle && (
+        <Text style={[styles.metricSubtitle, { color: mutedTextColor }]}>
+          {subtitle}
+        </Text>
+      )}
     </Container>
   );
 }
 
 export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
+  const { colors: themeColors, themeMode } = useAppSettings();
   const [selectedFlow, setSelectedFlow] = useState(null);
   const { width } = useWindowDimensions();
   const isProductionVariant = variant === "production";
@@ -461,9 +481,7 @@ export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
     : POWER_FLOW_COPY.default;
   const colors = isProductionVariant ? PRODUCTION_FLOW_COLORS : POWER_FLOW_COLORS;
   const energy = data.energy || {};
-  const energyPercent = data.energyPercent || {};
   const productionFlow = data.productionFlow || {};
-  const productionFlowPercent = data.productionFlowPercent || {};
   const consumptionKwh = Number(
     isProductionVariant
       ? productionFlow.pvGenerateKwh
@@ -475,27 +493,21 @@ export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
   const gridKwh = Number(
     isProductionVariant ? productionFlow.exportKwh : energy.gridKwh || 0,
   );
-  const totalKwh = Number(
+  const rawTotalKwh = Number(
     isProductionVariant
       ? productionFlow.totalProductionKwh ??
           consumptionKwh + batteryKwh + gridKwh
       : energy.totalKwh || 0,
   );
-  const pvPercent = formatPercent(
-    isProductionVariant
-      ? productionFlowPercent.pvGeneratePercent
-      : energyPercent.consumptionPercent,
-  );
-  const batteryPercent = formatPercent(
-    isProductionVariant
-      ? productionFlowPercent.chargePercent
-      : energyPercent.batteryPercent,
-  );
-  const gridPercent = formatPercent(
-    isProductionVariant
-      ? productionFlowPercent.exportPercent
-      : energyPercent.gridPercent,
-  );
+  const totalKwh =
+    Number.isFinite(rawTotalKwh) && rawTotalKwh > 0
+      ? rawTotalKwh
+      : getSafeRingValue(consumptionKwh) +
+        getSafeRingValue(batteryKwh) +
+        getSafeRingValue(gridKwh);
+  const pvPercent = formatPercent(getSectionPercent(consumptionKwh, totalKwh));
+  const batteryPercent = formatPercent(getSectionPercent(batteryKwh, totalKwh));
+  const gridPercent = formatPercent(getSectionPercent(gridKwh, totalKwh));
   const ringSegmentRatios = getRingSegmentRatios({
     pv: consumptionKwh,
     battery: batteryKwh,
@@ -514,6 +526,11 @@ export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
     layoutScale,
   );
   const iconScale = Math.min(1, Math.max(0.82, layoutScale));
+  const textColor = themeMode === "light" ? themeColors.text : "#FFFFFF";
+  const mutedTextColor =
+    themeMode === "light" ? themeColors.textMuted : "#D7DDE6";
+  const ringTrackColor =
+    themeMode === "light" ? "rgba(8,174,234,0.14)" : "rgba(248,250,252,0.08)";
   const selectFlow = (flowKey) => (event) => {
     event?.stopPropagation?.();
     setSelectedFlow((currentFlow) =>
@@ -585,6 +602,8 @@ export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
           fontScale={fontScale}
           selected={selectedFlow === "pv"}
           onPress={selectFlow("pv")}
+          textColor={textColor}
+          mutedTextColor={mutedTextColor}
         />
       </View>
 
@@ -597,7 +616,7 @@ export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
               cx="119"
               cy="119"
               r={POWER_FLOW_RING.radius}
-              stroke="rgba(248,250,252,0.08)"
+              stroke={ringTrackColor}
               strokeWidth={POWER_FLOW_SEGMENTS.pv.strokeWidth}
               strokeLinecap="round"
               fill="none"
@@ -717,8 +736,9 @@ export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
           >
             <Text
               style={[
-                styles.centerLabel,
-                {
+              styles.centerLabel,
+              {
+                  color: textColor,
                   fontSize: POWER_FLOW_FONT_SIZE.center.label * fontScale,
                   lineHeight:
                     POWER_FLOW_FONT_SIZE.center.labelLineHeight * fontScale,
@@ -738,8 +758,9 @@ export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
             </Text>
             <Text
               style={[
-                styles.centerValue,
-                {
+              styles.centerValue,
+              {
+                  color: textColor,
                   fontSize: POWER_FLOW_FONT_SIZE.center.value * fontScale,
                   lineHeight:
                     POWER_FLOW_FONT_SIZE.center.valueLineHeight * fontScale,
@@ -759,7 +780,10 @@ export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
               <Text
                 style={[
                   styles.centerUnit,
-                  { fontSize: POWER_FLOW_FONT_SIZE.center.unit * fontScale },
+                  {
+                    color: textColor,
+                    fontSize: POWER_FLOW_FONT_SIZE.center.unit * fontScale,
+                  },
                 ]}
               >
                 kWh
@@ -838,6 +862,7 @@ export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
             style={[
               styles.gridLabel,
               {
+                color: textColor,
                 fontSize:
                   POWER_FLOW_SEGMENT_LABEL_CONFIG.grid.nameFontSize *
                   fontScale,
@@ -904,7 +929,7 @@ export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
             style={[
               styles.gridPercent,
               {
-                color: "#FFFFFF",
+                color: textColor,
                 fontSize:
                   POWER_FLOW_SEGMENT_LABEL_CONFIG.grid.percentFontSize *
                   fontScale,
@@ -960,6 +985,8 @@ export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
           fontScale={fontScale}
           selected={selectedFlow === "battery"}
           onPress={selectFlow("battery")}
+          textColor={textColor}
+          mutedTextColor={mutedTextColor}
         />
       </View>
     </Pressable>

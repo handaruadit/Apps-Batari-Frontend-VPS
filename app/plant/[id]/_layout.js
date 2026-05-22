@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { appColors } from "@/config/theme";
+import { useAppSettings } from "@/context/AppSettingsContext";
 
 const hiddenScreens = [
   "data",
@@ -15,13 +16,16 @@ const hiddenScreens = [
 ];
 
 export default function PlantDetailLayout() {
+  const { colors, themeMode } = useAppSettings();
+  const isLightMode = themeMode === "light";
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
         tabBarHideOnKeyboard: true,
-        sceneStyle: { backgroundColor: appColors.screen },
+        sceneStyle: { backgroundColor: isLightMode ? colors.screen : appColors.screen },
 
         tabBarStyle: {
           position: "absolute",
@@ -32,12 +36,12 @@ export default function PlantDetailLayout() {
           paddingHorizontal: 0,
           paddingTop: 8,
           paddingBottom: 8,
-          backgroundColor: appColors.bubble,
+          backgroundColor: isLightMode ? colors.bubble : appColors.bubble,
           borderRadius: 22,
           borderTopWidth: 0,
           borderWidth: 1,
-          borderColor: "rgba(0,170,255,0.45)",
-          shadowColor: "#00AEEF",
+          borderColor: isLightMode ? colors.bubbleBorder : "rgba(0,170,255,0.45)",
+          shadowColor: isLightMode ? colors.accent : "#00AEEF",
           shadowOffset: { width: 0, height: 0 },
           shadowOpacity: 0.35,
           shadowRadius: 10,
@@ -60,7 +64,9 @@ export default function PlantDetailLayout() {
         },
 
         tabBarActiveTintColor: "#2F80FF",
-        tabBarInactiveTintColor: "rgba(255,255,255,0.65)",
+        tabBarInactiveTintColor: isLightMode
+          ? colors.textMuted
+          : "rgba(255,255,255,0.65)",
       }}
     >
       <Tabs.Screen

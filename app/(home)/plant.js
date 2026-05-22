@@ -1,6 +1,7 @@
 import { appColors, appFont } from "@/config/theme";
 import DeviceCard from "@/components/DeviceCard";
 import { AuthContext } from "@/context/AuthContext";
+import { useAppSettings } from "@/context/AppSettingsContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -20,14 +21,93 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import {
   DEMO_PLANT_NAME,
   deletePlant,
+  fetchPlantDevices,
   fetchPlants,
   isDemoPlant,
 } from "@/services/plantService";
 
 const PINNED_PLANTS_KEY = "batari:pinned-plants";
 const MAX_PINNED_PLANTS = 3;
+const STATUS_TIMESTAMP_FIELD_PATTERN =
+  /(^|_)(last|latest|created|updated|inserted|received|seen)(_|$)|timestamp|datetime|date_time|time/i;
+
+function parseStatusTimestamp(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  if (typeof value === "number") {
+    const milliseconds = value < 10000000000 ? value * 1000 : value;
+    return Number.isFinite(milliseconds) ? milliseconds : null;
+  }
+
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function collectStatusTimestamps(source, timestamps = []) {
+  if (!source || typeof source !== "object") {
+    return timestamps;
+  }
+
+  if (Array.isArray(source)) {
+    source.forEach((item) => collectStatusTimestamps(item, timestamps));
+    return timestamps;
+  }
+
+  Object.entries(source).forEach(([key, value]) => {
+    if (STATUS_TIMESTAMP_FIELD_PATTERN.test(key)) {
+      const timestamp = parseStatusTimestamp(value);
+
+      if (timestamp) {
+        timestamps.push(timestamp);
+      }
+    }
+
+    if (value && typeof value === "object") {
+      collectStatusTimestamps(value, timestamps);
+    }
+  });
+
+  return timestamps;
+}
+
+function getLatestStatusTimestamp(source) {
+  return Math.max(0, ...collectStatusTimestamps(source));
+}
+
+async function attachLatestDeviceTimestamps(plants) {
+  return Promise.all(
+    plants.map(async (plant) => {
+      const plantTimestamp = getLatestStatusTimestamp(plant);
+
+      try {
+        const result = await fetchPlantDevices(plant.id);
+        const deviceTimestamp = getLatestStatusTimestamp(result);
+        const latestDataTimestamp = Math.max(plantTimestamp, deviceTimestamp);
+
+        return {
+          ...plant,
+          latestDataStatusTimestamp: latestDataTimestamp || plantTimestamp || null,
+        };
+      } catch (error) {
+        console.warn(
+          "Failed to load latest device timestamp for plant status:",
+          plant?.id,
+          error?.message || error,
+        );
+
+        return {
+          ...plant,
+          latestDataStatusTimestamp: plantTimestamp || null,
+        };
+      }
+    }),
+  );
+}
 
 export default function PlantScreen() {
+  const { colors, themeMode } = useAppSettings();
   const { setSelectedDevice } = useContext(AuthContext);
   const [search, setSearch] = useState("");
   const [plantList, setPlantList] = useState([]);
@@ -81,6 +161,8 @@ export default function PlantScreen() {
         plantId: String(device.id),
         name: device.name || "",
         location: device.location || "",
+        city: device.city || "",
+        province: device.province || "",
         longitude: device.longitude == null ? "" : String(device.longitude),
         latitude: device.latitude == null ? "" : String(device.latitude),
         timezone: device.timezone || "",
@@ -145,7 +227,8 @@ export default function PlantScreen() {
     setIsLoading(true);
     try {
       const plants = await fetchPlants();
-      setPlantList(plants);
+      const plantsWithStatus = await attachLatestDeviceTimestamps(plants);
+      setPlantList(plantsWithStatus);
       const availableIds = new Set(plants.map((item) => String(item.id)));
       const nextPinnedIds = pinnedPlantIds.filter((id) => availableIds.has(id));
 
@@ -252,33 +335,53 @@ export default function PlantScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.screen }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Plant</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Plant</Text>
 
         <TouchableOpacity
-          style={styles.addButton}
+          style={[
+            styles.addButton,
+            themeMode === "light" && {
+              backgroundColor: colors.bubble,
+              borderColor: colors.bubbleBorder,
+            },
+          ]}
           activeOpacity={0.8}
           onPress={handleAddDevice}
         >
-          <Ionicons name="add" size={24} color="#FFFFFF" />
+          <Ionicons
+            name="add"
+            size={24}
+            color={themeMode === "light" ? colors.accent : "#FFFFFF"}
+          />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.searchBox}>
+      <View
+        style={[
+          styles.searchBox,
+          {
+            backgroundColor: colors.bubble,
+            borderColor: colors.bubbleBorder,
+          },
+        ]}
+      >
         <TextInput
           placeholder="Cari nama plant / SN / lokasi"
-          placeholderTextColor="#6B7280"
+          placeholderTextColor={colors.textMuted}
           value={search}
           onChangeText={setSearch}
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: colors.text }]}
         />
       </View>
 
       {isLoading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#60A5FA" />
-          <Text style={styles.loadingText}>Memuat data plant...</Text>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={[styles.loadingText, { color: colors.textMuted }]}>
+            Memuat data plant...
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -298,15 +401,22 @@ export default function PlantScreen() {
           contentContainerStyle={{ paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>Belum ada plant.</Text>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+              Belum ada plant.
+            </Text>
           }
         />
       )}
 
       {isNavigatingOverview && (
-        <View style={styles.navigationOverlay} pointerEvents="auto">
-          <ActivityIndicator size="large" color={appColors.accent} />
-          <Text style={styles.navigationLoadingText}>Membuka overview...</Text>
+        <View
+          style={[styles.navigationOverlay, { backgroundColor: colors.screen }]}
+          pointerEvents="auto"
+        >
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={[styles.navigationLoadingText, { color: colors.textSoft }]}>
+            Membuka overview...
+          </Text>
         </View>
       )}
     </SafeAreaView>

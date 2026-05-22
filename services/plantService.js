@@ -225,3 +225,33 @@ export async function linkDeviceToPlant(plantId, deviceId) {
 
   return body;
 }
+
+export async function fetchPlantDevices(plantId) {
+  if (plantId == null || String(plantId).trim() === "") {
+    throw new Error("ID plant tidak valid.");
+  }
+
+  const headers = await getAuthHeaders();
+  const url = `${BASE_URL}/api/plant/${encodeURIComponent(plantId)}/devices`;
+
+  console.log("FETCH_PLANT_DEVICES_URL:", url);
+  console.log("FETCH_PLANT_DEVICES_HAS_TOKEN:", Boolean(headers.Authorization));
+
+  const response = await fetch(
+    url,
+    {
+      method: "GET",
+      headers,
+    },
+  );
+  const body = await parseResponse(response);
+
+  console.log("FETCH_PLANT_DEVICES_STATUS:", response.status);
+  console.log("FETCH_PLANT_DEVICES_RESPONSE:", body);
+
+  if (!response.ok) {
+    throwApiError(response, body, "Gagal mengambil data device.");
+  }
+
+  return body?.data ?? { plant: null, devices: [] };
+}

@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { appColors, appFont } from "@/config/theme";
+import { useAppSettings } from "@/context/AppSettingsContext";
 import {
   View,
+  Animated,
   Text,
   TouchableOpacity,
   StyleSheet,
@@ -10,6 +12,75 @@ import {
   Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+
+const ONLINE_THRESHOLD_MS = 15 * 60 * 1000;
+const TIMESTAMP_FIELD_PATTERN =
+  /(^|_)(last|latest|created|updated|inserted|received|seen)(_|$)|timestamp|datetime|date_time|time/i;
+
+function parseTimestamp(value) {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  if (typeof value === "number") {
+    const milliseconds = value < 10000000000 ? value * 1000 : value;
+    return Number.isFinite(milliseconds) ? milliseconds : null;
+  }
+
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function collectTimestamps(source, timestamps = []) {
+  if (!source || typeof source !== "object") {
+    return timestamps;
+  }
+
+  if (Array.isArray(source)) {
+    source.forEach((item) => collectTimestamps(item, timestamps));
+    return timestamps;
+  }
+
+  Object.entries(source).forEach(([key, value]) => {
+    if (TIMESTAMP_FIELD_PATTERN.test(key)) {
+      const timestamp = parseTimestamp(value);
+
+      if (timestamp) {
+        timestamps.push(timestamp);
+      }
+    }
+
+    if (value && typeof value === "object") {
+      collectTimestamps(value, timestamps);
+    }
+  });
+
+  return timestamps;
+}
+
+function getLatestDataTimestamp(device) {
+  return Math.max(0, ...collectTimestamps(device));
+}
+
+function getPlantConnectionStatus(device) {
+  const latestTimestamp = getLatestDataTimestamp(device);
+  const isOnline =
+    latestTimestamp > 0 && Date.now() - latestTimestamp <= ONLINE_THRESHOLD_MS;
+
+  return {
+    isOnline,
+    label: isOnline ? "Online" : "Offline",
+    timestamp: latestTimestamp,
+  };
+}
+
+function formatCityProvince(device) {
+  const city = String(device?.city || "").trim();
+  const province = String(device?.province || "").trim();
+  const locationParts = [city, province].filter(Boolean);
+
+  return locationParts.length ? locationParts.join(", ") : "-";
+}
 
 export default function DeviceCard({
   device,
@@ -21,7 +92,33 @@ export default function DeviceCard({
   canEdit = true,
   canDelete = true,
 }) {
+  const { colors, themeMode } = useAppSettings();
   const [menuVisible, setMenuVisible] = useState(false);
+  const pulseAnim = useRef(new Animated.Value(0.45)).current;
+  const connectionStatus = getPlantConnectionStatus(device);
+  const statusColor = connectionStatus.isOnline ? "#16A34A" : "#DC2626";
+  const cityProvinceText = formatCityProvince(device);
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.45,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    animation.start();
+
+    return () => animation.stop();
+  }, [pulseAnim]);
 
   const handleEdit = () => {
     setMenuVisible(false);
@@ -40,7 +137,17 @@ export default function DeviceCard({
 
   return (
     <>
-      <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
+      <TouchableOpacity
+        style={[
+          styles.card,
+          themeMode === "light" && {
+            backgroundColor: colors.bubble,
+            borderColor: colors.bubbleBorder,
+          },
+        ]}
+        onPress={onPress}
+        activeOpacity={0.9}
+      >
         <View style={styles.imageWrapper}>
           <ImageBackground
             source={require("@/assets/images/solar-bg.jpg")}
@@ -51,20 +158,56 @@ export default function DeviceCard({
             <View style={styles.imageOverlay}>
               <View style={styles.topRight}>
                 <TouchableOpacity onPress={() => setMenuVisible(true)} hitSlop={10}>
-                  <Ionicons name="ellipsis-vertical" size={20} color="#FFFFFF" />
+          <Ionicons name="ellipsis-vertical" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
             </View>
           </ImageBackground>
         </View>
 
-        <View style={styles.textSection}>
-          <Text style={styles.title} numberOfLines={1}>
+        <View
+          style={[
+            styles.textSection,
+            themeMode === "light" && { backgroundColor: colors.bubble },
+          ]}
+        >
+          <Text
+            style={[styles.title, themeMode === "light" && { color: colors.text }]}
+            numberOfLines={1}
+          >
             {device.name}
           </Text>
-          <Text style={styles.subtitle} numberOfLines={1}>
-            {device.location}
+          <Text
+            style={[
+              styles.subtitle,
+              themeMode === "light" && { color: colors.textMuted },
+            ]}
+            numberOfLines={1}
+          >
+            {cityProvinceText}
           </Text>
+          <View style={styles.statusRow}>
+            <Animated.View
+              style={[
+                styles.statusDot,
+                {
+                  backgroundColor: statusColor,
+                  opacity: pulseAnim,
+                  transform: [
+                    {
+                      scale: pulseAnim.interpolate({
+                        inputRange: [0.45, 1],
+                        outputRange: [0.82, 1.18],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
+            <Text style={[styles.statusText, { color: statusColor }]}>
+              {connectionStatus.label}
+            </Text>
+          </View>
         </View>
       </TouchableOpacity>
 
@@ -75,20 +218,31 @@ export default function DeviceCard({
         onRequestClose={() => setMenuVisible(false)}
       >
         <Pressable style={styles.modalOverlay} onPress={() => setMenuVisible(false)}>
-          <View style={styles.popupMenu}>
+          <View
+            style={[
+              styles.popupMenu,
+              themeMode === "light" && {
+                backgroundColor: colors.bubble,
+                borderColor: colors.bubbleBorder,
+                borderWidth: 1,
+              },
+            ]}
+          >
             <TouchableOpacity style={styles.menuItem} onPress={handlePinToggle}>
               <Ionicons
                 name={isPinned ? "pin" : "pin-outline"}
                 size={18}
-                color={appColors.accent}
+                color={colors.accent}
               />
-              <Text style={styles.menuText}>{isPinned ? "Unpin" : "Pin"}</Text>
+              <Text style={[styles.menuText, { color: colors.text }]}>
+                {isPinned ? "Unpin" : "Pin"}
+              </Text>
             </TouchableOpacity>
 
             {canEdit && (
               <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
-                <Ionicons name="create-outline" size={18} color={appColors.accent} />
-                <Text style={styles.menuText}>Edit</Text>
+                <Ionicons name="create-outline" size={18} color={colors.accent} />
+                <Text style={[styles.menuText, { color: colors.text }]}>Edit</Text>
               </TouchableOpacity>
             )}
 
@@ -150,6 +304,24 @@ const styles = StyleSheet.create({
     color: appColors.textMuted,
     fontSize: 13,
     fontWeight: "400",
+    fontFamily: appFont,
+    letterSpacing: 0,
+  },
+  statusRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 7,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "800",
     fontFamily: appFont,
     letterSpacing: 0,
   },

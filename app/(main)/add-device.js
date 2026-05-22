@@ -14,6 +14,7 @@ import { useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { appColors, appFont } from '@/config/theme';
+import { useAppSettings } from '@/context/AppSettingsContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { createPlant, updatePlant } from '@/services/plantService';
 
@@ -147,12 +148,15 @@ function getInitialText(value) {
 }
 
 export default function AddDeviceScreen() {
+  const { colors, t } = useAppSettings();
   const params = useLocalSearchParams();
   const editPlantId = getParamValue(params.plantId);
   const isEditMode = getParamValue(params.mode) === 'edit' && Boolean(editPlantId);
 
   const [name, setName] = useState(() => getInitialText(params.name));
   const [address, setAddress] = useState(() => getInitialText(params.location));
+  const [province, setProvince] = useState(() => getInitialText(params.province));
+  const [city, setCity] = useState(() => getInitialText(params.city));
   const [longitude, setLongitude] = useState(() => getInitialText(params.longitude));
   const [latitude, setLatitude] = useState(() => getInitialText(params.latitude));
   const [timezone, setTimezone] = useState(() => getInitialText(params.timezone));
@@ -173,10 +177,19 @@ export default function AddDeviceScreen() {
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async () => {
-    if (!name || !address || !longitude || !latitude || !systemType || !timezone) {
+    if (
+      !name ||
+      !address ||
+      !city ||
+      !province ||
+      !longitude ||
+      !latitude ||
+      !systemType ||
+      !timezone
+    ) {
       Alert.alert(
-        'Peringatan',
-        'Mohon isi semua data wajib yang bertanda *.',
+        t('warning'),
+        t('fillRequired'),
       );
       return;
     }
@@ -189,12 +202,12 @@ export default function AddDeviceScreen() {
     const batteryCapacityNumber = batteryCapacity ? Number(batteryCapacity) : null;
 
     if (!Number.isFinite(longitudeNumber) || !Number.isFinite(latitudeNumber)) {
-      Alert.alert('Peringatan', 'Longitude dan latitude harus berupa angka.');
+      Alert.alert(t('warning'), t('coordinateNumber'));
       return;
     }
 
     if (installedCapacity && !Number.isFinite(installedCapacityNumber)) {
-      Alert.alert('Peringatan', 'Kapasitas terpasang harus berupa angka.');
+      Alert.alert(t('warning'), t('capacityNumber'));
       return;
     }
 
@@ -203,13 +216,15 @@ export default function AddDeviceScreen() {
       batteryCapacity &&
       !Number.isFinite(batteryCapacityNumber)
     ) {
-      Alert.alert('Peringatan', 'Kapasitas baterai harus berupa angka.');
+      Alert.alert(t('warning'), t('batteryCapacityNumber'));
       return;
     }
 
     const payload = {
       name: name.trim(),
       location: address.trim(),
+      city: city.trim(),
+      province: province.trim(),
       longitude: longitudeNumber,
       latitude: latitudeNumber,
       timezone,
@@ -233,10 +248,8 @@ export default function AddDeviceScreen() {
       }
 
       Alert.alert(
-        'Berhasil',
-        isEditMode
-          ? 'Perubahan plant berhasil disimpan.'
-          : 'Plant berhasil ditambahkan.',
+        t('success'),
+        isEditMode ? t('plantUpdated') : t('plantCreated'),
       );
       router.back();
     } catch (error) {
@@ -250,7 +263,7 @@ export default function AddDeviceScreen() {
       }
 
       Alert.alert(
-        'Gagal',
+        t('failed'),
         error.message ||
           (isEditMode ? 'Gagal menyimpan perubahan plant.' : 'Gagal menyimpan plant.'),
       );
@@ -280,110 +293,210 @@ export default function AddDeviceScreen() {
   };
 
   const renderLabel = (label, required = false) => (
-    <Text style={styles.label}>
+    <Text style={[styles.label, { color: colors.textSoft }]}>
       {label}
       {required && <Text style={styles.required}> *</Text>}
     </Text>
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.screen }]}>
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: colors.screen }]}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
           <TouchableOpacity
-            style={styles.backButton}
+            style={[
+              styles.backButton,
+              { backgroundColor: colors.bubble, borderColor: colors.bubbleBorder },
+            ]}
             activeOpacity={0.8}
             onPress={() => router.back()}
           >
             <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
           </TouchableOpacity>
 
-          <Text style={styles.title}>{isEditMode ? 'Edit Plant' : 'Tambah Plant'}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>
+            {isEditMode ? t('editPlant') : t('addPlant')}
+          </Text>
 
           <View style={styles.headerSpacer} />
         </View>
 
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Info dasar</Text>
+        <View
+          style={[
+            styles.sectionCard,
+            { backgroundColor: colors.bubble, borderColor: colors.bubbleBorder },
+          ]}
+        >
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {t('basicInfo')}
+          </Text>
 
-          {renderLabel('Nama Plant', true)}
+          {renderLabel(t('plantName'), true)}
           <TextInput
-            style={styles.input}
-            placeholder="Masukkan nama plant"
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.input,
+                borderColor: colors.inputBorder,
+                color: colors.text,
+              },
+            ]}
+            placeholder={t('enterPlantName')}
             placeholderTextColor="#6B7280"
             value={name}
             onChangeText={setName}
           />
 
-          {renderLabel('Alamat', true)}
+          {renderLabel(t('address'), true)}
           <TextInput
-            style={styles.input}
-            placeholder="Masukkan alamat"
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.input,
+                borderColor: colors.inputBorder,
+                color: colors.text,
+              },
+            ]}
+            placeholder={t('enterAddress')}
             placeholderTextColor="#6B7280"
             value={address}
             onChangeText={setAddress}
           />
 
-          {renderLabel('Longitude', true)}
+          {renderLabel(t('province'), true)}
           <TextInput
-            style={styles.input}
-            placeholder="Masukkan longitude"
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.input,
+                borderColor: colors.inputBorder,
+                color: colors.text,
+              },
+            ]}
+            placeholder={t('selectProvince')}
+            placeholderTextColor="#6B7280"
+            value={province}
+            onChangeText={setProvince}
+          />
+
+          {renderLabel(t('city'), true)}
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.input,
+                borderColor: colors.inputBorder,
+                color: colors.text,
+              },
+            ]}
+            placeholder={t('selectCity')}
+            placeholderTextColor="#6B7280"
+            value={city}
+            onChangeText={setCity}
+          />
+
+          {renderLabel(t('longitude'), true)}
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.input,
+                borderColor: colors.inputBorder,
+                color: colors.text,
+              },
+            ]}
+            placeholder={t('enterLongitude')}
             placeholderTextColor="#6B7280"
             value={longitude}
             onChangeText={setLongitude}
             keyboardType="numeric"
           />
 
-          {renderLabel('Latitude', true)}
+          {renderLabel(t('latitude'), true)}
           <TextInput
-            style={styles.input}
-            placeholder="Masukkan latitude"
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.input,
+                borderColor: colors.inputBorder,
+                color: colors.text,
+              },
+            ]}
+            placeholder={t('enterLatitude')}
             placeholderTextColor="#6B7280"
             value={latitude}
             onChangeText={setLatitude}
             keyboardType="numeric"
           />
 
-          {renderLabel('Zona Waktu', true)}
+          {renderLabel(t('timezone'), true)}
           <TouchableOpacity
-            style={styles.inputButton}
+            style={[
+              styles.inputButton,
+              { backgroundColor: colors.input, borderColor: colors.inputBorder },
+            ]}
             activeOpacity={0.8}
             onPress={() => setTimezoneModalVisible(true)}
           >
-            <Text style={timezone ? styles.inputButtonText : styles.placeholderText}>
-              {timezone || 'Pilih zona waktu'}
+            <Text
+              style={[
+                timezone ? styles.inputButtonText : styles.placeholderText,
+                { color: timezone ? colors.text : colors.textMuted },
+              ]}
+            >
+              {timezone || t('selectTimezone')}
             </Text>
             <Ionicons name="chevron-down" size={18} color="#94A3B8" />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Informasi sistem</Text>
+        <View
+          style={[
+            styles.sectionCard,
+            { backgroundColor: colors.bubble, borderColor: colors.bubbleBorder },
+          ]}
+        >
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {t('systemInfo')}
+          </Text>
 
-          {renderLabel('Tipe sistem', true)}
+          {renderLabel(t('systemType'), true)}
           <TouchableOpacity
-            style={styles.inputButton}
+            style={[
+              styles.inputButton,
+              { backgroundColor: colors.input, borderColor: colors.inputBorder },
+            ]}
             activeOpacity={0.8}
             onPress={() => setSystemTypeModalVisible(true)}
           >
             <Text
-              style={systemType ? styles.inputButtonText : styles.placeholderText}
+              style={[
+                systemType ? styles.inputButtonText : styles.placeholderText,
+                { color: systemType ? colors.text : colors.textMuted },
+              ]}
             >
-              {systemType || 'Pilih tipe sistem'}
+              {systemType || t('selectSystemType')}
             </Text>
             <Ionicons name="chevron-down" size={18} color="#94A3B8" />
           </TouchableOpacity>
 
           {systemType === 'Sistem terikat grid' && (
             <>
-              {renderLabel('Kapasitas Terpasang (kWp)')}
+              {renderLabel(t('installedCapacity'))}
               <TextInput
-                style={styles.input}
-                placeholder="Masukkan kapasitas terpasang"
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.inputBorder,
+                    color: colors.text,
+                  },
+                ]}
+                placeholder={t('enterInstalledCapacity')}
                 placeholderTextColor="#6B7280"
                 value={installedCapacity}
                 onChangeText={setInstalledCapacity}
@@ -394,20 +507,34 @@ export default function AddDeviceScreen() {
 
           {systemType === 'Sistem penyimpanan' && (
             <>
-              {renderLabel('Kapasitas Terpasang (kWp)')}
+              {renderLabel(t('installedCapacity'))}
               <TextInput
-                style={styles.input}
-                placeholder="Masukkan kapasitas terpasang"
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.inputBorder,
+                    color: colors.text,
+                  },
+                ]}
+                placeholder={t('enterInstalledCapacity')}
                 placeholderTextColor="#6B7280"
                 value={installedCapacity}
                 onChangeText={setInstalledCapacity}
                 keyboardType="numeric"
               />
 
-              {renderLabel('Kapasitas Baterai (kWh)')}
+              {renderLabel(t('batteryCapacity'))}
               <TextInput
-                style={styles.input}
-                placeholder="Masukkan kapasitas baterai"
+                style={[
+                  styles.input,
+                  {
+                    backgroundColor: colors.input,
+                    borderColor: colors.inputBorder,
+                    color: colors.text,
+                  },
+                ]}
+                placeholder={t('enterBatteryCapacity')}
                 placeholderTextColor="#6B7280"
                 value={batteryCapacity}
                 onChangeText={setBatteryCapacity}
@@ -417,17 +544,32 @@ export default function AddDeviceScreen() {
           )}
         </View>
 
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Info penghasilan</Text>
+        <View
+          style={[
+            styles.sectionCard,
+            { backgroundColor: colors.bubble, borderColor: colors.bubbleBorder },
+          ]}
+        >
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {t('incomeInfo')}
+          </Text>
 
-          {renderLabel('Mata uang')}
+          {renderLabel(t('currency'))}
           <TouchableOpacity
-            style={styles.inputButton}
+            style={[
+              styles.inputButton,
+              { backgroundColor: colors.input, borderColor: colors.inputBorder },
+            ]}
             activeOpacity={0.8}
             onPress={() => setCurrencyModalVisible(true)}
           >
-            <Text style={currency ? styles.inputButtonText : styles.placeholderText}>
-              {currency || 'Pilih mata uang'}
+            <Text
+              style={[
+                currency ? styles.inputButtonText : styles.placeholderText,
+                { color: currency ? colors.text : colors.textMuted },
+              ]}
+            >
+              {currency || t('selectCurrency')}
             </Text>
             <Ionicons name="chevron-down" size={18} color="#94A3B8" />
           </TouchableOpacity>
@@ -440,10 +582,10 @@ export default function AddDeviceScreen() {
           disabled={isSaving}
         >
           {isSaving ? (
-            <ActivityIndicator color={appColors.text} />
+            <ActivityIndicator color="#FFFFFF" />
           ) : (
             <Text style={styles.saveButtonText}>
-              {isEditMode ? 'Simpan Perubahan' : 'Simpan Plant'}
+              {isEditMode ? t('saveChanges') : t('savePlant')}
             </Text>
           )}
         </TouchableOpacity>
@@ -456,8 +598,15 @@ export default function AddDeviceScreen() {
         onRequestClose={() => setTimezoneModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Pilih Zona Waktu</Text>
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: colors.bubble, borderColor: colors.bubbleBorder },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {t('selectTimezone')}
+            </Text>
 
             <FlatList
               data={TIMEZONE_OPTIONS}
@@ -465,19 +614,26 @@ export default function AddDeviceScreen() {
               showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={styles.optionItem}
+                  style={[
+                    styles.optionItem,
+                    { borderBottomColor: colors.bubbleBorder },
+                  ]}
                   onPress={() => handleSelectTimezone(item)}
                 >
-                  <Text style={styles.optionItemText}>{item}</Text>
+                  <Text style={[styles.optionItemText, { color: colors.textSoft }]}>
+                    {item}
+                  </Text>
                 </TouchableOpacity>
               )}
             />
 
             <TouchableOpacity
-              style={styles.closeButton}
+              style={[styles.closeButton, { backgroundColor: colors.input }]}
               onPress={() => setTimezoneModalVisible(false)}
             >
-              <Text style={styles.closeButtonText}>Tutup</Text>
+              <Text style={[styles.closeButtonText, { color: colors.text }]}>
+                {t('close')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -490,27 +646,41 @@ export default function AddDeviceScreen() {
         onRequestClose={() => setSystemTypeModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Pilih Tipe Sistem</Text>
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: colors.bubble, borderColor: colors.bubbleBorder },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {t('selectSystemType')}
+            </Text>
 
             <FlatList
               data={SYSTEM_TYPE_OPTIONS}
               keyExtractor={(item) => item}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={styles.optionItem}
+                  style={[
+                    styles.optionItem,
+                    { borderBottomColor: colors.bubbleBorder },
+                  ]}
                   onPress={() => handleSelectSystemType(item)}
                 >
-                  <Text style={styles.optionItemText}>{item}</Text>
+                  <Text style={[styles.optionItemText, { color: colors.textSoft }]}>
+                    {item}
+                  </Text>
                 </TouchableOpacity>
               )}
             />
 
             <TouchableOpacity
-              style={styles.closeButton}
+              style={[styles.closeButton, { backgroundColor: colors.input }]}
               onPress={() => setSystemTypeModalVisible(false)}
             >
-              <Text style={styles.closeButtonText}>Tutup</Text>
+              <Text style={[styles.closeButtonText, { color: colors.text }]}>
+                {t('close')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -523,8 +693,15 @@ export default function AddDeviceScreen() {
         onRequestClose={() => setCurrencyModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Pilih Mata Uang</Text>
+          <View
+            style={[
+              styles.modalContent,
+              { backgroundColor: colors.bubble, borderColor: colors.bubbleBorder },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {t('selectCurrency')}
+            </Text>
 
             <FlatList
               data={CURRENCY_OPTIONS}
@@ -532,19 +709,26 @@ export default function AddDeviceScreen() {
               showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={styles.optionItem}
+                  style={[
+                    styles.optionItem,
+                    { borderBottomColor: colors.bubbleBorder },
+                  ]}
                   onPress={() => handleSelectCurrency(item)}
                 >
-                  <Text style={styles.optionItemText}>{item}</Text>
+                  <Text style={[styles.optionItemText, { color: colors.textSoft }]}>
+                    {item}
+                  </Text>
                 </TouchableOpacity>
               )}
             />
 
             <TouchableOpacity
-              style={styles.closeButton}
+              style={[styles.closeButton, { backgroundColor: colors.input }]}
               onPress={() => setCurrencyModalVisible(false)}
             >
-              <Text style={styles.closeButtonText}>Tutup</Text>
+              <Text style={[styles.closeButtonText, { color: colors.text }]}>
+                {t('close')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
