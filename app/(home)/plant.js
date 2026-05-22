@@ -76,19 +76,50 @@ function getLatestStatusTimestamp(source) {
   return Math.max(0, ...collectStatusTimestamps(source));
 }
 
+function isAllowedValue(value) {
+  return value === true || value === "true";
+}
+
+function getPlantDeviceId(plant) {
+  return (
+    plant?.device_id ??
+    plant?.deviceId ??
+    plant?.latestDeviceId ??
+    plant?.latest_device_id ??
+    null
+  );
+}
+
+function getDeviceLatestDataTimestamp(device) {
+  return Math.max(
+    0,
+    parseStatusTimestamp(device?.latestDataAt) || 0,
+    parseStatusTimestamp(device?.latest_data_at) || 0,
+    parseStatusTimestamp(device?.lastDataAt) || 0,
+    parseStatusTimestamp(device?.last_data_at) || 0,
+    parseStatusTimestamp(device?.timestamp) || 0,
+  );
+}
+
 async function attachLatestDeviceTimestamps(plants) {
   return Promise.all(
     plants.map(async (plant) => {
-      const plantTimestamp = getLatestStatusTimestamp(plant);
-
       try {
         const result = await fetchPlantDevices(plant.id);
-        const deviceTimestamp = getLatestStatusTimestamp(result);
-        const latestDataTimestamp = Math.max(plantTimestamp, deviceTimestamp);
+        const devices = Array.isArray(result?.devices) ? result.devices : [];
+        const allowedDevices = devices.filter((device) =>
+          isAllowedValue(device?.allowed),
+        );
+        const latestDataTimestamp = Math.max(
+          0,
+          ...allowedDevices.map(getDeviceLatestDataTimestamp),
+        );
 
         return {
           ...plant,
-          latestDataStatusTimestamp: latestDataTimestamp || plantTimestamp || null,
+          hasDeviceId: devices.length > 0,
+          hasAllowedDevice: allowedDevices.length > 0,
+          latestDataStatusTimestamp: latestDataTimestamp || null,
         };
       } catch (error) {
         console.warn(
@@ -99,7 +130,11 @@ async function attachLatestDeviceTimestamps(plants) {
 
         return {
           ...plant,
-          latestDataStatusTimestamp: plantTimestamp || null,
+          hasDeviceId: Boolean(getPlantDeviceId(plant)),
+          hasAllowedDevice: isAllowedValue(
+            plant?.allowed ?? plant?.deviceAllowed ?? plant?.device_allowed,
+          ),
+          latestDataStatusTimestamp: getLatestStatusTimestamp(plant) || null,
         };
       }
     }),

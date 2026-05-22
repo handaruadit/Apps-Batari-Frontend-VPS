@@ -14,8 +14,6 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 
 const ONLINE_THRESHOLD_MS = 15 * 60 * 1000;
-const TIMESTAMP_FIELD_PATTERN =
-  /(^|_)(last|latest|created|updated|inserted|received|seen)(_|$)|timestamp|datetime|date_time|time/i;
 
 function parseTimestamp(value) {
   if (value === null || value === undefined || value === "") {
@@ -31,43 +29,58 @@ function parseTimestamp(value) {
   return Number.isFinite(timestamp) ? timestamp : null;
 }
 
-function collectTimestamps(source, timestamps = []) {
-  if (!source || typeof source !== "object") {
-    return timestamps;
-  }
-
-  if (Array.isArray(source)) {
-    source.forEach((item) => collectTimestamps(item, timestamps));
-    return timestamps;
-  }
-
-  Object.entries(source).forEach(([key, value]) => {
-    if (TIMESTAMP_FIELD_PATTERN.test(key)) {
-      const timestamp = parseTimestamp(value);
-
-      if (timestamp) {
-        timestamps.push(timestamp);
-      }
-    }
-
-    if (value && typeof value === "object") {
-      collectTimestamps(value, timestamps);
-    }
-  });
-
-  return timestamps;
+function getLatestDataTimestamp(device) {
+  return Math.max(
+    0,
+    parseTimestamp(device?.latestDataStatusTimestamp) || 0,
+    parseTimestamp(device?.latestDataAt) || 0,
+    parseTimestamp(device?.latest_data_at) || 0,
+    parseTimestamp(device?.lastDataAt) || 0,
+    parseTimestamp(device?.last_data_at) || 0,
+    parseTimestamp(device?.latestDataTime) || 0,
+    parseTimestamp(device?.latest_data_time) || 0,
+    parseTimestamp(device?.last_seen) || 0,
+    parseTimestamp(device?.timestamp) || 0,
+  );
 }
 
-function getLatestDataTimestamp(device) {
-  return Math.max(0, ...collectTimestamps(device));
+function getPlantDeviceId(device) {
+  return (
+    device?.device_id ??
+    device?.deviceId ??
+    device?.latestDeviceId ??
+    device?.latest_device_id ??
+    null
+  );
 }
 
 function getPlantConnectionStatus(device) {
+  const hasDeviceId =
+    device?.hasDeviceId === true || Boolean(getPlantDeviceId(device));
+  const hasAllowedDevice =
+    device?.hasAllowedDevice === true ||
+    device?.allowed === true ||
+    device?.allowed === "true" ||
+    device?.deviceAllowed === true ||
+    device?.deviceAllowed === "true" ||
+    device?.device_allowed === true ||
+    device?.device_allowed === "true";
+
+  if (!hasDeviceId || !hasAllowedDevice) {
+    return {
+      key: "comissioning",
+      isOnline: false,
+      label: "Comissioning",
+      timestamp: null,
+    };
+  }
+
   const latestTimestamp = getLatestDataTimestamp(device);
   const isOnline =
     latestTimestamp > 0 && Date.now() - latestTimestamp <= ONLINE_THRESHOLD_MS;
 
   return {
+    key: isOnline ? "online" : "offline",
     isOnline,
     label: isOnline ? "Online" : "Offline",
     timestamp: latestTimestamp,
@@ -96,7 +109,12 @@ export default function DeviceCard({
   const [menuVisible, setMenuVisible] = useState(false);
   const pulseAnim = useRef(new Animated.Value(0.45)).current;
   const connectionStatus = getPlantConnectionStatus(device);
-  const statusColor = connectionStatus.isOnline ? "#16A34A" : "#DC2626";
+  const statusColor =
+    connectionStatus.key === "comissioning"
+      ? "#F97316"
+      : connectionStatus.isOnline
+        ? "#16A34A"
+        : "#DC2626";
   const cityProvinceText = formatCityProvince(device);
 
   useEffect(() => {

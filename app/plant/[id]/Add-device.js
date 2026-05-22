@@ -12,7 +12,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { appColors, appFont } from "@/config/theme";
+import { appFont } from "@/config/theme";
+import { useAppSettings } from "@/context/AppSettingsContext";
 import { linkDeviceToPlant } from "@/services/plantService";
 
 function getParamValue(value) {
@@ -21,6 +22,7 @@ function getParamValue(value) {
 
 export default function AddDataloggerScreen() {
   const params = useLocalSearchParams();
+  const { colors } = useAppSettings();
   const plantId = getParamValue(params.id);
   const [deviceId, setDeviceId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -87,32 +89,54 @@ export default function AddDataloggerScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.screen }]}>
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: colors.screen }]}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
           <TouchableOpacity
-            style={styles.backButton}
+            style={[
+              styles.backButton,
+              {
+                backgroundColor: colors.bubble,
+                borderColor: colors.bubbleBorder,
+              },
+            ]}
             activeOpacity={0.8}
             onPress={() => router.back()}
           >
-            <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+            <Ionicons name="chevron-back" size={22} color={colors.accent} />
           </TouchableOpacity>
 
-          <Text style={styles.title}>Add Datalogger</Text>
+          <Text style={[styles.title, { color: colors.text }]}>
+            Add Datalogger
+          </Text>
 
           <View style={styles.headerSpacer} />
         </View>
 
-        <View style={styles.sectionCard}>
-          <Text style={styles.label}>Device ID</Text>
+        <View
+          style={[
+            styles.sectionCard,
+            { backgroundColor: colors.bubble, borderColor: colors.bubbleBorder },
+          ]}
+        >
+          <Text style={[styles.label, { color: colors.textMuted }]}>
+            Device ID
+          </Text>
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              {
+                backgroundColor: colors.input,
+                borderColor: colors.inputBorder,
+                color: colors.text,
+              },
+            ]}
             placeholder="BS26040012"
-            placeholderTextColor="#6B7280"
+            placeholderTextColor={colors.textMuted}
             value={deviceId}
             onChangeText={setDeviceId}
             autoCapitalize="characters"
@@ -120,22 +144,28 @@ export default function AddDataloggerScreen() {
           />
 
           <TouchableOpacity
-            style={styles.secondaryButton}
+            style={[styles.secondaryButton, { borderColor: colors.inputBorder }]}
             activeOpacity={0.85}
             onPress={handleScanQr}
           >
-            <Ionicons name="qr-code-outline" size={20} color={appColors.text} />
-            <Text style={styles.secondaryButtonText}>Scan QR</Text>
+            <Ionicons name="qr-code-outline" size={20} color={colors.accent} />
+            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
+              Scan QR
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
+            style={[
+              styles.saveButton,
+              { backgroundColor: colors.accent },
+              isSaving && styles.saveButtonDisabled,
+            ]}
             activeOpacity={0.85}
             onPress={handleSaveDevice}
             disabled={isSaving}
           >
             {isSaving ? (
-              <ActivityIndicator color={appColors.text} />
+              <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text style={styles.saveButtonText}>Simpan Device</Text>
             )}
@@ -149,11 +179,9 @@ export default function AddDataloggerScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: appColors.screen,
   },
   container: {
     flex: 1,
-    backgroundColor: appColors.screen,
     paddingHorizontal: 16,
   },
   contentContainer: {
@@ -172,41 +200,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 22,
-    backgroundColor: appColors.bubble,
+    backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: appColors.bubbleBorder,
   },
   title: {
     fontSize: 22,
     fontWeight: "700",
-    color: appColors.text,
     fontFamily: appFont,
   },
   headerSpacer: {
     width: 44,
   },
   sectionCard: {
-    backgroundColor: appColors.bubble,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: appColors.bubbleBorder,
     padding: 16,
   },
   label: {
-    color: appColors.textSoft,
     fontSize: 14,
     fontWeight: "600",
     fontFamily: appFont,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: appColors.input,
     borderRadius: 14,
     paddingHorizontal: 16,
     height: 56,
     borderWidth: 1,
-    borderColor: appColors.inputBorder,
-    color: appColors.text,
     fontSize: 16,
     fontFamily: appFont,
     marginBottom: 14,
@@ -215,7 +235,6 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: appColors.inputBorder,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -223,7 +242,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   secondaryButtonText: {
-    color: appColors.text,
     fontSize: 15,
     fontWeight: "700",
     fontFamily: appFont,
@@ -233,13 +251,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: appColors.accent,
   },
   saveButtonDisabled: {
     opacity: 0.7,
   },
   saveButtonText: {
-    color: appColors.text,
+    color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
     fontFamily: appFont,
