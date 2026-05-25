@@ -2,10 +2,38 @@ import { clearAuth, getToken, isTokenValid } from "@/auth/token";
 import { BASE_URL } from "@/config/api";
 
 export const DEMO_PLANT_NAME = "Plant Testing";
+export const PLANT_ACCESS_ROLE_VALUES = Object.freeze({
+  VIEW_ONLY: "viewer",
+  MANAGE_ACCESS: "editor",
+});
+
+const PLANT_ACCESS_ROLE_ALIASES = Object.freeze({
+  viewer: PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY,
+  view_only: PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY,
+  only_view: PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY,
+  "view only": PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY,
+  view: PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY,
+  editor: PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS,
+  manage_access: PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS,
+  can_manage: PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS,
+  "manage access": PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS,
+  manager: PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS,
+  manage: PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS,
+});
 
 export function isDemoPlant(plant) {
   return String(plant?.name || "").trim().toLowerCase() ===
     DEMO_PLANT_NAME.toLowerCase();
+}
+
+export function normalizePlantAccessRole(role) {
+  const key = String(role || "").trim().toLowerCase();
+
+  return PLANT_ACCESS_ROLE_ALIASES[key] || "";
+}
+
+export function isValidPlantAccessRole(role) {
+  return Boolean(normalizePlantAccessRole(role));
 }
 
 async function getAuthHeaders() {
@@ -75,6 +103,89 @@ function throwApiError(response, body, fallbackMessage) {
   error.status = response.status;
   error.body = body;
   throw error;
+}
+
+function createServiceError(message, code, status, body) {
+  const error = new Error(message);
+  error.code = code;
+  error.status = status;
+  error.body = body;
+  return error;
+}
+
+function collectErrorText(value) {
+  if (!value) {
+    return "";
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(collectErrorText).filter(Boolean).join(" ");
+  }
+
+  if (typeof value === "object") {
+    return Object.values(value).map(collectErrorText).filter(Boolean).join(" ");
+  }
+
+  return String(value);
+}
+
+function getPlantAccessErrorMessage(response, body, fallbackMessage) {
+  const backendMessage =
+    collectErrorText(body?.message) ||
+    collectErrorText(body?.error) ||
+    collectErrorText(body?.errors) ||
+    collectErrorText(body?.raw);
+  const message = backendMessage || fallbackMessage;
+  const normalized = message.toLowerCase();
+
+  if (
+    response.status === 409 ||
+    /duplicate|already|unique|sudah.*akses|akses.*sudah|user_plants.*key/.test(
+      normalized,
+    )
+  ) {
+    return "User sudah memiliki akses ke plant ini.";
+  }
+
+  if (
+    response.status === 404 ||
+    /user.*not found|not found.*user|user.*tidak ditemukan|tidak ditemukan.*user/.test(
+      normalized,
+    )
+  ) {
+    return "User tidak ditemukan.";
+  }
+
+  if (
+    /user_plants_role_check|role.*check|check constraint.*role|invalid role|role tidak valid/.test(
+      normalized,
+    )
+  ) {
+    return "Role tidak valid. Silakan pilih View Only atau Manage Access.";
+  }
+
+  if (
+    /insert into|violates|constraint|syntax error|relation |select .* from|update .* set|delete from/.test(
+      normalized,
+    )
+  ) {
+    return fallbackMessage;
+  }
+
+  return message;
+}
+
+function throwPlantAccessApiError(response, body, fallbackMessage) {
+  throw createServiceError(
+    getPlantAccessErrorMessage(response, body, fallbackMessage),
+    "PLANT_ACCESS_ERROR",
+    response.status,
+    body,
+  );
 }
 
 export async function fetchPlants() {
@@ -238,39 +349,77 @@ export async function searchPlantAccessUsers(plantId, query) {
   return Array.isArray(body?.data) ? body.data : [];
 }
 
-export async function addPlantAccessUser(plantId, userId, role = "only_view") {
+export async function addPlantAccessUser(
+  plantId,
+  userId,
+  role = PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY,
+) {
+  const normalizedRole = normalizePlantAccessRole(role);
+
+  if (!normalizedRole) {
+    throw createServiceError(
+      "Role tidak valid. Silakan pilih View Only atau Manage Access.",
+      "INVALID_ROLE",
+    );
+  }
+
+  if (userId == null || String(userId).trim() === "") {
+    throw createServiceError("User tidak ditemukan.", "USER_NOT_FOUND");
+  }
+
   const headers = await getAuthHeaders();
   const response = await fetch(
     `${BASE_URL}/api/plant/${encodeURIComponent(plantId)}/access`,
     {
       method: "POST",
       headers,
-      body: JSON.stringify({ userId, role }),
+      body: JSON.stringify({ userId, role: normalizedRole }),
     },
   );
   const body = await parseResponse(response);
 
   if (!response.ok) {
-    throwApiError(response, body, "Gagal menambahkan akses user.");
+    throwPlantAccessApiError(
+      response,
+      body,
+      "Gagal menambahkan user. Pastikan email dan role sudah benar.",
+    );
   }
 
   return Array.isArray(body?.data) ? body.data : [];
 }
 
 export async function updatePlantAccessUser(plantId, userId, role) {
+  const normalizedRole = normalizePlantAccessRole(role);
+
+  if (!normalizedRole) {
+    throw createServiceError(
+      "Role tidak valid. Silakan pilih View Only atau Manage Access.",
+      "INVALID_ROLE",
+    );
+  }
+
+  if (userId == null || String(userId).trim() === "") {
+    throw createServiceError("User tidak ditemukan.", "USER_NOT_FOUND");
+  }
+
   const headers = await getAuthHeaders();
   const response = await fetch(
     `${BASE_URL}/api/plant/${encodeURIComponent(plantId)}/access/${encodeURIComponent(userId)}`,
     {
       method: "PATCH",
       headers,
-      body: JSON.stringify({ role }),
+      body: JSON.stringify({ role: normalizedRole }),
     },
   );
   const body = await parseResponse(response);
 
   if (!response.ok) {
-    throwApiError(response, body, "Gagal mengubah akses user.");
+    throwPlantAccessApiError(
+      response,
+      body,
+      "Gagal mengubah akses user. Pastikan role sudah benar.",
+    );
   }
 
   return Array.isArray(body?.data) ? body.data : [];

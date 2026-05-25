@@ -3,6 +3,8 @@ import { useAppSettings } from "@/context/AppSettingsContext";
 import {
   addPlantAccessUser,
   fetchPlantAccess,
+  normalizePlantAccessRole,
+  PLANT_ACCESS_ROLE_VALUES,
   removePlantAccessUser,
   searchPlantAccessUsers,
   updatePlantAccessUser,
@@ -26,10 +28,29 @@ function getParamValue(value) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+const ACCESS_ROLE_OPTIONS = [
+  { label: "View Only", value: PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY },
+  { label: "Manage Access", value: PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS },
+];
+
 function formatRole(role) {
-  if (role === "owner") return "owner";
-  if (role === "can_manage") return "can manage";
-  return "only view";
+  if (role === "owner") return "Owner";
+
+  const normalizedRole = normalizePlantAccessRole(role);
+
+  if (normalizedRole === PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS) {
+    return "Manage Access";
+  }
+
+  if (normalizedRole === PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY) {
+    return "View Only";
+  }
+
+  return "-";
+}
+
+function getAccessUserId(user) {
+  return user?.userId ?? user?.user_id ?? user?.id ?? null;
 }
 
 export default function ManageAccessScreen() {
@@ -43,6 +64,9 @@ export default function ManageAccessScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedAddRole, setSelectedAddRole] = useState(
+    PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY,
+  );
 
   const loadAccess = useCallback(async () => {
     if (!plantId) return;
@@ -81,18 +105,76 @@ export default function ManageAccessScreen() {
     }
   };
 
-  const handleAddUser = async (user) => {
+  const executeAddUser = async (user, role) => {
+    const userId = getAccessUserId(user);
+    const normalizedRole = normalizePlantAccessRole(role);
+
+    if (!userId) {
+      Alert.alert("Tambah Access", "User tidak ditemukan.");
+      return;
+    }
+
+    if (!normalizedRole) {
+      Alert.alert(
+        "Tambah Access",
+        "Role tidak valid. Silakan pilih View Only atau Manage Access.",
+      );
+      return;
+    }
+
     setIsUpdating(true);
     try {
-      const result = await addPlantAccessUser(plantId, user.userId, "only_view");
-      setUsers(result);
+      await addPlantAccessUser(plantId, userId, normalizedRole);
+      await loadAccess();
       setQuery("");
       setSearchResults([]);
+      Alert.alert("Tambah Access", "User berhasil ditambahkan ke plant.");
     } catch (error) {
-      Alert.alert("Tambah Access", error.message || "Gagal menambahkan user.");
+      Alert.alert(
+        "Tambah Access",
+        error.message || "Gagal menambahkan user. Pastikan email dan role sudah benar.",
+      );
     } finally {
       setIsUpdating(false);
     }
+  };
+
+  const handleAddUser = (user) => {
+    const userId = getAccessUserId(user);
+    const normalizedRole = normalizePlantAccessRole(selectedAddRole);
+
+    if (!userId) {
+      Alert.alert("Tambah Access", "User tidak ditemukan.");
+      return;
+    }
+
+    if (!normalizedRole) {
+      Alert.alert(
+        "Tambah Access",
+        "Role tidak valid. Silakan pilih View Only atau Manage Access.",
+      );
+      return;
+    }
+
+    const alreadyHasAccess = users.some(
+      (accessUser) => String(getAccessUserId(accessUser)) === String(userId),
+    );
+
+    if (alreadyHasAccess) {
+      Alert.alert("Tambah Access", "User sudah memiliki akses ke plant ini.");
+      return;
+    }
+
+    Alert.alert("Tambah Access", "Apakah anda yakin untuk menambah User ini?", [
+      {
+        text: "Ya",
+        onPress: () => executeAddUser(user, normalizedRole),
+      },
+      {
+        text: "Tidak",
+        style: "cancel",
+      },
+    ]);
   };
 
   const handleUserAction = (user) => {
@@ -103,12 +185,14 @@ export default function ManageAccessScreen() {
 
     Alert.alert(user.email || "User", "Pilih permission", [
       {
-        text: "only view",
-        onPress: () => handleUpdateRole(user, "only_view"),
+        text: "View Only",
+        onPress: () =>
+          handleUpdateRole(user, PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY),
       },
       {
-        text: "can manage",
-        onPress: () => handleUpdateRole(user, "can_manage"),
+        text: "Manage Access",
+        onPress: () =>
+          handleUpdateRole(user, PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS),
       },
       {
         text: "remove access",
@@ -120,21 +204,47 @@ export default function ManageAccessScreen() {
   };
 
   const handleUpdateRole = async (user, role) => {
+    const userId = getAccessUserId(user);
+    const normalizedRole = normalizePlantAccessRole(role);
+
+    if (!userId) {
+      Alert.alert("Update Access", "User tidak ditemukan.");
+      return;
+    }
+
+    if (!normalizedRole) {
+      Alert.alert(
+        "Update Access",
+        "Role tidak valid. Silakan pilih View Only atau Manage Access.",
+      );
+      return;
+    }
+
     setIsUpdating(true);
     try {
-      const result = await updatePlantAccessUser(plantId, user.userId, role);
+      const result = await updatePlantAccessUser(plantId, userId, normalizedRole);
       setUsers(result);
     } catch (error) {
-      Alert.alert("Update Access", error.message || "Gagal mengubah akses.");
+      Alert.alert(
+        "Update Access",
+        error.message || "Gagal mengubah akses user. Pastikan role sudah benar.",
+      );
     } finally {
       setIsUpdating(false);
     }
   };
 
   const handleRemoveUser = async (user) => {
+    const userId = getAccessUserId(user);
+
+    if (!userId) {
+      Alert.alert("Remove Access", "User tidak ditemukan.");
+      return;
+    }
+
     setIsUpdating(true);
     try {
-      const result = await removePlantAccessUser(plantId, user.userId);
+      const result = await removePlantAccessUser(plantId, userId);
       setUsers(result);
     } catch (error) {
       Alert.alert("Remove Access", error.message || "Gagal menghapus akses.");
@@ -186,7 +296,7 @@ export default function ManageAccessScreen() {
           ) : (
             users.map((user) => (
               <TouchableOpacity
-                key={user.userId}
+                key={getAccessUserId(user)}
                 activeOpacity={user.role === "owner" ? 1 : 0.75}
                 onPress={() => handleUserAction(user)}
                 style={[styles.userRow, { borderTopColor: colors.bubbleBorder }]}
@@ -243,9 +353,40 @@ export default function ManageAccessScreen() {
             </TouchableOpacity>
           </View>
 
+          <View style={styles.roleSelector}>
+            {ACCESS_ROLE_OPTIONS.map((roleOption) => {
+              const isSelected = selectedAddRole === roleOption.value;
+
+              return (
+                <TouchableOpacity
+                  key={roleOption.value}
+                  activeOpacity={0.8}
+                  onPress={() => setSelectedAddRole(roleOption.value)}
+                  disabled={isUpdating}
+                  style={[
+                    styles.roleOption,
+                    {
+                      borderColor: isSelected ? colors.accent : colors.inputBorder,
+                      backgroundColor: isSelected ? colors.accent : colors.input,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.roleOptionText,
+                      { color: isSelected ? "#FFFFFF" : colors.text },
+                    ]}
+                  >
+                    {roleOption.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           {searchResults.map((user) => (
             <TouchableOpacity
-              key={user.userId}
+              key={getAccessUserId(user)}
               activeOpacity={0.78}
               onPress={() => handleAddUser(user)}
               disabled={isUpdating}
@@ -352,6 +493,26 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+  },
+  roleSelector: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+  },
+  roleOption: {
+    flex: 1,
+    minHeight: 40,
+    borderWidth: 1,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+  roleOptionText: {
+    fontFamily: appFont,
+    fontSize: 12,
+    fontWeight: "900",
+    textAlign: "center",
   },
   input: {
     flex: 1,
