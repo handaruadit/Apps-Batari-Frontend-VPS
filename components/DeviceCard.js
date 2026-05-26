@@ -79,7 +79,7 @@ export default function DeviceCard({
   canAddDatalogger = false,
   canManageAccess = false,
 }) {
-  const { colors, themeMode } = useAppSettings();
+  const { colors, t, themeMode } = useAppSettings();
   const [menuVisible, setMenuVisible] = useState(false);
   const pulseAnim = useRef(new Animated.Value(0.45)).current;
   const connectionStatus = getPlantConnectionStatus(device);
@@ -232,14 +232,14 @@ export default function DeviceCard({
                 color={colors.accent}
               />
               <Text style={[styles.menuText, { color: colors.text }]}>
-                {isPinned ? "Unpin" : "Pin"}
+                {isPinned ? t("unpin") : t("pin")}
               </Text>
             </TouchableOpacity>
 
             {canEdit && (
               <TouchableOpacity style={styles.menuItem} onPress={handleEdit}>
                 <Ionicons name="create-outline" size={18} color={colors.accent} />
-                <Text style={[styles.menuText, { color: colors.text }]}>Edit</Text>
+                <Text style={[styles.menuText, { color: colors.text }]}>{t("edit")}</Text>
               </TouchableOpacity>
             )}
 
@@ -251,7 +251,7 @@ export default function DeviceCard({
                   color={colors.accent}
                 />
                 <Text style={[styles.menuText, { color: colors.text }]}>
-                  Add Datalogger
+                  {t("addDatalogger")}
                 </Text>
               </TouchableOpacity>
             )}
@@ -264,7 +264,7 @@ export default function DeviceCard({
                   color={colors.accent}
                 />
                 <Text style={[styles.menuText, { color: colors.text }]}>
-                  Manage Access
+                  {t("manageAccess")}
                 </Text>
               </TouchableOpacity>
             )}
@@ -272,7 +272,7 @@ export default function DeviceCard({
             {canDelete && (
               <TouchableOpacity style={styles.menuItem} onPress={handleDelete}>
                 <Ionicons name="trash-outline" size={18} color="#DC2626" />
-                <Text style={[styles.menuText, styles.deleteText]}>Delete</Text>
+                <Text style={[styles.menuText, styles.deleteText]}>{t("delete")}</Text>
               </TouchableOpacity>
             )}
           </View>

@@ -7,7 +7,7 @@ import { BASE_URL, GOOGLE_MAPS_API_KEY } from "@/config/api";
 import { appColors, appFont } from "@/config/theme";
 import { AuthContext } from "@/context/AuthContext";
 import { useAppSettings } from "@/context/AppSettingsContext";
-import { isDemoPlant } from "@/services/plantService";
+import { fetchPlantDevices, isDemoPlant } from "@/services/plantService";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
@@ -108,26 +108,20 @@ const WEATHER_ICON_SIZE = {
   day: 34,
 };
 const POWER_SERIES_CONFIG = [
-  { key: "production", label: "PV", color: "#1FB7FF", group: "consumption" },
-  { key: "grid", label: "Grid", color: "#FF9300", group: "consumption" },
-  { key: "battery", label: "Battery", color: "#99E500", group: "consumption" },
+  { key: "production", labelKey: "pv", label: "PV", color: "#1FB7FF", group: "consumption" },
+  { key: "grid", labelKey: "grid", label: "Grid", color: "#FF9300", group: "consumption" },
+  { key: "battery", labelKey: "battery", label: "Battery", color: "#99E500", group: "consumption" },
   {
     key: "pvGenerate",
+    labelKey: "pvGenerate",
     label: "PV Generate",
     color: "#FF4646",
     group: "production",
   },
-  { key: "export", label: "Export", color: "#4F46E5", group: "production" },
-  { key: "charge", label: "Charge", color: "#A855F7", group: "production" },
+  { key: "export", labelKey: "export", label: "Export", color: "#4F46E5", group: "production" },
+  { key: "charge", labelKey: "charge", label: "Charge", color: "#A855F7", group: "production" },
 ];
-const POWER_SERIES_SWITCH_LABELS = {
-  production: "PV",
-  grid: "Grid",
-  battery: "Battery",
-  pvGenerate: "PV Generate",
-  export: "Export",
-  charge: "Charge",
-};
+const getPowerSeriesLabel = (item, t) => t(item?.labelKey) || item?.label || "";
 const OVERVIEW_CHART_SWITCH_STORAGE_KEY = "overviewChartSwitchSettings";
 const getDefaultVisiblePowerSeries = () =>
   POWER_SERIES_CONFIG.reduce((items, item) => {
@@ -905,21 +899,6 @@ const POWER_CHART_TIME_TICKS = [0, 3, 6, 9, 12, 15, 18, 21, 24];
 const POWER_CHART_MONTH_X_TICKS = [
   1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31,
 ];
-const POWER_CHART_YEAR_X_TICKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-const MONTH_LABELS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "Mei",
-  "Jun",
-  "Jul",
-  "Agu",
-  "Sep",
-  "Okt",
-  "Nov",
-  "Des",
-];
 const POWER_CHART_MARKER = {
   color: "#F8FAFC",
   lineColor: "rgba(248,250,252,0.82)",
@@ -1019,29 +998,29 @@ const weatherForecastDays = [
   { day: "4", icon: "rainy-outline", temp: 29 },
 ];
 const monthlySavingItems = [
-  { key: "jan", month: "January", value: "Rp0" },
-  { key: "feb", month: "February", value: "Rp0" },
-  { key: "mar", month: "March", value: "Rp0" },
-  { key: "apr", month: "April", value: "Rp0" },
+  { key: "jan", monthKey: "january", value: "Rp0" },
+  { key: "feb", monthKey: "february", value: "Rp0" },
+  { key: "mar", monthKey: "march", value: "Rp0" },
+  { key: "apr", monthKey: "april", value: "Rp0" },
 ];
 const environmentImpactItems = [
   {
     key: "co2",
     icon: "cloud-outline",
     value: "0.00",
-    label: "CO2 reduced",
+    labelKey: "co2Reduced",
   },
   {
     key: "coal",
     icon: "cloud-done-outline",
     value: "0.00",
-    label: "Standard coal\nsaved",
+    labelKey: "standardCoalSave",
   },
   {
     key: "deforestation",
     icon: "leaf-outline",
     value: "0.00",
-    label: "Deforestation\nreduced",
+    labelKey: "deforestationReduced",
   },
 ];
 
@@ -1177,6 +1156,13 @@ function getJakartaDateParts(date = new Date()) {
   };
 }
 
+function getYearRange(selectedYear) {
+  const year = Number(selectedYear);
+  const safeYear = Number.isFinite(year) ? year : getJakartaDateParts().year;
+
+  return Array.from({ length: 5 }, (_, index) => safeYear - 3 + index);
+}
+
 function getResponsiveChartWidth(windowWidth) {
   return Math.min(
     POWER_CHART_RESPONSIVE_WIDTH.max,
@@ -1226,8 +1212,8 @@ function buildGoogleGeocodeEndpoint(locationText) {
   )}&region=id&key=${GOOGLE_MAPS_API_KEY}`;
 }
 
-function buildGoogleWeatherEndpoint(latitude, longitude) {
-  return `https://weather.googleapis.com/v1/currentConditions:lookup?key=${GOOGLE_MAPS_API_KEY}&location.latitude=${latitude}&location.longitude=${longitude}&unitsSystem=METRIC&languageCode=id`;
+function buildGoogleWeatherEndpoint(latitude, longitude, languageCode = "id") {
+  return `https://weather.googleapis.com/v1/currentConditions:lookup?key=${GOOGLE_MAPS_API_KEY}&location.latitude=${latitude}&location.longitude=${longitude}&unitsSystem=METRIC&languageCode=${languageCode}`;
 }
 
 function getWeatherConditionText(weather) {
@@ -1273,6 +1259,7 @@ async function fetchGoogleWeatherForPlant({
   locationText,
   latitude,
   longitude,
+  languageCode = "id",
 }) {
   if (!GOOGLE_MAPS_API_KEY) {
     return null;
@@ -1309,7 +1296,7 @@ async function fetchGoogleWeatherForPlant({
   }
 
   const weatherResponse = await fetch(
-    buildGoogleWeatherEndpoint(resolvedLatitude, resolvedLongitude),
+    buildGoogleWeatherEndpoint(resolvedLatitude, resolvedLongitude, languageCode),
   );
   const weatherJson = await weatherResponse.json().catch(() => null);
 
@@ -1427,6 +1414,10 @@ function getRecordTimestampText(record) {
   return pickValue(
     record?.created_at,
     record?.createdAt,
+    record?.inserted_at,
+    record?.insertedAt,
+    record?.received_at,
+    record?.receivedAt,
     record?.timestamp,
     record?.time,
     record?.datetime,
@@ -1567,6 +1558,27 @@ function collectMonitoringTimestamps(source, timestamps = []) {
   return timestamps;
 }
 
+function hasNumericMonitoringData(source) {
+  if (!source) {
+    return false;
+  }
+
+  if (Array.isArray(source)) {
+    return source.some(hasNumericMonitoringData);
+  }
+
+  if (typeof source === "object") {
+    if (getApiNumber(source) !== null) {
+      return true;
+    }
+
+    return Object.values(source).some(hasNumericMonitoringData);
+  }
+
+  const number = Number(source);
+  return Number.isFinite(number);
+}
+
 function hasOfflineStatus(source) {
   if (!source || typeof source !== "object") {
     return false;
@@ -1615,11 +1627,15 @@ function getMonitoringOnlineState(latestResults) {
     collectMonitoringTimestamps(json?.data),
   );
   const latestTimestamp = timestamps.length ? Math.max(...timestamps) : null;
+  const hasReadableData = successfulJson.some((json) =>
+    hasNumericMonitoringData(json?.data),
+  );
 
   return {
     isOnline:
-      latestTimestamp !== null &&
-      Date.now() - latestTimestamp <= MONITORING_ONLINE_THRESHOLD_MS,
+      latestTimestamp !== null
+        ? Date.now() - latestTimestamp <= MONITORING_ONLINE_THRESHOLD_MS
+        : hasReadableData,
     latestTimestamp,
   };
 }
@@ -1815,6 +1831,7 @@ function normalizeChartSeries(data) {
             value: Math.abs(value),
             day: row?.day,
             month: row?.month,
+            year: row?.year,
             label: row?.label,
             date: row?.date,
             source: data?.source,
@@ -1917,6 +1934,124 @@ function mergePowerValues(...powerSources) {
   }, {});
 }
 
+function sumPowerValues(...powerSources) {
+  return powerSources.reduce((totals, item) => {
+    Object.entries(item || {}).forEach(([key, value]) => {
+      const number = Number(value);
+
+      if (!Number.isFinite(number)) {
+        return;
+      }
+
+      totals[key] = (Number(totals[key]) || 0) + number;
+    });
+
+    return totals;
+  }, {});
+}
+
+function hasAnyPowerValue(powerValues) {
+  return Object.values(powerValues || {}).some((value) =>
+    Number.isFinite(Number(value)),
+  );
+}
+
+function getDeviceIdentifier(device) {
+  return pickValue(
+    device?.device_id,
+    device?.deviceId,
+    device?.serialNumber,
+    device?.serial_number,
+    device?.sn,
+    null,
+  );
+}
+
+function normalizeDeviceList(devices) {
+  const seen = new Set();
+
+  return (Array.isArray(devices) ? devices : [])
+    .map((device) => ({
+      ...device,
+      dataSourceId: getDeviceIdentifier(device),
+    }))
+    .filter((device) => {
+      if (!device.dataSourceId) {
+        return false;
+      }
+
+      const key = String(device.dataSourceId);
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+}
+
+function areDeviceListsEqual(leftDevices, rightDevices) {
+  const leftIds = normalizeDeviceList(leftDevices).map((device) =>
+    String(device.dataSourceId),
+  );
+  const rightIds = normalizeDeviceList(rightDevices).map((device) =>
+    String(device.dataSourceId),
+  );
+
+  return (
+    leftIds.length === rightIds.length &&
+    leftIds.every((id, index) => id === rightIds[index])
+  );
+}
+
+function getDeviceLatestSources(device) {
+  return [
+    device?.latestData,
+    device?.latest_data,
+    device?.data,
+    device?.parameters,
+    device?.latestPowerData,
+    device?.latest_power_data,
+  ].filter(Boolean);
+}
+
+function getDevicePowerValues(device) {
+  return mergePowerValues(
+    ...getDeviceLatestSources(device).map((source) => normalizePowerValues(source)),
+  );
+}
+
+function getDevicesAggregatePowerValues(devices) {
+  return sumPowerValues(
+    ...normalizeDeviceList(devices).map((device) => getDevicePowerValues(device)),
+  );
+}
+
+function getDeviceLatestTimestamp(device) {
+  const timestamps = collectMonitoringTimestamps(device);
+
+  return timestamps.length ? Math.max(...timestamps) : 0;
+}
+
+function getDevicesMonitoringState(devices) {
+  const timestamps = normalizeDeviceList(devices)
+    .map(getDeviceLatestTimestamp)
+    .filter((timestamp) => timestamp > 0);
+  const latestTimestamp = timestamps.length ? Math.max(...timestamps) : null;
+  const hasReadableData = normalizeDeviceList(devices).some((device) =>
+    hasAnyPowerValue(getDevicePowerValues(device)),
+  );
+
+  return {
+    isOnline:
+      latestTimestamp !== null
+        ? Date.now() - latestTimestamp <= MONITORING_ONLINE_THRESHOLD_MS
+        : hasReadableData,
+    latestTimestamp,
+  };
+}
+
 function createEmptyChartSeries() {
   return POWER_SERIES_CONFIG.reduce((items, item) => {
     items[item.key] = [];
@@ -1938,6 +2073,129 @@ function limitChartSeriesRows(series) {
 
 function mergeAndLimitChartSeries(...seriesGroups) {
   return limitChartSeriesRows(mergeChartSeries(...seriesGroups));
+}
+
+const DEMO_POWER_VALUES = {
+  production: 2.35,
+  pv: 2.35,
+  grid: 0.42,
+  battery: -0.28,
+  upsLoad: 0.86,
+  load: 1.54,
+  pvGenerate: 2.35,
+  export: 0.42,
+  charge: 0.28,
+};
+const DEMO_ENERGY_VALUES = {
+  energy: {
+    consumptionKwh: 4.8,
+    batteryKwh: 1.4,
+    gridKwh: 0.9,
+    totalKwh: 7.1,
+  },
+  energyPercent: {
+    batteryPercent: 20,
+    consumptionPercent: 68,
+    gridPercent: 12,
+  },
+};
+
+function createDemoChartRow(value, dateFields) {
+  return {
+    value: Number(value.toFixed(3)),
+    ...dateFields,
+  };
+}
+
+function buildDemoChartSeries(segment, selectedDay, selectedMonth, selectedYear, yearRange) {
+  const series = createEmptyChartSeries();
+
+  if (segment === "year") {
+    const years = Array.isArray(yearRange) && yearRange.length
+      ? yearRange
+      : getYearRange(selectedYear);
+
+    POWER_SERIES_CONFIG.forEach((item, itemIndex) => {
+      series[item.key] = years.map((year, index) => {
+        const base = Math.max(0, Number(DEMO_POWER_VALUES[item.key] || 0));
+        const factor = 1 + (index - 2) * 0.08 + itemIndex * 0.01;
+        return createDemoChartRow(base * 12 * factor, {
+          year,
+          label: String(year),
+        });
+      });
+    });
+
+    return series;
+  }
+
+  if (segment === "month") {
+    const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
+
+    POWER_SERIES_CONFIG.forEach((item, itemIndex) => {
+      series[item.key] = Array.from({ length: daysInMonth }, (_, index) => {
+        const day = index + 1;
+        const base = Math.max(0, Number(DEMO_POWER_VALUES[item.key] || 0));
+        const dailyShape = 0.72 + 0.22 * Math.sin((day / daysInMonth) * Math.PI);
+        return createDemoChartRow(base * dailyShape * (1 + itemIndex * 0.01), {
+          day,
+          month: selectedMonth,
+          year: selectedYear,
+          date: `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+        });
+      });
+    });
+
+    return series;
+  }
+
+  POWER_SERIES_CONFIG.forEach((item, itemIndex) => {
+    series[item.key] = Array.from({ length: 24 }, (_, hour) => {
+      const base = Math.max(0, Number(DEMO_POWER_VALUES[item.key] || 0));
+      const daylight = hour >= 6 && hour <= 18
+        ? Math.sin(((hour - 6) / 12) * Math.PI)
+        : 0.15;
+      const value = base * Math.max(0.08, daylight + itemIndex * 0.015);
+
+      return createDemoChartRow(value, {
+        createdAt: `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}T${String(hour).padStart(2, "0")}:00:00`,
+      });
+    });
+  });
+
+  return series;
+}
+
+function aggregateSeriesRows(rows) {
+  return normalizeSeriesRows(rows).reduce((total, row) => {
+    const value = getApiNumber(row);
+
+    if (value === null) {
+      return total;
+    }
+
+    return total + Math.abs(value);
+  }, 0);
+}
+
+function buildYearRangeChartSeries(chartResults, yearRange) {
+  return POWER_SERIES_CONFIG.reduce((series, item) => {
+    series[item.key] = yearRange.map((year, index) => {
+      const chartResult = chartResults[index];
+      const normalizedSeries =
+        chartResult?.ok && chartResult?.json?.data != null
+          ? normalizeChartSeries(chartResult.json.data)
+          : createEmptyChartSeries();
+
+      return {
+        value: aggregateSeriesRows(normalizedSeries[item.key], year),
+        year,
+        label: String(year),
+      };
+    });
+
+    return series;
+  }, {});
 }
 
 function getStoredChartSeriesKey(chartSelectionKey) {
@@ -2142,10 +2400,12 @@ function buildChartSelectionKey(
   selectedDay,
   selectedMonth,
   selectedYear,
+  dataSource = "plant",
 ) {
   return [
     segment,
     plantId,
+    dataSource,
     String(selectedYear),
     String(selectedMonth).padStart(2, "0"),
     String(selectedDay).padStart(2, "0"),
@@ -2197,10 +2457,17 @@ function getChartFallbackValue(key, plantData) {
   return plantData?.[key] ?? 0;
 }
 
-function buildLatestPowerRequests(plantId, config) {
+function buildLatestPowerRequests(plantId, config, dataSourceDeviceId = null) {
   return getPowerCategoryAliases(config.category).map((category) => ({
     sourceCategory: config.category,
-    endpoint: `${BASE_URL}/api/data/?plantId=${plantId}&category=${category}&type=${config.types.join(",")}&latestBy=inserted`,
+    endpoint: `${BASE_URL}/api/data/?${buildQueryString({
+      plantId,
+      category,
+      type: config.types.join(","),
+      latestBy: "inserted",
+      device_id: dataSourceDeviceId,
+      deviceId: dataSourceDeviceId,
+    })}`,
   }));
 }
 
@@ -2222,6 +2489,7 @@ function buildChartEndpoint(
   selectedDay,
   selectedMonth,
   selectedYear,
+  dataSourceDeviceId = null,
 ) {
   const date = getChartRequestDate(
     segment,
@@ -2232,6 +2500,8 @@ function buildChartEndpoint(
   const params = {
     plantId: String(plantId),
     segment,
+    device_id: dataSourceDeviceId,
+    deviceId: dataSourceDeviceId,
   };
 
   if (date) {
@@ -2242,6 +2512,8 @@ function buildChartEndpoint(
     return `${BASE_URL}/api/data/chart/monthly?${buildQueryString({
       plantId: String(plantId),
       month: date,
+      device_id: dataSourceDeviceId,
+      deviceId: dataSourceDeviceId,
     })}`;
   }
 
@@ -2249,6 +2521,8 @@ function buildChartEndpoint(
     return `${BASE_URL}/api/data/chart/yearly?${buildQueryString({
       plantId: String(plantId),
       year: date,
+      device_id: dataSourceDeviceId,
+      deviceId: dataSourceDeviceId,
     })}`;
   }
 
@@ -2344,17 +2618,17 @@ function getMonthTickDays(selectedYear, selectedMonth) {
   return POWER_CHART_MONTH_X_TICKS.filter((day) => day <= daysInMonth);
 }
 
-function getAggregateTickValues(segment, selectedYear, selectedMonth) {
+function getAggregateTickValues(segment, selectedYear, selectedMonth, yearRange = []) {
   if (segment === "year") {
-    return POWER_CHART_YEAR_X_TICKS;
+    return yearRange.length ? yearRange : getYearRange(selectedYear);
   }
 
   return getMonthTickDays(selectedYear, selectedMonth);
 }
 
-function getAggregateItemCount(segment, selectedYear, selectedMonth) {
+function getAggregateItemCount(segment, selectedYear, selectedMonth, yearRange = []) {
   if (segment === "year") {
-    return 12;
+    return (yearRange.length ? yearRange : getYearRange(selectedYear)).length;
   }
 
   return new Date(selectedYear, selectedMonth, 0).getDate();
@@ -2366,16 +2640,23 @@ function getAggregateRecordIndex(
   segment,
   selectedYear,
   selectedMonth,
+  yearRange = [],
 ) {
   if (segment === "year") {
-    const explicitMonth = Number(record?.month);
+    const years = yearRange.length ? yearRange : getYearRange(selectedYear);
+    const explicitYear = Number(pickValue(record?.year, record?.label));
 
     if (
-      Number.isFinite(explicitMonth) &&
-      explicitMonth >= 1 &&
-      explicitMonth <= 12
+      Number.isFinite(explicitYear) &&
+      years.includes(explicitYear)
     ) {
-      return explicitMonth - 1;
+      return years.indexOf(explicitYear);
+    }
+
+    const parsedDate = parseChartTimestamp(getRecordTimestampText(record));
+
+    if (parsedDate && years.includes(parsedDate.getFullYear())) {
+      return years.indexOf(parsedDate.getFullYear());
     }
 
     return fallbackIndex;
@@ -2405,8 +2686,19 @@ function getAggregateRecordIndex(
   return fallbackIndex;
 }
 
-function buildAggregateChartStacks(series, segment, selectedYear, selectedMonth) {
-  const itemCount = getAggregateItemCount(segment, selectedYear, selectedMonth);
+function buildAggregateChartStacks(
+  series,
+  segment,
+  selectedYear,
+  selectedMonth,
+  yearRange = [],
+) {
+  const itemCount = getAggregateItemCount(
+    segment,
+    selectedYear,
+    selectedMonth,
+    yearRange,
+  );
   const values = POWER_SERIES_CONFIG.reduce((items, item) => {
     items[item.key] = Array.from({ length: itemCount }, () => 0);
     return items;
@@ -2422,6 +2714,7 @@ function buildAggregateChartStacks(series, segment, selectedYear, selectedMonth)
         segment,
         selectedYear,
         selectedMonth,
+        yearRange,
       );
 
       if (itemIndex < 0 || itemIndex >= itemCount) {
@@ -2434,7 +2727,7 @@ function buildAggregateChartStacks(series, segment, selectedYear, selectedMonth)
         return;
       }
 
-      values[item.key][itemIndex] = Math.abs(value);
+      values[item.key][itemIndex] += Math.abs(value);
     });
   });
 
@@ -2461,9 +2754,13 @@ function getSeriesMaxIndex(
   selectedYear,
   selectedMonth,
   dayTimeline = null,
+  yearRange = [],
 ) {
   if (segment === "month" || segment === "year") {
-    return Math.max(0, getAggregateItemCount(segment, selectedYear, selectedMonth) - 1);
+    return Math.max(
+      0,
+      getAggregateItemCount(segment, selectedYear, selectedMonth, yearRange) - 1,
+    );
   }
 
   const timeline = dayTimeline ?? buildDayChartTimeline(series);
@@ -2534,6 +2831,7 @@ function getDefaultChartSelectedIndex(
   selectedMonth,
   currentTime,
   dayTimeline = [],
+  yearRange = [],
 ) {
   if (maxIndex <= 0) {
     return 0;
@@ -2550,11 +2848,12 @@ function getDefaultChartSelectedIndex(
   }
 
   if (segment === "year") {
-    if (selectedYear === now.year) {
-      return clampSelectedIndex(now.month - 1, maxIndex);
-    }
+    const years = yearRange.length ? yearRange : getYearRange(selectedYear);
+    const selectedYearIndex = years.indexOf(selectedYear);
 
-    return 0;
+    return selectedYearIndex >= 0
+      ? clampSelectedIndex(selectedYearIndex, maxIndex)
+      : 0;
   }
 
   if (dayTimeline.length) {
@@ -2787,21 +3086,23 @@ function getSelectedDayLabel(series, selectedIndex, maxIndex, dayTimeline = []) 
 }
 
 function getSelectedChartLabel({
+  t,
   segment,
   series,
   selectedIndex,
   maxIndex,
   dayTimeline = [],
+  yearRange = [],
 }) {
   if (segment === "month") {
-    return `Tanggal ${selectedIndex + 1}`;
+    return `${t("date")} ${selectedIndex + 1}`;
   }
 
   if (segment === "year") {
-    const firstSeries = normalizeSeriesRows(series?.production);
-    const label = firstSeries[selectedIndex]?.label;
+    const years = yearRange.length ? yearRange : getYearRange(new Date().getFullYear());
+    const label = years[selectedIndex];
 
-    return label || MONTH_LABELS[selectedIndex] || `Bulan ${selectedIndex + 1}`;
+    return label ? String(label) : String(selectedIndex + 1);
   }
 
   return getSelectedDayLabel(series, selectedIndex, maxIndex, dayTimeline);
@@ -2996,6 +3297,7 @@ function DailyOverviewChart({
   selectedDay = 1,
   selectedMonth = 1,
   selectedYear = new Date().getFullYear(),
+  yearRange = [],
 }) {
   const { colors, t, themeMode } = useAppSettings();
   const isLightMode = themeMode === "light";
@@ -3043,12 +3345,14 @@ function DailyOverviewChart({
     segment,
     selectedYear,
     selectedMonth,
+    yearRange,
   );
   const aggregateStacks = buildAggregateChartStacks(
     series,
     segment,
     selectedYear,
     selectedMonth,
+    yearRange,
   );
   const dayTimeline = useMemo(() => buildDayChartTimeline(series), [series]);
   const selectedMaxIndex = getSeriesMaxIndex(
@@ -3057,6 +3361,7 @@ function DailyOverviewChart({
     selectedYear,
     selectedMonth,
     dayTimeline,
+    yearRange,
   );
   const [selectedIndex, setSelectedIndex] = useState(() =>
     getDefaultChartSelectedIndex(
@@ -3066,6 +3371,7 @@ function DailyOverviewChart({
       selectedMonth,
       currentTime,
       dayTimeline,
+      yearRange,
     ),
   );
   const [isSavingCsv, setIsSavingCsv] = useState(false);
@@ -3076,6 +3382,7 @@ function DailyOverviewChart({
     selectedMonth,
     currentTime,
     dayTimeline,
+    yearRange,
   );
   const chartIdleTimerRef = useRef(null);
   const hasManualChartSelectionRef = useRef(false);
@@ -3129,11 +3436,13 @@ function DailyOverviewChart({
   const selectedTotalProduction =
     selectedValues.pvGenerate + selectedValues.export + selectedValues.charge;
   const selectedLabel = getSelectedChartLabel({
+    t,
     segment,
     series,
     selectedIndex,
     maxIndex: selectedMaxIndex,
     dayTimeline,
+    yearRange,
   });
   const selectedInfoRows = POWER_SERIES_CONFIG.filter(
     (item) => visibleSeries[item.key],
@@ -3261,7 +3570,7 @@ function DailyOverviewChart({
         latestMaxIndexRef.current,
       ),
     );
-  }, [clearChartIdleTimer, segment, selectedYear, selectedMonth]);
+  }, [clearChartIdleTimer, segment, selectedYear, selectedMonth, yearRange]);
 
   useEffect(() => {
     setSelectedIndex((current) => {
@@ -3359,7 +3668,7 @@ function DailyOverviewChart({
             fontWeight="500"
             textAnchor="end"
           >
-            Percentage
+            {t("percentage")}
           </SvgText>
         )}
 
@@ -3403,10 +3712,13 @@ function DailyOverviewChart({
           );
         })}
 
-        {(isAggregateSegment ? aggregateTicks : timeTicks).map((tick) => {
+        {(isAggregateSegment ? aggregateTicks : timeTicks).map((tick, tickIndex) => {
+          const aggregateTickPosition =
+            segment === "year" ? tickIndex + 1 : tick;
           const x = isAggregateSegment
             ? pad.left +
-              ((tick - 0.5) / Math.max(aggregateStacks.itemCount, 1)) *
+              ((aggregateTickPosition - 0.5) /
+                Math.max(aggregateStacks.itemCount, 1)) *
                 innerWidth
             : pad.left + (tick / 24) * innerWidth;
 
@@ -3618,7 +3930,7 @@ function DailyOverviewChart({
         <View style={styles.chartSwitchRow}>
         {datasets.map((item) => {
           const isActive = visibleSeries[item.key];
-          const switchLabel = POWER_SERIES_SWITCH_LABELS[item.key] ?? item.label;
+          const switchLabel = getPowerSeriesLabel(item, t);
 
           return (
             <View key={item.key} style={styles.chartSwitchItem}>
@@ -3691,8 +4003,8 @@ function DailyOverviewChart({
               {segment === "day"
                 ? `${t("time")}: ${selectedLabel}`
                 : segment === "month"
-                  ? `${t("date")}: ${selectedLabel.replace("Tanggal ", "")}`
-                  : `${t("month")}: ${selectedLabel}`}
+                  ? `${t("date")}: ${selectedLabel.replace(`${t("date")} `, "")}`
+                  : `${t("year")}: ${selectedLabel}`}
             </Text>
           </View>
 
@@ -3709,7 +4021,7 @@ function DailyOverviewChart({
                   style={[styles.chartSelectedInfoLabel, { color: colors.textMuted }]}
                   numberOfLines={1}
                 >
-                  {POWER_SERIES_SWITCH_LABELS[item.key] ?? item.label}
+                  {getPowerSeriesLabel(item, t)}
                 </Text>
                 <Text
                   style={[styles.chartSelectedInfoValue, { color: colors.text }]}
@@ -3753,7 +4065,7 @@ function DailyOverviewChart({
 
 export default function OverviewScreen() {
   const insets = useSafeAreaInsets();
-  const { colors, t, themeMode } = useAppSettings();
+  const { colors, language, t, themeMode } = useAppSettings();
   const isLightMode = themeMode === "light";
   const navigationColor = isLightMode ? appColors.screen : "rgba(248,250,252,0.88)";
   const pointerLineColor = isLightMode ? colors.accent : GRID_POINTER_CONFIG.lineColor;
@@ -3765,6 +4077,10 @@ export default function OverviewScreen() {
   const initialJakartaDate = useMemo(() => getJakartaDateParts(), []);
   const [activeSegment, setActiveSegment] = useState("day");
   const [fetchedData, setFetchedData] = useState(null);
+  const [plantDevices, setPlantDevices] = useState([]);
+  const [selectedDataSource, setSelectedDataSource] = useState("plant");
+  const [dataSourceMenuVisible, setDataSourceMenuVisible] = useState(false);
+  const plantDevicesRef = useRef([]);
   const [focusRefreshKey, setFocusRefreshKey] = useState(0);
   const [selectedDay, setSelectedDay] = useState(initialJakartaDate.day);
   const [selectedMonth, setSelectedMonth] = useState(initialJakartaDate.month);
@@ -3786,6 +4102,10 @@ export default function OverviewScreen() {
     () => getResponsiveChartWidth(windowWidth),
     [windowWidth],
   );
+  const chartYearRange = useMemo(
+    () => getYearRange(initialJakartaDate.year),
+    [initialJakartaDate.year],
+  );
   const chartSelectionKey = useMemo(() => {
     if (!resolvedPlantId) {
       return null;
@@ -3797,6 +4117,7 @@ export default function OverviewScreen() {
       selectedDay,
       selectedMonth,
       selectedYear,
+      selectedDataSource,
     );
   }, [
     activeSegment,
@@ -3804,6 +4125,7 @@ export default function OverviewScreen() {
     selectedDay,
     selectedMonth,
     selectedYear,
+    selectedDataSource,
   ]);
   const weatherCardAnim = useRef(new Animated.Value(0)).current;
   const gridPointerProgress = useRef(new Animated.Value(0)).current;
@@ -3820,6 +4142,21 @@ export default function OverviewScreen() {
   const todayDay = todayParts.day;
   const todayMonth = todayParts.month;
   const todayYear = todayParts.year;
+  const dataSourceOptions = useMemo(
+    () => [
+      { key: "plant", label: t("plantData") },
+      ...normalizeDeviceList(plantDevices).map((device) => ({
+        key: String(device.dataSourceId),
+        label: String(device.dataSourceId),
+      })),
+    ],
+    [plantDevices, t],
+  );
+  const selectedDataSourceLabel =
+    dataSourceOptions.find((item) => item.key === selectedDataSource)?.label ||
+    t("plantData");
+  const selectedSourceDeviceId =
+    selectedDataSource === "plant" ? null : selectedDataSource;
 
   useEffect(() => {
     let isMounted = true;
@@ -3926,16 +4263,65 @@ export default function OverviewScreen() {
           return;
         }
 
+        let latestPlantDevices = plantDevicesRef.current;
+
+        try {
+          const deviceResult = await fetchPlantDevices(resolvedPlantId);
+          latestPlantDevices = normalizeDeviceList(deviceResult?.devices);
+          plantDevicesRef.current = latestPlantDevices;
+          setPlantDevices((currentDevices) =>
+            areDeviceListsEqual(currentDevices, latestPlantDevices)
+              ? currentDevices
+              : latestPlantDevices,
+          );
+
+          if (
+            selectedDataSource !== "plant" &&
+            !latestPlantDevices.some(
+              (device) => String(device.dataSourceId) === selectedDataSource,
+            )
+          ) {
+            setSelectedDataSource("plant");
+          }
+        } catch (error) {
+          console.warn("Failed to load plant devices:", error?.message || error);
+        }
+
+        const sourceDevices = selectedSourceDeviceId
+          ? latestPlantDevices.filter(
+              (device) => String(device.dataSourceId) === selectedSourceDeviceId,
+            )
+          : latestPlantDevices;
         const latestRequests = POWER_LATEST_ENDPOINT_CONFIG.flatMap((item) =>
-          buildLatestPowerRequests(resolvedPlantId, item),
+          buildLatestPowerRequests(
+            resolvedPlantId,
+            item,
+            selectedSourceDeviceId,
+          ),
         );
-        const chartEndpoint = buildChartEndpoint(
-          activeSegment,
-          resolvedPlantId,
-          selectedDay,
-          selectedMonth,
-          selectedYear,
-        );
+        const chartEndpoints =
+          activeSegment === "year"
+            ? chartYearRange.map((year) =>
+                buildChartEndpoint(
+                  activeSegment,
+                  resolvedPlantId,
+                  selectedDay,
+                  selectedMonth,
+                  year,
+                  selectedSourceDeviceId,
+                ),
+              )
+            : [
+                buildChartEndpoint(
+                  activeSegment,
+                  resolvedPlantId,
+                  selectedDay,
+                  selectedMonth,
+                  selectedYear,
+                  selectedSourceDeviceId,
+                ),
+              ];
+        const chartEndpoint = chartEndpoints[0];
         const chartDate = getChartRequestDate(
           activeSegment,
           selectedDay,
@@ -3952,9 +4338,13 @@ export default function OverviewScreen() {
 
         const [plantResult, chartResult, ...latestResults] = await Promise.all([
           requestJson(`${BASE_URL}/api/plant/`, headers),
-          requestJson(chartEndpoint, headers),
+          ...chartEndpoints.map((endpoint) => requestJson(endpoint, headers)),
           ...latestRequests.map((item) => requestJson(item.endpoint, headers)),
         ]);
+        const chartResults =
+          activeSegment === "year"
+            ? [chartResult, ...latestResults.splice(0, chartEndpoints.length - 1)]
+            : [chartResult];
 
         const plants = Array.isArray(plantResult?.json?.data)
           ? plantResult.json.data
@@ -3982,23 +4372,27 @@ export default function OverviewScreen() {
               selectedDevice?.longitude,
               null,
             ),
+            languageCode: language === "id" ? "id" : "en",
           });
         } catch (_error) {
           googleWeather = null;
         }
 
-        const chartRequestSucceeded =
-          chartResult?.ok && chartResult?.json?.data != null;
+        const chartRequestSucceeded = chartResults.some(
+          (item) => item?.ok && item?.json?.data != null,
+        );
         const chartSeries = chartRequestSucceeded
-          ? mergeChartSeries(normalizeChartSeries(chartResult.json.data))
+          ? activeSegment === "year"
+            ? buildYearRangeChartSeries(chartResults, chartYearRange)
+            : mergeChartSeries(normalizeChartSeries(chartResult.json.data))
           : createEmptyChartSeries();
         debugChartLog("response", {
           plantId: resolvedPlantId,
           segment: activeSegment,
           date: chartDate,
-          status: chartResult?.status,
-          ok: chartResult?.ok,
-          error: chartResult?.error,
+          status: chartResults.map((item) => item?.status).join(","),
+          ok: chartRequestSucceeded,
+          error: chartResults.map((item) => item?.error).filter(Boolean).join("; "),
           counts: getChartSeriesCounts(chartSeries),
         });
         const fallbackChartSeries =
@@ -4013,20 +4407,40 @@ export default function OverviewScreen() {
             ),
           ),
         );
+        const devicePowerValues = getDevicesAggregatePowerValues(sourceDevices);
         const apiEnergyValues = getLatestEnergyValues(latestResults);
         const monitoringState = getMonitoringOnlineState(latestResults);
-        const displayPowerValues = monitoringState.isOnline
+        const deviceMonitoringState = getDevicesMonitoringState(sourceDevices);
+        const isCurrentDemoPlant = isDemoPlant(plantInfo);
+        const effectiveMonitoringState = isCurrentDemoPlant
+          ? { isOnline: true, latestTimestamp: Date.now() }
+          : monitoringState.isOnline || deviceMonitoringState.isOnline
+            ? {
+                isOnline: true,
+                latestTimestamp:
+                  monitoringState.latestTimestamp ??
+                  deviceMonitoringState.latestTimestamp,
+              }
+            : monitoringState;
+        const effectivePowerValues = hasAnyPowerValue(apiPowerValues)
           ? apiPowerValues
-          : ZERO_POWER_VALUES;
-        const displayEnergyValues = monitoringState.isOnline
-          ? apiEnergyValues
-          : ZERO_ENERGY_VALUES;
+          : devicePowerValues;
+        const displayPowerValues = isCurrentDemoPlant
+          ? DEMO_POWER_VALUES
+          : effectiveMonitoringState.isOnline
+            ? effectivePowerValues
+            : ZERO_POWER_VALUES;
+        const displayEnergyValues = isCurrentDemoPlant
+          ? DEMO_ENERGY_VALUES
+          : effectiveMonitoringState.isOnline
+            ? apiEnergyValues
+            : ZERO_ENERGY_VALUES;
         const realtimeChartSampleSeries = isSelectedCurrentDay(
           activeSegment,
           selectedDay,
           selectedMonth,
           selectedYear,
-        ) && monitoringState.isOnline
+        ) && effectiveMonitoringState.isOnline
           ? createRealtimeChartSampleSeries(displayPowerValues)
           : createEmptyChartSeries();
 
@@ -4035,11 +4449,23 @@ export default function OverviewScreen() {
             current?.chartSelectionKey === chartSelectionKey
               ? current?.chartSeries
               : createEmptyChartSeries();
-          const baseChartSeries = chartRequestSucceeded
-            ? chartSeries
-            : hasChartSeriesRows(fallbackChartSeries)
-              ? fallbackChartSeries
-              : currentChartSeries;
+          const demoChartSeries = isCurrentDemoPlant
+            ? buildDemoChartSeries(
+                activeSegment,
+                selectedDay,
+                selectedMonth,
+                selectedYear,
+                chartYearRange,
+              )
+            : null;
+          const baseChartSeries =
+            isCurrentDemoPlant && !hasChartSeriesRows(chartSeries)
+              ? demoChartSeries
+              : chartRequestSucceeded
+                ? chartSeries
+                : hasChartSeriesRows(fallbackChartSeries)
+                  ? fallbackChartSeries
+                  : currentChartSeries;
           let nextChartSeries = mergeAndLimitChartSeries(baseChartSeries);
 
           if (
@@ -4130,53 +4556,53 @@ export default function OverviewScreen() {
               displayPowerValues.production,
               plantInfo.productionToday,
               plantInfo.production,
-              monitoringState.isOnline ? current?.productionToday : 0,
-              monitoringState.isOnline ? current?.production : 0,
+              effectiveMonitoringState.isOnline ? current?.productionToday : 0,
+              effectiveMonitoringState.isOnline ? current?.production : 0,
               selectedDevice?.productionToday,
               selectedDevice?.production,
             ),
             production:
               displayPowerValues.production ??
-              (monitoringState.isOnline ? current?.production : 0) ??
+              (effectiveMonitoringState.isOnline ? current?.production : 0) ??
               plantInfo.production ??
               selectedDevice?.production ??
               0,
             pv:
               displayPowerValues.pv ??
-              (monitoringState.isOnline ? current?.pv : 0) ??
+              (effectiveMonitoringState.isOnline ? current?.pv : 0) ??
               plantInfo.pv ??
               selectedDevice?.pv ??
               0,
             grid:
               displayPowerValues.grid ??
-              (monitoringState.isOnline ? current?.grid : 0) ??
+              (effectiveMonitoringState.isOnline ? current?.grid : 0) ??
               plantInfo.grid ??
               selectedDevice?.grid ??
               0,
             battery:
               displayPowerValues.battery ??
-              (monitoringState.isOnline ? current?.battery : 0) ??
+              (effectiveMonitoringState.isOnline ? current?.battery : 0) ??
               plantInfo.battery ??
               selectedDevice?.battery ??
               0,
             upsLoad:
               displayPowerValues.upsLoad ??
-              (monitoringState.isOnline ? current?.upsLoad : 0) ??
+              (effectiveMonitoringState.isOnline ? current?.upsLoad : 0) ??
               plantInfo.upsLoad ??
               selectedDevice?.upsLoad ??
               0,
             load:
               displayPowerValues.load ??
-              (monitoringState.isOnline ? current?.load : 0) ??
+              (effectiveMonitoringState.isOnline ? current?.load : 0) ??
               plantInfo.load ??
               selectedDevice?.load ??
               0,
             energy: displayEnergyValues.energy,
             energyPercent: displayEnergyValues.energyPercent,
-            isDeviceOnline: monitoringState.isOnline,
-            latestDataTimestamp: monitoringState.latestTimestamp,
+            isDeviceOnline: effectiveMonitoringState.isOnline,
+            latestDataTimestamp: effectiveMonitoringState.latestTimestamp,
             status: pickValue(
-              monitoringState.isOnline ? "online" : "offline",
+              effectiveMonitoringState.isOnline ? "online" : "offline",
               plantInfo.status,
               current?.status,
               selectedDevice?.status,
@@ -4201,12 +4627,16 @@ export default function OverviewScreen() {
     [
       activeSegment,
       chartSelectionKey,
+      chartYearRange,
       getAuthorizedHeaders,
+      language,
       requestJson,
       resolvedPlantId,
       selectedDay,
+      selectedDataSource,
       selectedDevice,
       selectedMonth,
+      selectedSourceDeviceId,
       selectedYear,
     ],
   );
@@ -4337,7 +4767,10 @@ export default function OverviewScreen() {
     plantData.weatherLow,
     Math.max(currentTemperature - 7, 0),
   );
-  const weatherCondition = pickValue(plantData.weatherConditionText, "Raining");
+  const weatherCondition = pickValue(
+    plantData.weatherConditionText,
+    language === "id" ? "Hujan" : "Raining",
+  );
   const weatherIconName = getWeatherIconName(
     plantData.weatherConditionType,
     plantData.weatherIsDaytime,
@@ -4395,8 +4828,7 @@ export default function OverviewScreen() {
     (selectedYear > todayYear ||
       (selectedYear === todayYear && selectedMonth > todayMonth));
 
-  const isFutureYearSelection =
-    activeSegment === "year" && selectedYear > todayYear;
+  const isFutureYearSelection = false;
 
   const isFutureSelection =
     isFutureDaySelection || isFutureMonthSelection || isFutureYearSelection;
@@ -4446,18 +4878,18 @@ export default function OverviewScreen() {
   };
 
   const monthOptions = [
-    { label: "January", value: 1 },
-    { label: "February", value: 2 },
-    { label: "March", value: 3 },
-    { label: "April", value: 4 },
-    { label: "May", value: 5 },
-    { label: "June", value: 6 },
-    { label: "July", value: 7 },
-    { label: "August", value: 8 },
-    { label: "September", value: 9 },
-    { label: "October", value: 10 },
-    { label: "November", value: 11 },
-    { label: "December", value: 12 },
+    { label: t("january"), value: 1 },
+    { label: t("february"), value: 2 },
+    { label: t("march"), value: 3 },
+    { label: t("april"), value: 4 },
+    { label: t("may"), value: 5 },
+    { label: t("june"), value: 6 },
+    { label: t("july"), value: 7 },
+    { label: t("august"), value: 8 },
+    { label: t("september"), value: 9 },
+    { label: t("october"), value: 10 },
+    { label: t("november"), value: 11 },
+    { label: t("december"), value: 12 },
   ];
 
   const selectedMonthLabel =
@@ -4662,10 +5094,7 @@ export default function OverviewScreen() {
     return () => clearInterval(clock);
   }, []);
 
-  const yearOptions = Array.from(
-    { length: 3000 - 2021 + 1 },
-    (_, i) => 2021 + i,
-  );
+  const yearOptions = getYearRange(todayYear);
 
   useEffect(() => {
     if (!DEBUG_LAYOUT || !__DEV__) {
@@ -5290,7 +5719,7 @@ export default function OverviewScreen() {
             >
               <ActivityIndicator size="large" color={colors.accent} />
               <Text style={[styles.refreshLoadingTitle, { color: colors.text }]}>
-                Loading . . .
+                {t("loading")}
               </Text>
             </View>
           </View>
@@ -5308,6 +5737,83 @@ export default function OverviewScreen() {
                   setHouseOverlayLayout(nativeEvent.layout)
                 }
               >
+                <View style={styles.dataSourceDropdownWrap}>
+                  <TouchableOpacity
+                    activeOpacity={0.82}
+                    style={[
+                      styles.dataSourceDropdownButton,
+                      isLightMode && {
+                        backgroundColor: colors.bubble,
+                        borderColor: colors.bubbleBorder,
+                      },
+                    ]}
+                    onPress={() =>
+                      setDataSourceMenuVisible((current) => !current)
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.dataSourceDropdownText,
+                        { color: colors.text },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {selectedDataSourceLabel}
+                    </Text>
+                    <Ionicons
+                      name={
+                        dataSourceMenuVisible
+                          ? "chevron-up"
+                          : "chevron-down"
+                      }
+                      size={15}
+                      color={colors.accent}
+                    />
+                  </TouchableOpacity>
+
+                  {dataSourceMenuVisible && (
+                    <View
+                      style={[
+                        styles.dataSourceDropdownMenu,
+                        isLightMode && {
+                          backgroundColor: colors.bubble,
+                          borderColor: colors.bubbleBorder,
+                        },
+                      ]}
+                    >
+                      {dataSourceOptions.map((item) => {
+                        const isSelected = item.key === selectedDataSource;
+
+                        return (
+                          <TouchableOpacity
+                            key={item.key}
+                            activeOpacity={0.78}
+                            style={styles.dataSourceDropdownItem}
+                            onPress={() => {
+                              setSelectedDataSource(item.key);
+                              setDataSourceMenuVisible(false);
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.dataSourceDropdownItemText,
+                                {
+                                  color: isSelected
+                                    ? colors.accent
+                                    : colors.text,
+                                },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {item.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+
                 <Image
                   source={require("@/assets/images/Asset App Batari Alternative.png")}
                   style={[styles.houseImage, { height: houseOverlayHeight }]}
@@ -5590,7 +6096,7 @@ export default function OverviewScreen() {
                     adjustsFontSizeToFit
                     minimumFontScale={0.78}
                   >
-                    PV
+                    {t("pv")}
                   </Text>
                   <Text
                     style={[
@@ -5633,7 +6139,7 @@ export default function OverviewScreen() {
                     adjustsFontSizeToFit
                     minimumFontScale={0.78}
                   >
-                    Grid
+                    {t("grid")}
                   </Text>
                   <Text
                     style={[
@@ -5684,7 +6190,7 @@ export default function OverviewScreen() {
                     adjustsFontSizeToFit
                     minimumFontScale={0.78}
                   >
-                    Battery
+                    {t("battery")}
                   </Text>
                   <Text
                     style={[
@@ -5727,7 +6233,7 @@ export default function OverviewScreen() {
                     adjustsFontSizeToFit
                     minimumFontScale={0.78}
                   >
-                    Load
+                    {t("load")}
                   </Text>
                   <Text
                     style={[
@@ -5746,7 +6252,7 @@ export default function OverviewScreen() {
             </View>
 
             <Text style={[styles.powerFlowTitle, { color: colors.text }]}>
-              Self Consumption-Production Ratio
+              {t("selfConsumptionProductionRatio")}
             </Text>
             <View
               style={[
@@ -5768,10 +6274,7 @@ export default function OverviewScreen() {
           <View style={styles.dashboardSection}>
             <View style={styles.monthlySavingsSection}>
               <Text style={[styles.dashboardSectionTitle, { color: colors.text }]}>
-                Penghematan Bulanan
-              </Text>
-              <Text style={[styles.dashboardSectionMeta, { color: colors.textMuted }]}>
-                Diperbaharui 10 menit yang lalu
+                {t("monthlySavings")}
               </Text>
 
               <ScrollView
@@ -5791,7 +6294,7 @@ export default function OverviewScreen() {
                     ]}
                   >
                     <Text style={[styles.monthlySavingMonth, { color: colors.text }]}>
-                      {item.month}
+                      {t(item.monthKey)}
                     </Text>
                     <Ionicons
                       name="sunny-outline"
@@ -5828,7 +6331,7 @@ export default function OverviewScreen() {
                   <Text
                     style={[styles.environmentImpactLabel, { color: colors.textMuted }]}
                   >
-                    {item.label}
+                    {t(item.labelKey)}
                   </Text>
                 </View>
               ))}
@@ -5870,7 +6373,7 @@ export default function OverviewScreen() {
                     },
                   ]}
                 >
-                  Day
+                  {t("day")}
                 </Text>
               </TouchableOpacity>
 
@@ -5895,7 +6398,7 @@ export default function OverviewScreen() {
                     },
                   ]}
                 >
-                  Month
+                  {t("month")}
                 </Text>
               </TouchableOpacity>
 
@@ -5915,7 +6418,7 @@ export default function OverviewScreen() {
                     },
                   ]}
                 >
-                  Year
+                  {t("year")}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -6066,7 +6569,7 @@ export default function OverviewScreen() {
                   >
                     <ActivityIndicator size="large" color={colors.accent} />
                     <Text style={[styles.chartLoadingText, { color: colors.textSoft }]}>
-                      Memuat data grafik...
+                      {t("loadingChart")}
                     </Text>
                   </View>
                 ) : (
@@ -6081,6 +6584,7 @@ export default function OverviewScreen() {
                     selectedDay={selectedDay}
                     selectedMonth={selectedMonth}
                     selectedYear={selectedYear}
+                    yearRange={chartYearRange}
                     plantName={plantData.plantName}
                   />
                 )}
@@ -6152,7 +6656,7 @@ export default function OverviewScreen() {
                 >
                   <ActivityIndicator size="large" color={colors.accent} />
                   <Text style={[styles.chartLoadingText, { color: colors.textSoft }]}>
-                    Memuat data grafik...
+                    {t("loadingChart")}
                   </Text>
                 </View>
               ) : (
@@ -6170,6 +6674,7 @@ export default function OverviewScreen() {
                   selectedDay={selectedDay}
                   selectedMonth={selectedMonth}
                   selectedYear={selectedYear}
+                  yearRange={chartYearRange}
                   plantName={plantData.plantName}
                 />
               )}
@@ -7057,6 +7562,50 @@ const styles = StyleSheet.create({
     height: 360,
     alignItems: "center",
     justifyContent: "center",
+  },
+  dataSourceDropdownWrap: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    zIndex: 20,
+    width: 152,
+  },
+  dataSourceDropdownButton: {
+    minHeight: 34,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 6,
+    backgroundColor: "rgba(2,7,19,0.72)",
+    borderWidth: 1,
+    borderColor: "rgba(8,174,234,0.32)",
+  },
+  dataSourceDropdownText: {
+    flex: 1,
+    minWidth: 0,
+    fontFamily: appFont,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  dataSourceDropdownMenu: {
+    marginTop: 6,
+    borderRadius: 10,
+    backgroundColor: "rgba(2,7,19,0.92)",
+    borderWidth: 1,
+    borderColor: "rgba(8,174,234,0.32)",
+    overflow: "hidden",
+  },
+  dataSourceDropdownItem: {
+    minHeight: 34,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+  dataSourceDropdownItemText: {
+    fontFamily: appFont,
+    fontSize: 12,
+    fontWeight: "800",
   },
   gridPointerOverlay: {
     position: "absolute",

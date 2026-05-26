@@ -50,21 +50,6 @@ const PRODUCTION_FLOW_COLORS = {
   battery: "#A855F7",
 };
 
-const POWER_FLOW_COPY = {
-  default: {
-    centerTitle: "Consumption",
-    pvTitle: "PV",
-    gridTitle: "Grid",
-    batteryTitle: "Battery",
-  },
-  production: {
-    centerTitle: "Production",
-    pvTitle: "PV Generate",
-    gridTitle: "Export",
-    batteryTitle: "Charge",
-  },
-};
-
 const POWER_FLOW_RING = {
   radius: 76,
   circumference: 477,
@@ -472,13 +457,23 @@ function MetricBlock({
 }
 
 export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
-  const { colors: themeColors, themeMode } = useAppSettings();
+  const { colors: themeColors, t, themeMode } = useAppSettings();
   const [selectedFlow, setSelectedFlow] = useState(null);
   const { width } = useWindowDimensions();
   const isProductionVariant = variant === "production";
   const copy = isProductionVariant
-    ? POWER_FLOW_COPY.production
-    : POWER_FLOW_COPY.default;
+    ? {
+        centerTitle: t("production"),
+        pvTitle: t("pvGenerate"),
+        gridTitle: t("export"),
+        batteryTitle: t("charge"),
+      }
+    : {
+        centerTitle: t("consumption"),
+        pvTitle: t("pv"),
+        gridTitle: t("grid"),
+        batteryTitle: t("battery"),
+      };
   const colors = isProductionVariant ? PRODUCTION_FLOW_COLORS : POWER_FLOW_COLORS;
   const energy = data.energy || {};
   const productionFlow = data.productionFlow || {};

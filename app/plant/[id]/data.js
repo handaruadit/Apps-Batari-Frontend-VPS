@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { appColors, appFont } from '@/config/theme';
+import { useAppSettings } from '@/context/AppSettingsContext';
 import {
   View,
   Text,
@@ -119,13 +120,14 @@ function buildAreaPath(data, minY, maxY, width, height, pad) {
 }
 
 function DailyChart({ series }) {
+  const { t } = useAppSettings();
   const pad = { top: 12, right: 10, bottom: 28, left: 38 };
   const datasets = [
-    { key: 'production', label: 'Production', color: '#22C55E', data: series.production },
-    { key: 'grid', label: 'Grid', color: '#F59E0B', data: series.grid },
-    { key: 'battery', label: 'Battery', color: '#3B82F6', data: series.battery },
+    { key: 'production', label: t('production'), color: '#22C55E', data: series.production },
+    { key: 'grid', label: t('grid'), color: '#F59E0B', data: series.grid },
+    { key: 'battery', label: t('battery'), color: '#3B82F6', data: series.battery },
     { key: 'upsLoad', label: 'Ups-Load', color: '#8B5CF6', data: series.upsLoad },
-    { key: 'load', label: 'Load', color: '#EF4444', data: series.load },
+    { key: 'load', label: t('load'), color: '#EF4444', data: series.load },
   ];
 
   const allValues = datasets.flatMap((d) => d.data);
@@ -243,6 +245,7 @@ function CircleLegend({ color }) {
 }
 
 export default function DataScreen() {
+  const { t } = useAppSettings();
   const [activeTab, setActiveTab] = useState('day');
   const series = useMemo(() => generateDailySeries(), []);
 
@@ -255,7 +258,7 @@ export default function DataScreen() {
             onPress={() => setActiveTab('day')}
           >
             <Text style={[styles.tabText, activeTab === 'day' && styles.tabTextActive]}>
-              Day
+              {t('day')}
             </Text>
           </TouchableOpacity>
 
@@ -263,14 +266,14 @@ export default function DataScreen() {
             style={styles.tabButton}
             onPress={() => setActiveTab('month')}
           >
-            <Text style={styles.tabText}>Month</Text>
+            <Text style={styles.tabText}>{t('month')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.tabButton}
             onPress={() => setActiveTab('year')}
           >
-            <Text style={styles.tabText}>Year</Text>
+            <Text style={styles.tabText}>{t('year')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

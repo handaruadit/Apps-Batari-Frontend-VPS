@@ -22,7 +22,7 @@ function getParamValue(value) {
 
 export default function AddDataloggerScreen() {
   const params = useLocalSearchParams();
-  const { colors } = useAppSettings();
+  const { colors, t } = useAppSettings();
   const plantId = getParamValue(params.id);
   const [deviceId, setDeviceId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -111,7 +111,7 @@ export default function AddDataloggerScreen() {
           </TouchableOpacity>
 
           <Text style={[styles.title, { color: colors.text }]}>
-            Add Datalogger
+            {t("addDatalogger")}
           </Text>
 
           <View style={styles.headerSpacer} />
@@ -124,7 +124,7 @@ export default function AddDataloggerScreen() {
           ]}
         >
           <Text style={[styles.label, { color: colors.textMuted }]}>
-            Device ID
+            {t("deviceId")}
           </Text>
           <TextInput
             style={[

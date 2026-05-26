@@ -90,6 +90,14 @@ function getDeviceLatestDataTimestamp(device) {
 async function attachLatestDeviceTimestamps(plants) {
   return Promise.all(
     plants.map(async (plant) => {
+      if (isDemoPlant(plant)) {
+        return {
+          ...plant,
+          hasDeviceId: true,
+          latestDataStatusTimestamp: Date.now(),
+        };
+      }
+
       try {
         const result = await fetchPlantDevices(plant.id);
         const devices = Array.isArray(result?.devices) ? result.devices : [];
@@ -120,7 +128,7 @@ async function attachLatestDeviceTimestamps(plants) {
 }
 
 export default function PlantScreen() {
-  const { colors, themeMode } = useAppSettings();
+  const { colors, t, themeMode } = useAppSettings();
   const { setSelectedDevice } = useContext(AuthContext);
   const [search, setSearch] = useState("");
   const [plantList, setPlantList] = useState([]);
@@ -398,7 +406,7 @@ export default function PlantScreen() {
         ]}
       >
         <TextInput
-          placeholder="Cari nama plant / SN / lokasi"
+          placeholder={t("searchPlantPlaceholder")}
           placeholderTextColor={colors.textMuted}
           value={search}
           onChangeText={setSearch}
@@ -410,7 +418,7 @@ export default function PlantScreen() {
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.accent} />
           <Text style={[styles.loadingText, { color: colors.textMuted }]}>
-            Memuat data plant...
+            {t("loadingPlants")}
           </Text>
         </View>
       ) : (
@@ -439,7 +447,7 @@ export default function PlantScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              Belum ada plant.
+              {t("emptyPlants")}
             </Text>
           }
         />
@@ -452,7 +460,7 @@ export default function PlantScreen() {
         >
           <ActivityIndicator size="large" color={colors.accent} />
           <Text style={[styles.navigationLoadingText, { color: colors.textSoft }]}>
-            Membuka overview...
+            {t("openingOverview")}
           </Text>
         </View>
       )}

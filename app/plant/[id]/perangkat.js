@@ -74,21 +74,21 @@ function normalizeParameterKey(value) {
     .toLowerCase();
 }
 
-function formatBatteryParameterLabel(value) {
+function formatBatteryParameterLabel(value, t = (key) => key) {
   const key = normalizeParameterKey(value);
   const cellMatch = key.match(/^cells?_(\d+)$/);
 
   if (cellMatch) {
-    return `Cell ${cellMatch[1]}`;
+    return `${t("cell")} ${cellMatch[1]}`;
   }
 
   const knownLabels = {
-    power: "Power",
-    alarm: "Alarm",
-    current: "Current",
-    cycle: "Cycle",
+    power: t("power"),
+    alarm: t("alarm"),
+    current: t("current"),
+    cycle: t("cycle"),
     soc: "SoC",
-    voltage: "Voltage",
+    voltage: t("voltage"),
   };
 
   if (knownLabels[key]) {
@@ -140,7 +140,7 @@ function isBatteryCategory(value) {
   );
 }
 
-function pushBatteryParameter(rows, seenKeys, label, value) {
+function pushBatteryParameter(rows, seenKeys, label, value, t) {
   const safeLabel = String(label || "").trim();
 
   if (!safeLabel) {
@@ -163,12 +163,32 @@ function pushBatteryParameter(rows, seenKeys, label, value) {
   seenKeys.add(normalizedKey);
   rows.push({
     key: normalizedKey,
-    label: formatBatteryParameterLabel(safeLabel),
+    label: formatBatteryParameterLabel(safeLabel, t),
     value,
   });
 }
 
-function collectBatteryObjectParameters(source, rows, seenKeys, prefix = "") {
+function parseMaybeJson(value) {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue || !["{", "["].includes(trimmedValue[0])) {
+    return value;
+  }
+
+  try {
+    return JSON.parse(trimmedValue);
+  } catch {
+    return value;
+  }
+}
+
+function collectBatteryObjectParameters(source, rows, seenKeys, prefix = "", t) {
+  source = parseMaybeJson(source);
+
   if (!source || typeof source !== "object") {
     return;
   }
@@ -190,24 +210,65 @@ function collectBatteryObjectParameters(source, rows, seenKeys, prefix = "") {
     if (Array.isArray(value)) {
       value.forEach((item, index) => {
         if (item && typeof item === "object") {
-          collectBatteryObjectParameters(item, rows, seenKeys, nextPrefix);
+          collectBatteryObjectParameters(item, rows, seenKeys, nextPrefix, t);
         } else {
-          pushBatteryParameter(rows, seenKeys, `${label}_${index + 1}`, item);
+          pushBatteryParameter(rows, seenKeys, `${label}_${index + 1}`, item, t);
         }
       });
       return;
     }
 
-    if (value && typeof value === "object") {
-      collectBatteryObjectParameters(value, rows, seenKeys, nextPrefix);
+    const parsedValue = parseMaybeJson(value);
+
+    if (parsedValue && typeof parsedValue === "object") {
+      collectBatteryObjectParameters(parsedValue, rows, seenKeys, nextPrefix, t);
       return;
     }
 
-    pushBatteryParameter(rows, seenKeys, label, value);
+    pushBatteryParameter(rows, seenKeys, label, parsedValue, t);
   });
 }
 
-function getBatteryParameterRows(device) {
+function collectBatterySource(source, rows, seenKeys, t) {
+  const parsedSource = parseMaybeJson(source);
+
+  if (Array.isArray(parsedSource)) {
+    parsedSource.forEach((item) => {
+      const parsedItem = parseMaybeJson(item);
+
+      if (parsedItem?.type || parsedItem?.parameter || parsedItem?.name) {
+        pushBatteryParameter(
+          rows,
+          seenKeys,
+          parsedItem.type || parsedItem.parameter || parsedItem.name,
+          parseMaybeJson(parsedItem.value),
+          t,
+        );
+        return;
+      }
+
+      collectBatteryObjectParameters(parsedItem, rows, seenKeys, "", t);
+    });
+    return;
+  }
+
+  if (parsedSource && typeof parsedSource === "object") {
+    const batteryEntries = Object.entries(parsedSource).filter(([key]) =>
+      isBatteryCategory(key),
+    );
+
+    if (batteryEntries.length) {
+      batteryEntries.forEach(([, value]) =>
+        collectBatteryObjectParameters(value, rows, seenKeys, "", t),
+      );
+      return;
+    }
+  }
+
+  collectBatteryObjectParameters(parsedSource, rows, seenKeys, "", t);
+}
+
+function getBatteryParameterRows(device, t) {
   const rows = [];
   const seenKeys = new Set();
 
@@ -220,8 +281,14 @@ function getBatteryParameterRows(device) {
         return;
       }
 
-      if (BATTERY_GROUP_KEYS.has(typeKey) && row?.value && typeof row.value === "object") {
-        collectBatteryObjectParameters(row.value, rows, seenKeys);
+      const parsedRowValue = parseMaybeJson(row?.value);
+
+      if (
+        BATTERY_GROUP_KEYS.has(typeKey) &&
+        parsedRowValue &&
+        typeof parsedRowValue === "object"
+      ) {
+        collectBatteryObjectParameters(parsedRowValue, rows, seenKeys, "", t);
         return;
       }
 
@@ -229,12 +296,20 @@ function getBatteryParameterRows(device) {
         rows,
         seenKeys,
         row?.type || row?.parameter || row?.name,
-        row?.value,
+        parsedRowValue,
+        t,
       );
     });
   }
 
   [
+    device?.latestData && !Array.isArray(device.latestData)
+      ? device.latestData
+      : null,
+    device?.latest_data,
+    device?.data_bms,
+    device?.setting_bms,
+    device?.baterai,
     device?.battery,
     device?.batteries,
     device?.batteryData,
@@ -244,28 +319,11 @@ function getBatteryParameterRows(device) {
     device?.parameters?.battery,
     device?.parameters?.baterai,
   ].forEach((source) => {
-    if (Array.isArray(source)) {
-      source.forEach((item) => {
-        if (item?.type || item?.parameter || item?.name) {
-          pushBatteryParameter(
-            rows,
-            seenKeys,
-            item.type || item.parameter || item.name,
-            item.value,
-          );
-          return;
-        }
-
-        collectBatteryObjectParameters(item, rows, seenKeys);
-      });
-      return;
-    }
-
-    collectBatteryObjectParameters(source, rows, seenKeys);
+    collectBatterySource(source, rows, seenKeys, t);
   });
 
   DEFAULT_BATTERY_PARAMS.forEach((key) => {
-    pushBatteryParameter(rows, seenKeys, key, 0);
+    pushBatteryParameter(rows, seenKeys, key, 0, t);
   });
 
   const defaultOrder = new Map(
@@ -293,7 +351,7 @@ function getBatteryParameterRows(device) {
 }
 
 export default function PerangkatScreen() {
-  const { colors, themeMode } = useAppSettings();
+  const { colors, t, themeMode } = useAppSettings();
   const router = useRouter();
   const localParams = useLocalSearchParams();
   const globalParams = useGlobalSearchParams();
@@ -397,7 +455,7 @@ export default function PerangkatScreen() {
       >
         <View style={styles.content}>
           <Text style={[styles.quantityText, { color: colors.textMuted }]}>
-            Inverter Quantity: {devices.length}
+            {t("inverterQuantity")}: {devices.length}
           </Text>
 
           {isLoading ? (
@@ -412,7 +470,7 @@ export default function PerangkatScreen() {
             >
               <ActivityIndicator color={colors.accent} />
               <Text style={[styles.stateText, { color: colors.textMuted }]}>
-                Loading device...
+                {t("loadingDevice")}
               </Text>
             </View>
           ) : errorMessage ? (
@@ -440,12 +498,12 @@ export default function PerangkatScreen() {
               ]}
             >
               <Text style={[styles.stateText, { color: colors.textMuted }]}>
-                Belum ada device terhubung.
+                {t("noDeviceConnected")}
               </Text>
             </View>
           ) : (
             devices.map((item, index) => {
-              const batteryParameterRows = getBatteryParameterRows(item);
+              const batteryParameterRows = getBatteryParameterRows(item, t);
 
               return (
                 <View
@@ -461,7 +519,7 @@ export default function PerangkatScreen() {
                 >
                 <View style={styles.cardTopRow}>
                   <Text style={[styles.inverterTitle, { color: colors.text }]}>
-                    Inverter {index + 1}
+                    {t("inverter")} {index + 1}
                   </Text>
                   <Text style={[styles.snText, { color: colors.textMuted }]}>
                     {item.device_id}
@@ -470,7 +528,7 @@ export default function PerangkatScreen() {
 
                 <View style={styles.infoBlock}>
                   <Text style={[styles.metricLabel, { color: colors.textMuted }]}>
-                    Device ID
+                    {t("deviceId")}
                   </Text>
                   <Text style={[styles.infoValue, { color: colors.text }]}>
                     {item.device_id || "-"}
@@ -479,7 +537,7 @@ export default function PerangkatScreen() {
 
                 <View style={styles.infoBlock}>
                   <Text style={[styles.metricLabel, { color: colors.textMuted }]}>
-                    Address
+                    {t("address")}
                   </Text>
                   <Text style={[styles.infoValue, { color: colors.text }]}>
                     {plant?.location || "-"}
@@ -489,7 +547,7 @@ export default function PerangkatScreen() {
                 <View style={styles.metricRow}>
                   <View style={styles.metricItem}>
                     <Text style={[styles.metricLabel, { color: colors.textMuted }]}>
-                      City, Province
+                      {t("cityProvince")}
                     </Text>
                     <Text style={[styles.metricValueSmall, { color: colors.text }]}>
                       {formatLocation(plant)}
@@ -498,7 +556,7 @@ export default function PerangkatScreen() {
 
                   <View style={styles.metricItem}>
                     <Text style={[styles.metricLabel, { color: colors.textMuted }]}>
-                      Weather
+                      {t("weather")}
                     </Text>
                     <Text style={[styles.metricValueSmall, { color: colors.text }]}>
                       {formatWeather(plant)}
@@ -515,7 +573,7 @@ export default function PerangkatScreen() {
                   ]}
                 >
                   <Text style={[styles.parameterTitle, { color: colors.text }]}>
-                    Battery Parameters
+                    {t("batteryParameters")}
                   </Text>
                   {batteryParameterRows.length > 0 ? (
                     batteryParameterRows.map((row) => (
@@ -543,7 +601,7 @@ export default function PerangkatScreen() {
                         { color: colors.textMuted },
                       ]}
                     >
-                      No data available
+                      {t("noDataAvailable")}
                     </Text>
                   )}
                 </View>
