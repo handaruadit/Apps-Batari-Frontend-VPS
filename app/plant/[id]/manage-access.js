@@ -54,6 +54,8 @@ function getAccessUserId(user) {
 }
 
 export default function ManageAccessScreen() {
+  console.log("PLANT_ACCESS_ROLE_VALUES =", PLANT_ACCESS_ROLE_VALUES);
+  
   const params = useLocalSearchParams();
   const plantId = getParamValue(params.id);
   const plantName = getParamValue(params.name) || "Plant";
@@ -64,9 +66,6 @@ export default function ManageAccessScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [selectedAddRole, setSelectedAddRole] = useState(
-    PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY,
-  );
 
   const loadAccess = useCallback(async () => {
     if (!plantId) return;
@@ -106,8 +105,10 @@ export default function ManageAccessScreen() {
   };
 
   const executeAddUser = async (user, role) => {
+    console.log("ROLE =", role);
     const userId = getAccessUserId(user);
     const normalizedRole = normalizePlantAccessRole(role);
+    console.log("NORMALIZED =", normalizedRole);
 
     if (!userId) {
       Alert.alert("Tambah Access", "User tidak ditemukan.");
@@ -132,7 +133,8 @@ export default function ManageAccessScreen() {
     } catch (error) {
       Alert.alert(
         "Tambah Access",
-        error.message || "Gagal menambahkan user. Pastikan email dan role sudah benar.",
+        error.message ||
+          "Gagal menambahkan user. Pastikan email dan role sudah benar.",
       );
     } finally {
       setIsUpdating(false);
@@ -141,18 +143,9 @@ export default function ManageAccessScreen() {
 
   const handleAddUser = (user) => {
     const userId = getAccessUserId(user);
-    const normalizedRole = normalizePlantAccessRole(selectedAddRole);
 
     if (!userId) {
       Alert.alert("Tambah Access", "User tidak ditemukan.");
-      return;
-    }
-
-    if (!normalizedRole) {
-      Alert.alert(
-        "Tambah Access",
-        "Role tidak valid. Silakan pilih View Only atau Manage Access.",
-      );
       return;
     }
 
@@ -165,10 +158,27 @@ export default function ManageAccessScreen() {
       return;
     }
 
-    Alert.alert("Tambah Access", "Apakah anda yakin untuk menambah User ini?", [
+    Alert.alert("Tambah Access", "Apakah anda yakin menambahkan user ini?", [
       {
         text: "Ya",
-        onPress: () => executeAddUser(user, normalizedRole),
+        onPress: () => {
+          Alert.alert("Pilih Permission", "Tentukan akses untuk user ini", [
+            {
+              text: "View Only",
+              onPress: () =>
+                executeAddUser(user, PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY),
+            },
+            {
+              text: "Manage Access",
+              onPress: () =>
+                executeAddUser(user, PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS),
+            },
+            {
+              text: "Batal",
+              style: "cancel",
+            },
+          ]);
+        },
       },
       {
         text: "Tidak",
@@ -222,12 +232,17 @@ export default function ManageAccessScreen() {
 
     setIsUpdating(true);
     try {
-      const result = await updatePlantAccessUser(plantId, userId, normalizedRole);
+      const result = await updatePlantAccessUser(
+        plantId,
+        userId,
+        normalizedRole,
+      );
       setUsers(result);
     } catch (error) {
       Alert.alert(
         "Update Access",
-        error.message || "Gagal mengubah akses user. Pastikan role sudah benar.",
+        error.message ||
+          "Gagal mengubah akses user. Pastikan role sudah benar.",
       );
     } finally {
       setIsUpdating(false);
@@ -266,7 +281,10 @@ export default function ManageAccessScreen() {
             onPress={() => router.back()}
             style={[
               styles.backButton,
-              { backgroundColor: colors.bubble, borderColor: colors.bubbleBorder },
+              {
+                backgroundColor: colors.bubble,
+                borderColor: colors.bubbleBorder,
+              },
             ]}
           >
             <Ionicons name="chevron-back" size={22} color={colors.accent} />
@@ -284,7 +302,10 @@ export default function ManageAccessScreen() {
         <View
           style={[
             styles.card,
-            { backgroundColor: colors.bubble, borderColor: colors.bubbleBorder },
+            {
+              backgroundColor: colors.bubble,
+              borderColor: colors.bubbleBorder,
+            },
           ]}
         >
           <Text style={[styles.cardTitle, { color: colors.text }]}>
@@ -299,7 +320,10 @@ export default function ManageAccessScreen() {
                 key={getAccessUserId(user)}
                 activeOpacity={user.role === "owner" ? 1 : 0.75}
                 onPress={() => handleUserAction(user)}
-                style={[styles.userRow, { borderTopColor: colors.bubbleBorder }]}
+                style={[
+                  styles.userRow,
+                  { borderTopColor: colors.bubbleBorder },
+                ]}
               >
                 <View style={styles.userInfo}>
                   <Text style={[styles.userEmail, { color: colors.text }]}>
@@ -320,7 +344,10 @@ export default function ManageAccessScreen() {
         <View
           style={[
             styles.card,
-            { backgroundColor: colors.bubble, borderColor: colors.bubbleBorder },
+            {
+              backgroundColor: colors.bubble,
+              borderColor: colors.bubbleBorder,
+            },
           ]}
         >
           <Text style={[styles.cardTitle, { color: colors.text }]}>+ Add</Text>
@@ -353,37 +380,6 @@ export default function ManageAccessScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.roleSelector}>
-            {ACCESS_ROLE_OPTIONS.map((roleOption) => {
-              const isSelected = selectedAddRole === roleOption.value;
-
-              return (
-                <TouchableOpacity
-                  key={roleOption.value}
-                  activeOpacity={0.8}
-                  onPress={() => setSelectedAddRole(roleOption.value)}
-                  disabled={isUpdating}
-                  style={[
-                    styles.roleOption,
-                    {
-                      borderColor: isSelected ? colors.accent : colors.inputBorder,
-                      backgroundColor: isSelected ? colors.accent : colors.input,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.roleOptionText,
-                      { color: isSelected ? "#FFFFFF" : colors.text },
-                    ]}
-                  >
-                    {roleOption.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
           {searchResults.map((user) => (
             <TouchableOpacity
               key={getAccessUserId(user)}
@@ -400,7 +396,9 @@ export default function ManageAccessScreen() {
                   {user.phone || "-"}
                 </Text>
               </View>
-              <Text style={[styles.roleText, { color: colors.accent }]}>Add</Text>
+              <Text style={[styles.roleText, { color: colors.accent }]}>
+                Add
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -493,26 +491,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-  },
-  roleSelector: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 12,
-  },
-  roleOption: {
-    flex: 1,
-    minHeight: 40,
-    borderWidth: 1,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 10,
-  },
-  roleOptionText: {
-    fontFamily: appFont,
-    fontSize: 12,
-    fontWeight: "900",
-    textAlign: "center",
   },
   input: {
     flex: 1,
