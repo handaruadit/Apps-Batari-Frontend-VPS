@@ -5,7 +5,13 @@ import {
   saveUserInfo,
   setRememberMe,
 } from "@/auth/token";
+import {
+  getRememberedAccounts,
+  getRememberedPassword,
+  saveRememberedAccount,
+} from "@/auth/rememberedAccounts";
 import { AuthContext } from "@/context/AuthContext";
+import { checkAppUpdate } from "../../services/updateService";
 import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
 import { router, Stack } from "expo-router";
 import { useContext, useEffect, useRef, useState } from "react";
@@ -35,6 +41,7 @@ const appFont = Platform.select({
   ios: "Helvetica Neue",
   default: "System",
 });
+
 const BATARI_LOGO_SIZE = 100;
 
 function clamp(value, min, max) {
@@ -43,16 +50,25 @@ function clamp(value, min, max) {
 
 const LoginScreen = () => {
   const { width, height } = useWindowDimensions();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  const [savedEmails, setSavedEmails] = useState([]);
+  const [showEmailOptions, setShowEmailOptions] = useState(false);
+
   const { setUser } = useContext(AuthContext);
+
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
+
   const introAnim = useRef(new Animated.Value(0)).current;
+
   const isCompactHeight = height < 720;
   const isNarrow = width < 360;
+
   const logoSize = clamp(width * 0.24, isCompactHeight ? 72 : 84, 100);
   const heroHeight = clamp(height * 0.23, isCompactHeight ? 132 : 164, 188);
   const formTopPadding = isCompactHeight ? 22 : 45;
@@ -60,6 +76,10 @@ const LoginScreen = () => {
   const buttonHeight = isCompactHeight ? 52 : 58;
   const inputHeight = isCompactHeight ? 46 : 48;
   const footerHeight = isCompactHeight ? 28 : 52;
+
+  useEffect(() => {
+    checkAppUpdate();
+  }, []);
 
   useEffect(() => {
     Animated.timing(introAnim, {
@@ -70,6 +90,15 @@ const LoginScreen = () => {
     }).start();
   }, [introAnim]);
 
+  useEffect(() => {
+    const loadSavedEmails = async () => {
+      const accounts = await getRememberedAccounts();
+      setSavedEmails(accounts);
+    };
+
+    loadSavedEmails();
+  }, []);
+
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert("Login gagal", "Email dan password harus diisi.");
@@ -79,6 +108,7 @@ const LoginScreen = () => {
     const endpoint = `${BASE_URL}/api/auth/login`;
 
     setLoading(true);
+
     let loginSuccess = false;
     let redirectPath = "/(home)/plant";
 
@@ -103,15 +133,22 @@ const LoginScreen = () => {
         jsonResponse.token
       ) {
         const userToken = jsonResponse.token;
+
         await saveToken(userToken);
         await setRememberMe(remember);
 
+        if (remember) {
+          await saveRememberedAccount(email, password);
+        }
+
         const userInfo = jsonResponse.user ??
           getUserFromToken(userToken) ?? { email };
-        await saveUserInfo(userInfo);
-        setUser(userInfo);
-        redirectPath = "/(home)/plant";
 
+        await saveUserInfo(userInfo);
+
+        setUser(userInfo);
+
+        redirectPath = "/(home)/plant";
         loginSuccess = true;
       } else {
         Alert.alert(
@@ -121,12 +158,14 @@ const LoginScreen = () => {
       }
     } catch (error) {
       console.error(error);
+
       Alert.alert(
         "Login gagal",
         "Terjadi kesalahan jaringan. Silakan coba lagi.",
       );
     } finally {
       setLoading(false);
+
       if (loginSuccess) {
         router.replace(redirectPath);
       }
@@ -157,9 +196,16 @@ const LoginScreen = () => {
     ],
   };
 
+  const visibleSavedEmails = savedEmails.filter((item) =>
+    item.toLowerCase().includes(email.trim().toLowerCase()),
+  );
+
+  const isEmailDropdownOpen = showEmailOptions && visibleSavedEmails.length > 0;
+
   return (
     <>
       <Stack.Screen options={{ headerShown: false, title: "" }} />
+
       <StatusBar barStyle="light-content" backgroundColor="#0C1222" />
 
       <SafeAreaView style={styles.safeArea}>
@@ -169,225 +215,289 @@ const LoginScreen = () => {
         >
           <ScrollView
             style={styles.scroll}
-            contentContainerStyle={[styles.scrollContent, { minHeight: height }]}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { minHeight: height },
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-          <View style={styles.screen}>
-            <ImageBackground
-              source={require("@/assets/images/solar-bg.jpg")}
-              style={[styles.hero, { height: heroHeight }]}
-              imageStyle={styles.backgroundPhoto}
+            <Pressable
+              style={styles.screen}
+              onPress={() => {
+                setShowEmailOptions(false);
+              }}
             >
-              <View style={styles.heroOverlay} />
-              <Animated.View
-                style={[
-                  styles.brandBlock,
-                  { paddingTop: isCompactHeight ? 8 : 14 },
-                  heroAnimatedStyle,
-                ]}
+              <ImageBackground
+                source={require("@/assets/images/solar-bg.jpg")}
+                style={[styles.hero, { height: heroHeight }]}
+                imageStyle={styles.backgroundPhoto}
               >
-                <View
+                <View style={styles.heroOverlay} />
+
+                <Animated.View
                   style={[
-                    styles.logoFrame,
-                    {
-                      width: logoSize,
-                      height: logoSize,
-                      borderRadius: logoSize / 2,
-                    },
+                    styles.brandBlock,
+                    { paddingTop: isCompactHeight ? 8 : 14 },
+                    heroAnimatedStyle,
                   ]}
                 >
-                  <Image
-                    source={require("@/assets/images/batari-logo.jpeg")}
+                  <View
                     style={[
-                      styles.logo,
+                      styles.logoFrame,
                       {
                         width: logoSize,
                         height: logoSize,
                         borderRadius: logoSize / 2,
                       },
                     ]}
-                  />
-                </View>
-                <Text
-                  style={[
-                    styles.welcome,
-                    {
-                      fontSize: isCompactHeight ? 26 : 31,
-                      marginTop: isCompactHeight ? 4 : 8,
-                    },
-                  ]}
-                >
-                  Welcome
-                </Text>
-              </Animated.View>
-            </ImageBackground>
-
-            <Animated.View
-              style={[
-                styles.formSection,
-                {
-                  paddingHorizontal: horizontalPadding,
-                  paddingTop: formTopPadding,
-                },
-                formAnimatedStyle,
-              ]}
-            >
-              <View style={styles.formSurface}>
-                <Text style={styles.label}>Email</Text>
-                <View
-                  style={[
-                    styles.inputWrapper,
-                    { minHeight: inputHeight },
-                    focusedField === "email" && styles.inputWrapperFocused,
-                  ]}
-                >
-                  <TextInput
-                    style={styles.input}
-                    placeholder="hallo@batari.com"
-                    placeholderTextColor="#6E7480"
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoFocus
-                    selectionColor="#18AEE6"
-                    cursorColor="#18AEE6"
-                    onFocus={() => setFocusedField("email")}
-                    onBlur={() => setFocusedField(null)}
-                  />
-                  <Ionicons
-                    name="mail-outline"
-                    size={20}
-                    color={focusedField === "email" ? "#18AEE6" : "#64748B"}
-                  />
-                </View>
-
-                <Text style={styles.label}>Password</Text>
-                <View
-                  style={[
-                    styles.inputWrapper,
-                    { minHeight: inputHeight },
-                    focusedField === "password" && styles.inputWrapperFocused,
-                  ]}
-                >
-                  <TextInput
-                    style={styles.input}
-                    placeholder="password"
-                    placeholderTextColor="#6E7480"
-                    secureTextEntry={!showPassword}
-                    value={password}
-                    onChangeText={setPassword}
-                    selectionColor="#18AEE6"
-                    cursorColor="#18AEE6"
-                    onFocus={() => setFocusedField("password")}
-                    onBlur={() => setFocusedField(null)}
-                  />
-                  <Pressable
-                    onPress={() => setShowPassword((value) => !value)}
-                    hitSlop={10}
                   >
-                    <Ionicons
-                      name={showPassword ? "eye-off-outline" : "eye-outline"}
-                      size={21}
-                      color={
-                        focusedField === "password" ? "#18AEE6" : "#64748B"
-                      }
+                    <Image
+                      source={require("@/assets/images/batari-logo.jpeg")}
+                      style={[
+                        styles.logo,
+                        {
+                          width: logoSize,
+                          height: logoSize,
+                          borderRadius: logoSize / 2,
+                        },
+                      ]}
                     />
-                  </Pressable>
-                </View>
-
-                <Pressable
-                  style={styles.rememberRow}
-                  onPress={() => setRemember(!remember)}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: remember }}
-                >
-                  <View
-                    style={[styles.checkbox, remember && styles.checkboxActive]}
-                  >
-                    {remember ? (
-                      <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                    ) : null}
                   </View>
-                  <Text style={styles.rememberText}>Remember me</Text>
-                </Pressable>
 
-                <TouchableOpacity
-                  style={[
-                    styles.loginButton,
-                    { minHeight: buttonHeight },
-                    loading && styles.loginButtonBusy,
-                  ]}
-                  onPress={handleLogin}
-                  disabled={loading}
-                  activeOpacity={0.8}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.loginText}>Log In</Text>
-                  )}
-                </TouchableOpacity>
-
-                <View style={styles.linkRow}>
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => router.push("/(auth)/forgot-password")}
+                  <Text
+                    style={[
+                      styles.welcome,
+                      {
+                        fontSize: isCompactHeight ? 26 : 31,
+                        marginTop: isCompactHeight ? 4 : 8,
+                      },
+                    ]}
                   >
-                    <Text style={styles.link}>Forgot password</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => router.push("/(auth)/register")}
-                  >
-                    <Text style={styles.link}>Create new account</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <Text style={styles.orText}>OR</Text>
-
-                <TouchableOpacity
-                  style={[styles.googleButton, { minHeight: buttonHeight }]}
-                  activeOpacity={0.8}
-                >
-                  <AntDesign
-                    name="google"
-                    size={22}
-                    color="#111827"
-                    style={styles.socialIcon}
-                  />
-                  <Text style={styles.googleText}>Continue with Google</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.facebookButton, { minHeight: buttonHeight }]}
-                  activeOpacity={0.8}
-                >
-                  <FontAwesome
-                    name="facebook"
-                    size={24}
-                    color="#FFFFFF"
-                    style={styles.socialIcon}
-                  />
-                  <Text style={styles.facebookText}>
-                    Continue with Facebook
+                    Welcome
                   </Text>
-                </TouchableOpacity>
+                </Animated.View>
+              </ImageBackground>
 
-                <Text style={styles.tagline}>
-                  Powering your home with battery.
-                </Text>
-              </View>
-            </Animated.View>
+              <Animated.View
+                style={[
+                  styles.formSection,
+                  {
+                    paddingHorizontal: horizontalPadding,
+                    paddingTop: formTopPadding,
+                  },
+                  formAnimatedStyle,
+                ]}
+              >
+                <View style={styles.formSurface}>
+                  <Text style={styles.label}>Email</Text>
 
-            <ImageBackground
-              source={require("@/assets/images/solar-bg.jpg")}
-              style={[styles.footerPhotoBlock, { height: footerHeight }]}
-              imageStyle={styles.footerPhoto}
-            />
-          </View>
+                  <Pressable onPress={(event) => event.stopPropagation()}>
+                    <View
+                      style={[
+                        styles.inputWrapper,
+                        { minHeight: inputHeight },
+                        focusedField === "email" && styles.inputWrapperFocused,
+                        isEmailDropdownOpen && styles.emailInputOpen,
+                      ]}
+                    >
+                      <TextInput
+                        style={styles.input}
+                        placeholder="batari@gmail.com"
+                        placeholderTextColor="#6E7480"
+                        value={email}
+                        onChangeText={(text) => {
+                          setEmail(text);
+                          setPassword("");
+                          setShowEmailOptions(true);
+                        }}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoFocus={false}
+                        selectionColor="#18AEE6"
+                        cursorColor="#18AEE6"
+                        onFocus={() => {
+                          setFocusedField("email");
+                          setShowEmailOptions(true);
+                        }}
+                        onBlur={() => setFocusedField(null)}
+                      />
+
+                      <Ionicons
+                        name="mail-outline"
+                        size={20}
+                        color={focusedField === "email" ? "#18AEE6" : "#64748B"}
+                      />
+                    </View>
+
+                    {isEmailDropdownOpen ? (
+                      <View style={styles.emailOptionsBox}>
+                        {visibleSavedEmails.map((item) => (
+                          <Pressable
+                            key={item}
+                            style={styles.emailOption}
+                            onPress={async () => {
+                              setEmail(item);
+
+                              const savedPassword =
+                                await getRememberedPassword(item);
+
+                              if (savedPassword) {
+                                setPassword(savedPassword);
+                              }
+
+                              setShowEmailOptions(false);
+                            }}
+                          >
+                            <Ionicons
+                              name="person-circle-outline"
+                              size={20}
+                              color="#64748B"
+                            />
+
+                            <Text style={styles.emailOptionText}>{item}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    ) : null}
+                  </Pressable>
+
+                  <Text style={styles.label}>Password</Text>
+
+                  <View
+                    style={[
+                      styles.inputWrapper,
+                      { minHeight: inputHeight },
+                      focusedField === "password" && styles.inputWrapperFocused,
+                    ]}
+                  >
+                    <TextInput
+                      style={styles.input}
+                      placeholder="password"
+                      placeholderTextColor="#6E7480"
+                      secureTextEntry={!showPassword}
+                      value={password}
+                      onChangeText={setPassword}
+                      selectionColor="#18AEE6"
+                      cursorColor="#18AEE6"
+                      onFocus={() => {
+                        setFocusedField("password");
+                        setShowEmailOptions(false);
+                      }}
+                      onBlur={() => setFocusedField(null)}
+                    />
+
+                    <Pressable
+                      onPress={() => setShowPassword((value) => !value)}
+                      hitSlop={10}
+                    >
+                      <Ionicons
+                        name={showPassword ? "eye-off-outline" : "eye-outline"}
+                        size={21}
+                        color={
+                          focusedField === "password" ? "#18AEE6" : "#64748B"
+                        }
+                      />
+                    </Pressable>
+                  </View>
+
+                  <Pressable
+                    style={styles.rememberRow}
+                    onPress={() => setRemember(!remember)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: remember }}
+                  >
+                    <View
+                      style={[
+                        styles.checkbox,
+                        remember && styles.checkboxActive,
+                      ]}
+                    >
+                      {remember ? (
+                        <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                      ) : null}
+                    </View>
+
+                    <Text style={styles.rememberText}>Remember me</Text>
+                  </Pressable>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.loginButton,
+                      { minHeight: buttonHeight },
+                      loading && styles.loginButtonBusy,
+                    ]}
+                    onPress={handleLogin}
+                    disabled={loading}
+                    activeOpacity={0.8}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.loginText}>Log In</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <View style={styles.linkRow}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => router.push("/(auth)/forgot-password")}
+                    >
+                      <Text style={styles.link}>Forgot password</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => router.push("/(auth)/register")}
+                    >
+                      <Text style={styles.link}>Create new account</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text style={styles.orText}>OR</Text>
+
+                  <TouchableOpacity
+                    style={[styles.googleButton, { minHeight: buttonHeight }]}
+                    activeOpacity={0.8}
+                  >
+                    <AntDesign
+                      name="google"
+                      size={22}
+                      color="#111827"
+                      style={styles.socialIcon}
+                    />
+
+                    <Text style={styles.googleText}>Continue with Google</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.facebookButton, { minHeight: buttonHeight }]}
+                    activeOpacity={0.8}
+                  >
+                    <FontAwesome
+                      name="facebook"
+                      size={24}
+                      color="#FFFFFF"
+                      style={styles.socialIcon}
+                    />
+
+                    <Text style={styles.facebookText}>
+                      Continue with Facebook
+                    </Text>
+                  </TouchableOpacity>
+
+                  <Text style={styles.tagline}>
+                    Powering your home with battery.
+                  </Text>
+                </View>
+              </Animated.View>
+
+              <ImageBackground
+                source={require("@/assets/images/solar-bg.jpg")}
+                style={[styles.footerPhotoBlock, { height: footerHeight }]}
+                imageStyle={styles.footerPhoto}
+              />
+            </Pressable>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -660,6 +770,38 @@ const styles = StyleSheet.create({
   },
   footerPhoto: {
     opacity: 0.18,
+  },
+  emailOptionsBox: {
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 0,
+    borderWidth: 1,
+    borderColor: "rgba(24, 174, 230, 0.25)",
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    marginTop: -1,
+    marginBottom: 16,
+    overflow: "hidden",
+  },
+  emailOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(15, 23, 42, 0.08)",
+  },
+  emailOptionText: {
+    marginLeft: 10,
+    color: "#111827",
+    fontFamily: appFont,
+    fontSize: 15,
+  },
+  emailInputOpen: {
+    marginBottom: 0,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
 });
 

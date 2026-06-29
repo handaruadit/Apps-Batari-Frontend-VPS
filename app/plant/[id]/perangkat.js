@@ -1,7 +1,12 @@
 import { appColors, appFont } from "@/config/theme";
 import { AuthContext } from "@/context/AuthContext";
 import { useAppSettings } from "@/context/AppSettingsContext";
-import { fetchPlantDevices } from "@/services/plantService";
+import {
+  fetchPlantDevices,
+  unlinkDeviceFromPlant,
+  normalizePlantAccessRole,
+  PLANT_ACCESS_ROLE_VALUES,
+} from "@/services/plantService";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   useGlobalSearchParams,
@@ -16,9 +21,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { MaterialIcons } from "@expo/vector-icons";
 
 function formatValue(value) {
   if (value === null || value === undefined || value === "") {
@@ -26,7 +33,9 @@ function formatValue(value) {
   }
 
   const number = Number(value);
-  return Number.isFinite(number) ? String(Number(number.toFixed(4))) : String(value);
+  return Number.isFinite(number)
+    ? String(Number(number.toFixed(4)))
+    : String(value);
 }
 
 function formatLocation(plant) {
@@ -38,22 +47,74 @@ function formatLocation(plant) {
   return cityProvince || "-";
 }
 
-function formatWeather(plant) {
-  const weather = plant?.weatherConditionText || plant?.weather || "-";
-  const temperature =
-    plant?.weatherTemperature === null || plant?.weatherTemperature === undefined
-      ? "-"
-      : `${plant.weatherTemperature}°C`;
-
-  return `${weather} / ${temperature}`;
+function formatAddress(plant) {
+  return plant?.address || plant?.location || "-";
 }
 
 function getParamValue(value) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function getAccessRoleFromPlant(value) {
+  const role =
+    value?.accessRole ??
+    value?.access_role ??
+    value?.plantAccessRole ??
+    value?.plant_access_role ??
+    value?.userRole ??
+    value?.user_role ??
+    value?.role ??
+    value?.permission ??
+    value?.access;
+
+  if (role === "owner") {
+    return "owner";
+  }
+
+  return normalizePlantAccessRole(role);
+}
+
+function canCurrentUserUnlinkDevice(plant, selectedDevice) {
+  const role =
+    getAccessRoleFromPlant(plant) || getAccessRoleFromPlant(selectedDevice);
+
+  if (role === "owner") {
+    return true;
+  }
+
+  if (role === PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY) {
+    return false;
+  }
+
+  if (role === PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS) {
+    return true;
+  }
+
+  return (
+    plant?.canUnlinkDevice === true ||
+    plant?.can_unlink_device === true ||
+    plant?.canDeleteDevice === true ||
+    plant?.can_delete_device === true ||
+    plant?.canManage === true ||
+    plant?.can_manage === true ||
+    selectedDevice?.canUnlinkDevice === true ||
+    selectedDevice?.can_unlink_device === true ||
+    selectedDevice?.canDeleteDevice === true ||
+    selectedDevice?.can_delete_device === true ||
+    selectedDevice?.canManage === true ||
+    selectedDevice?.can_manage === true ||
+    selectedDevice?.canAddDatalogger === true ||
+    selectedDevice?.can_add_datalogger === true
+  );
+}
+
 const HIDDEN_BATTERY_PARAMETERS = new Set(["sw_bal", "sw_chg", "sw_dis"]);
-const BATTERY_GROUP_KEYS = new Set(["baterai", "battery", "data_bms", "setting_bms"]);
+const BATTERY_GROUP_KEYS = new Set([
+  "baterai",
+  "battery",
+  "data_bms",
+  "setting_bms",
+]);
 const DEFAULT_BATTERY_PARAMS = [
   "power",
   "cells_1",
@@ -95,11 +156,13 @@ function formatBatteryParameterLabel(value, t = (key) => key) {
     return knownLabels[key];
   }
 
-  return String(value || "-")
-    .replace(/_/g, " ")
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .trim()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase()) || "-";
+  return (
+    String(value || "-")
+      .replace(/_/g, " ")
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .trim()
+      .replace(/\b\w/g, (letter) => letter.toUpperCase()) || "-"
+  );
 }
 
 function getBatteryParameterUnit(key) {
@@ -126,7 +189,9 @@ function getBatteryParameterUnit(key) {
 
 function formatBatteryParameterValue(value, key) {
   const formattedValue =
-    value === null || value === undefined || value === "" ? "0" : formatValue(value);
+    value === null || value === undefined || value === ""
+      ? "0"
+      : formatValue(value);
   const unit = getBatteryParameterUnit(key);
   return unit ? `${formattedValue} ${unit}` : formattedValue;
 }
@@ -186,7 +251,13 @@ function parseMaybeJson(value) {
   }
 }
 
-function collectBatteryObjectParameters(source, rows, seenKeys, prefix = "", t) {
+function collectBatteryObjectParameters(
+  source,
+  rows,
+  seenKeys,
+  prefix = "",
+  t,
+) {
   source = parseMaybeJson(source);
 
   if (!source || typeof source !== "object") {
@@ -195,9 +266,14 @@ function collectBatteryObjectParameters(source, rows, seenKeys, prefix = "", t) 
 
   Object.entries(source).forEach(([key, value]) => {
     if (
-      ["id", "device_id", "deviceId", "created_at", "updated_at", "timestamp"].includes(
-        key,
-      )
+      [
+        "id",
+        "device_id",
+        "deviceId",
+        "created_at",
+        "updated_at",
+        "timestamp",
+      ].includes(key)
     ) {
       return;
     }
@@ -212,7 +288,13 @@ function collectBatteryObjectParameters(source, rows, seenKeys, prefix = "", t) 
         if (item && typeof item === "object") {
           collectBatteryObjectParameters(item, rows, seenKeys, nextPrefix, t);
         } else {
-          pushBatteryParameter(rows, seenKeys, `${label}_${index + 1}`, item, t);
+          pushBatteryParameter(
+            rows,
+            seenKeys,
+            `${label}_${index + 1}`,
+            item,
+            t,
+          );
         }
       });
       return;
@@ -221,7 +303,13 @@ function collectBatteryObjectParameters(source, rows, seenKeys, prefix = "", t) 
     const parsedValue = parseMaybeJson(value);
 
     if (parsedValue && typeof parsedValue === "object") {
-      collectBatteryObjectParameters(parsedValue, rows, seenKeys, nextPrefix, t);
+      collectBatteryObjectParameters(
+        parsedValue,
+        rows,
+        seenKeys,
+        nextPrefix,
+        t,
+      );
       return;
     }
 
@@ -275,7 +363,9 @@ function getBatteryParameterRows(device, t) {
   if (Array.isArray(device?.latestData)) {
     device.latestData.forEach((row) => {
       const categoryKey = normalizeParameterKey(row?.category);
-      const typeKey = normalizeParameterKey(row?.type || row?.parameter || row?.name);
+      const typeKey = normalizeParameterKey(
+        row?.type || row?.parameter || row?.name,
+      );
 
       if (!isBatteryCategory(categoryKey) && !isBatteryCategory(typeKey)) {
         return;
@@ -327,7 +417,10 @@ function getBatteryParameterRows(device, t) {
   });
 
   const defaultOrder = new Map(
-    DEFAULT_BATTERY_PARAMS.map((key, index) => [normalizeParameterKey(key), index]),
+    DEFAULT_BATTERY_PARAMS.map((key, index) => [
+      normalizeParameterKey(key),
+      index,
+    ]),
   );
 
   return rows.sort((left, right) => {
@@ -371,9 +464,70 @@ export default function PerangkatScreen() {
   );
   const [plant, setPlant] = useState(null);
   const [devices, setDevices] = useState([]);
+  const [canUnlinkDevice, setCanUnlinkDevice] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  const handleDeleteDevice = (deviceId) => {
+    if (!canUnlinkDevice) {
+      Alert.alert(
+        "Tidak diizinkan",
+        "Akun view only tidak dapat melepas device dari plant.",
+      );
+      return;
+    }
+
+    if (!resolvedPlantId) {
+      setErrorMessage("ID plant tidak ditemukan.");
+      setCanUnlinkDevice(false);
+      setIsLoading(false);
+      setIsRefreshing(false);
+      return;
+    }
+
+    if (!deviceId) {
+      Alert.alert("Gagal", "Device ID tidak ditemukan.");
+      return;
+    }
+
+    Alert.alert(
+      "Hapus Device",
+      "Apakah Anda yakin ingin melepas device ini dari plant?",
+      [
+        {
+          text: "Batal",
+          style: "cancel",
+        },
+        {
+          text: "Hapus",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await unlinkDeviceFromPlant(resolvedPlantId, deviceId);
+              setDevices((prevDevices) =>
+                prevDevices.filter((device) => device.device_id !== deviceId),
+              );
+            } catch (error) {
+              if (error.code === "AUTH_EXPIRED") {
+                Alert.alert(
+                  "Error",
+                  "Sesi Anda telah habis atau token tidak valid. Silakan login kembali.",
+                );
+                router.replace("/(auth)/login");
+                return;
+              }
+
+              Alert.alert(
+                "Gagal",
+                error.message || "Gagal melepas device dari plant.",
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const loadDevices = useCallback(
     async ({ refreshing = false } = {}) => {
@@ -402,9 +556,18 @@ export default function PerangkatScreen() {
       try {
         setErrorMessage("");
         const result = await fetchPlantDevices(resolvedPlantId);
-        console.log("PERANGKAT_RESPONSE_DATA:", result);
-        setPlant(result?.plant || null);
-        setDevices(Array.isArray(result?.devices) ? result.devices : []);
+        console.log("DEVICE_RESPONSE", result);
+
+        const nextPlant = result?.plant || null;
+        const nextDevices = Array.isArray(result?.devices)
+          ? result.devices
+          : [];
+
+        setPlant(nextPlant);
+        setDevices(nextDevices);
+        setCanUnlinkDevice(
+          canCurrentUserUnlinkDevice(nextPlant, selectedDevice),
+        );
       } catch (error) {
         console.log("PERANGKAT_ERROR:", error?.message || error);
         if (error.code === "AUTH_EXPIRED") {
@@ -517,95 +680,116 @@ export default function PerangkatScreen() {
                     },
                   ]}
                 >
-                <View style={styles.cardTopRow}>
-                  <Text style={[styles.inverterTitle, { color: colors.text }]}>
-                    {t("inverter")} {index + 1}
-                  </Text>
-                  <Text style={[styles.snText, { color: colors.textMuted }]}>
-                    {item.device_id}
-                  </Text>
-                </View>
+                  <View style={styles.cardTopRow}>
+                    <Text
+                      style={[styles.inverterTitle, { color: colors.text }]}
+                    >
+                      {t("inverter")} {index + 1}
+                    </Text>
 
-                <View style={styles.infoBlock}>
-                  <Text style={[styles.metricLabel, { color: colors.textMuted }]}>
-                    {t("deviceId")}
-                  </Text>
-                  <Text style={[styles.infoValue, { color: colors.text }]}>
-                    {item.device_id || "-"}
-                  </Text>
-                </View>
+                    {canUnlinkDevice && (
+                      <View style={styles.cardHeaderRight}>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteDevice(item.device_id)}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <MaterialIcons
+                            name="delete-outline"
+                            size={22}
+                            color="#EF4444"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
 
-                <View style={styles.infoBlock}>
-                  <Text style={[styles.metricLabel, { color: colors.textMuted }]}>
-                    {t("address")}
-                  </Text>
-                  <Text style={[styles.infoValue, { color: colors.text }]}>
-                    {plant?.location || "-"}
-                  </Text>
-                </View>
+                  <View style={styles.infoBlock}>
+                    <Text
+                      style={[styles.metricLabel, { color: colors.textMuted }]}
+                    >
+                      {t("deviceId")}
+                    </Text>
+                    <Text style={[styles.infoValue, { color: colors.text }]}>
+                      {item.device_id || "-"}
+                    </Text>
+                  </View>
 
-                <View style={styles.metricRow}>
-                  <View style={styles.metricItem}>
-                    <Text style={[styles.metricLabel, { color: colors.textMuted }]}>
+                  <View style={styles.infoBlock}>
+                    <Text
+                      style={[styles.metricLabel, { color: colors.textMuted }]}
+                    >
+                      {t("address")}
+                    </Text>
+                    <Text style={[styles.infoValue, { color: colors.text }]}>
+                      {formatAddress(plant)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.infoBlock}>
+                    <Text
+                      style={[styles.metricLabel, { color: colors.textMuted }]}
+                    >
                       {t("cityProvince")}
                     </Text>
-                    <Text style={[styles.metricValueSmall, { color: colors.text }]}>
+                    <Text style={[styles.infoValue, { color: colors.text }]}>
                       {formatLocation(plant)}
                     </Text>
                   </View>
 
-                  <View style={styles.metricItem}>
-                    <Text style={[styles.metricLabel, { color: colors.textMuted }]}>
-                      {t("weather")}
+                  <View
+                    style={[
+                      styles.parameterSection,
+                      themeMode === "light" && {
+                        borderTopColor: colors.bubbleBorder,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[styles.parameterTitle, { color: colors.text }]}
+                    >
+                      {t("batteryParameters")}
                     </Text>
-                    <Text style={[styles.metricValueSmall, { color: colors.text }]}>
-                      {formatWeather(plant)}
-                    </Text>
-                  </View>
-                </View>
-
-                <View
-                  style={[
-                    styles.parameterSection,
-                    themeMode === "light" && {
-                      borderTopColor: colors.bubbleBorder,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.parameterTitle, { color: colors.text }]}>
-                    {t("batteryParameters")}
-                  </Text>
-                  {batteryParameterRows.length > 0 ? (
-                    batteryParameterRows.map((row) => (
-                      <View
-                        key={`battery-${row.key}`}
+                    {batteryParameterRows.length > 0 ? (
+                      batteryParameterRows.map((row) => (
+                        <View
+                          key={`battery-${row.key}`}
+                          style={[
+                            styles.parameterRow,
+                            themeMode === "light" && {
+                              borderBottomColor: "rgba(8,174,234,0.14)",
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.parameterType,
+                              { color: colors.text },
+                            ]}
+                          >
+                            {row.label}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.parameterValue,
+                              { color: colors.accent },
+                            ]}
+                          >
+                            {formatBatteryParameterValue(row.value, row.key)}
+                          </Text>
+                        </View>
+                      ))
+                    ) : (
+                      <Text
                         style={[
-                          styles.parameterRow,
-                          themeMode === "light" && {
-                            borderBottomColor: "rgba(8,174,234,0.14)",
-                          },
+                          styles.emptyParameterText,
+                          { color: colors.textMuted },
                         ]}
                       >
-                        <Text style={[styles.parameterType, { color: colors.text }]}>
-                          {row.label}
-                        </Text>
-                        <Text style={[styles.parameterValue, { color: colors.accent }]}>
-                          {formatBatteryParameterValue(row.value, row.key)}
-                        </Text>
-                      </View>
-                    ))
-                  ) : (
-                    <Text
-                      style={[
-                        styles.emptyParameterText,
-                        { color: colors.textMuted },
-                      ]}
-                    >
-                      {t("noDataAvailable")}
-                    </Text>
-                  )}
+                        {t("noDataAvailable")}
+                      </Text>
+                    )}
+                  </View>
                 </View>
-              </View>
               );
             })
           )}
@@ -679,34 +863,12 @@ const styles = StyleSheet.create({
     color: appColors.text,
     fontFamily: appFont,
   },
-  snText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "600",
-    color: appColors.textMuted,
-    fontFamily: appFont,
-    textAlign: "right",
-  },
-  metricRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  metricItem: {
-    flex: 1,
-  },
   metricLabel: {
     fontSize: 13,
     fontWeight: "500",
     color: appColors.textMuted,
     fontFamily: appFont,
     marginBottom: 6,
-  },
-  metricValueSmall: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: appColors.text,
-    fontFamily: appFont,
   },
   infoBlock: {
     marginBottom: 12,
@@ -766,5 +928,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: appColors.textMuted,
     fontFamily: appFont,
+  },
+  cardHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
 });

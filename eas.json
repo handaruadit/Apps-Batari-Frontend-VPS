@@ -16,8 +16,32 @@
     },
     "production": {
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "apk"
       }
     }
   }
 }
+
+// {
+//   "cli": {
+//     "version": ">= 16.0.0",
+//     "appVersionSource": "local"
+//   },
+//   "build": {
+//     "development": {
+//       "developmentClient": true,
+//       "distribution": "internal"
+//     },
+//     "preview": {
+//       "distribution": "internal",
+//       "android": {
+//         "buildType": "apk"
+//       }
+//     },
+//     "production": {
+//       "android": {
+//         "buildType": "apk"
+//       }
+//     }
+//   }
+// }

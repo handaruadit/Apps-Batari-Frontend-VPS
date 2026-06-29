@@ -5,15 +5,10 @@ import { useAppSettings } from "@/context/AppSettingsContext";
 
 const hiddenScreens = [
   "data",
-  "eksperimen",
   "Add-device",
   "manage-access",
   "qr-scanner",
-  "index",
-  "sub-plant/data-battery",
-  "sub-plant/data-grid",
-  "sub-plant/data-load",
-  "sub-plant/data-pv",
+  "sub-plant",
 ];
 
 export default function PlantDetailLayout() {

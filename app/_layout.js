@@ -1,14 +1,24 @@
-import { clearAuth } from '@/auth/token';
+import {
+  getUserFromToken,
+  getUserInfo,
+  getValidRememberedToken,
+} from '@/auth/token';
 import { Stack, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import {
   Image,
   Pressable,
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
-import { AuthProvider } from '../context/AuthContext';
-import { AppSettingsProvider, useAppSettings } from '../context/AppSettingsContext';
+import {
+  AuthContext,
+  AuthProvider,
+} from '../context/AuthContext';
+import {
+  AppSettingsProvider,
+  useAppSettings,
+} from '../context/AppSettingsContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const BATARI_LOGO = require('../assets/images/batari-logo.jpeg');
@@ -26,66 +36,95 @@ export default function Layout() {
 }
 
 function RootLayoutContent() {
-  const router = useRouter();
   const { colors } = useAppSettings();
   const { width, height } = useWindowDimensions();
-  const [showBootSplash, setShowBootSplash] = useState(true);
+
   const isCompactHeight = height < 720;
   const logoSize = clamp(width * 0.24, isCompactHeight ? 72 : 84, 100);
 
+  return (
+    <AuthProvider>
+      <SessionGate colors={colors} logoSize={logoSize} />
+    </AuthProvider>
+  );
+}
+
+function SessionGate({ colors, logoSize }) {
+  const router = useRouter();
+  const { setUser } = useContext(AuthContext);
+
+  const [showBootSplash, setShowBootSplash] = useState(true);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [nextRoute, setNextRoute] = useState('/(auth)/login');
+
   useEffect(() => {
-    const prepareApp = async () => {
+    const checkSession = async () => {
       try {
-        await clearAuth();
+        const token = await getValidRememberedToken();
+
+        if (token) {
+          const userInfo = (await getUserInfo()) ?? getUserFromToken(token);
+
+          if (userInfo) {
+            setUser(userInfo);
+          }
+
+          setNextRoute('/(home)/plant');
+        } else {
+          setNextRoute('/(auth)/login');
+        }
       } catch {
-        // Tetap lanjut ke login meskipun storage gagal dibersihkan.
+        setNextRoute('/(auth)/login');
+      } finally {
+        setSessionReady(true);
       }
     };
 
-    prepareApp();
-  }, []);
+    checkSession();
+  }, [setUser]);
 
   const handleBootSplashPress = () => {
+    if (!sessionReady) return;
+
     setShowBootSplash(false);
-    router.replace('/(auth)/login');
+    router.replace(nextRoute);
   };
 
   return (
-    <AuthProvider>
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.screen }}>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            animation: 'fade',
-            contentStyle: { backgroundColor: colors.screen },
-          }}
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.screen }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'fade',
+          contentStyle: { backgroundColor: colors.screen },
+        }}
+      >
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(main)" />
+        <Stack.Screen name="(home)" />
+        <Stack.Screen name="plant/[id]" />
+      </Stack>
+
+      {showBootSplash && (
+        <Pressable
+          style={[styles.bootSplash, { backgroundColor: colors.screen }]}
+          onPress={handleBootSplashPress}
         >
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(main)" />
-          <Stack.Screen name="(home)" />
-          <Stack.Screen name="plant/[id]" />
-        </Stack>
-        {showBootSplash && (
-          <Pressable
-            style={[styles.bootSplash, { backgroundColor: colors.screen }]}
-            onPress={handleBootSplashPress}
-          >
-            <Image
-              source={BATARI_LOGO}
-              style={[
-                styles.bootSplashLogo,
-                {
-                  width: logoSize,
-                  height: logoSize,
-                  borderRadius: logoSize / 2,
-                },
-              ]}
-              resizeMode="cover"
-            />
-          </Pressable>
-        )}
-      </SafeAreaView>
-    </AuthProvider>
+          <Image
+            source={BATARI_LOGO}
+            style={[
+              styles.bootSplashLogo,
+              {
+                width: logoSize,
+                height: logoSize,
+                borderRadius: logoSize / 2,
+              },
+            ]}
+            resizeMode="cover"
+          />
+        </Pressable>
+      )}
+    </SafeAreaView>
   );
 }
 

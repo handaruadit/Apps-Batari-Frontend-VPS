@@ -116,20 +116,6 @@ export default function MainLayout() {
           ),
         }}
       />
-
-      <Tabs.Screen
-        name="index"
-        options={{
-          href: null,
-        }}
-      />
-
-      <Tabs.Screen
-        name="add-device"
-        options={{
-          href: null,
-        }}
-      />
     </Tabs>
   );
 }

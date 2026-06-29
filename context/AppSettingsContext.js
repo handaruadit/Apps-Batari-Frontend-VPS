@@ -285,7 +285,7 @@ const translations = {
 const AppSettingsContext = createContext(null);
 
 export function AppSettingsProvider({ children }) {
-  const [themeMode, setThemeModeState] = useState("dark");
+  const [themeMode, setThemeModeState] = useState("light");
   const [language, setLanguageState] = useState("en");
 
   useEffect(() => {
@@ -352,11 +352,11 @@ export function useAppSettings() {
 
   if (!value) {
     return {
-      themeMode: "dark",
+      themeMode: "light",
       setThemeMode: async () => {},
       language: "en",
       setLanguage: async () => {},
-      colors: getAppColors("dark"),
+      colors: getAppColors("light"),
       t: (key) => translations.en[key] || key,
     };
   }

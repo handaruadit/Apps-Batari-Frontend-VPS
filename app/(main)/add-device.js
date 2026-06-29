@@ -315,7 +315,7 @@ export default function AddDeviceScreen() {
             activeOpacity={0.8}
             onPress={() => router.back()}
           >
-            <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+            <Ionicons name="chevron-back" size={22} color={colors.text} />
           </TouchableOpacity>
 
           <Text style={[styles.title, { color: colors.text }]}>

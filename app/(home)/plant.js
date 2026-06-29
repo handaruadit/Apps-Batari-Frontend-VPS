@@ -77,6 +77,8 @@ function getLatestStatusTimestamp(source) {
 }
 
 function getDeviceLatestDataTimestamp(device) {
+  const latestDataTimestamps = collectStatusTimestamps(device?.latestData);
+
   return Math.max(
     0,
     parseStatusTimestamp(device?.latestDataAt) || 0,
@@ -84,6 +86,7 @@ function getDeviceLatestDataTimestamp(device) {
     parseStatusTimestamp(device?.lastDataAt) || 0,
     parseStatusTimestamp(device?.last_data_at) || 0,
     parseStatusTimestamp(device?.timestamp) || 0,
+    ...latestDataTimestamps,
   );
 }
 

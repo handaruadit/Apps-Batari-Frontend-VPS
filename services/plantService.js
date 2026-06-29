@@ -21,6 +21,14 @@ const PLANT_ACCESS_ROLE_ALIASES = Object.freeze({
   manage: PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS,
 });
 
+const DEBUG = false;
+
+const debug = (...args) => {
+  if (__DEV__ && DEBUG) {
+    console.log(...args);
+  }
+};
+
 export function isDemoPlant(plant) {
   return String(plant?.name || "").trim().toLowerCase() ===
     DEMO_PLANT_NAME.toLowerCase();
@@ -38,13 +46,15 @@ export function isValidPlantAccessRole(role) {
 
 async function getAuthHeaders() {
   const token = await getToken();
-
   if (!token || !isTokenValid(token)) {
     await clearAuth();
     const error = new Error("Sesi Anda telah habis atau token tidak valid.");
     error.code = "AUTH_EXPIRED";
     throw error;
   }
+
+  debug("TOKEN VALID");
+  debug("HAS_TOKEN:", !!token);
 
   return {
     Accept: "application/json",
@@ -204,21 +214,23 @@ export async function fetchPlants() {
 }
 
 export async function createPlant(payload) {
+  debug("MASUK CREATE PLANT");
+  debug("PAYLOAD:", payload);
   const url = `${BASE_URL}/api/plant/create`;
   let headers;
 
   try {
     headers = await getAuthHeaders();
   } catch (error) {
-    console.log("CREATE_PLANT_URL:", url);
-    console.log("CREATE_PLANT_PAYLOAD:", payload);
-    console.log("CREATE_PLANT_HAS_TOKEN:", false);
+    debug("CREATE_PLANT_URL:", url);
+    debug("CREATE_PLANT_PAYLOAD:", payload);
+    debug("CREATE_PLANT_HAS_TOKEN:", false);
     throw error;
   }
 
-  console.log("CREATE_PLANT_URL:", url);
-  console.log("CREATE_PLANT_PAYLOAD:", payload);
-  console.log("CREATE_PLANT_HAS_TOKEN:", Boolean(headers.Authorization));
+  debug("CREATE_PLANT_URL:", url);
+  debug("CREATE_PLANT_PAYLOAD:", payload);
+  debug("CREATE_PLANT_HAS_TOKEN:", Boolean(headers.Authorization));
 
   const response = await fetch(url, {
     method: "POST",
@@ -227,8 +239,8 @@ export async function createPlant(payload) {
   });
   const body = await parseResponse(response);
 
-  console.log("CREATE_PLANT_STATUS:", response.status);
-  console.log("CREATE_PLANT_RESPONSE:", body);
+  debug("CREATE_PLANT_STATUS:", response.status);
+  debug("CREATE_PLANT_RESPONSE:", body);
 
   if (!response.ok) {
     throwApiError(response, body, "Gagal menyimpan plant");
@@ -244,15 +256,15 @@ export async function updatePlant(plantId, payload) {
   try {
     headers = await getAuthHeaders();
   } catch (error) {
-    console.log("UPDATE_PLANT_URL:", url);
-    console.log("UPDATE_PLANT_PAYLOAD:", payload);
-    console.log("UPDATE_PLANT_HAS_TOKEN:", false);
+    debug("UPDATE_PLANT_URL:", url);
+    debug("UPDATE_PLANT_PAYLOAD:", payload);
+    debug("UPDATE_PLANT_HAS_TOKEN:", false);
     throw error;
   }
 
-  console.log("UPDATE_PLANT_URL:", url);
-  console.log("UPDATE_PLANT_PAYLOAD:", payload);
-  console.log("UPDATE_PLANT_HAS_TOKEN:", Boolean(headers.Authorization));
+  debug("UPDATE_PLANT_URL:", url);
+  debug("UPDATE_PLANT_PAYLOAD:", payload);
+  debug("UPDATE_PLANT_HAS_TOKEN:", Boolean(headers.Authorization));
 
   const response = await fetch(url, {
     method: "PUT",
@@ -261,8 +273,8 @@ export async function updatePlant(plantId, payload) {
   });
   const body = await parseResponse(response);
 
-  console.log("UPDATE_PLANT_STATUS:", response.status);
-  console.log("UPDATE_PLANT_RESPONSE:", body);
+  debug("UPDATE_PLANT_STATUS:", response.status);
+  debug("UPDATE_PLANT_RESPONSE:", body);
 
   if (!response.ok) {
     throwApiError(response, body, "Gagal menyimpan perubahan plant");
@@ -282,15 +294,15 @@ export async function deletePlant(plantId) {
   try {
     headers = await getAuthHeaders();
   } catch (error) {
-    console.log("DELETE_PLANT_URL:", url);
-    console.log("DELETE_PLANT_ID:", plantId);
-    console.log("DELETE_PLANT_HAS_TOKEN:", false);
+    debug("DELETE_PLANT_URL:", url);
+    debug("DELETE_PLANT_ID:", plantId);
+    debug("DELETE_PLANT_HAS_TOKEN:", false);
     throw error;
   }
 
-  console.log("DELETE_PLANT_URL:", url);
-  console.log("DELETE_PLANT_ID:", plantId);
-  console.log("DELETE_PLANT_HAS_TOKEN:", Boolean(headers.Authorization));
+  debug("DELETE_PLANT_URL:", url);
+  debug("DELETE_PLANT_ID:", plantId);
+  debug("DELETE_PLANT_HAS_TOKEN:", Boolean(headers.Authorization));
 
   const response = await fetch(url, {
     method: "DELETE",
@@ -298,8 +310,8 @@ export async function deletePlant(plantId) {
   });
   const body = await parseResponse(response);
 
-  console.log("DELETE_PLANT_STATUS:", response.status);
-  console.log("DELETE_PLANT_RESPONSE:", body);
+  debug("DELETE_PLANT_STATUS:", response.status);
+  debug("DELETE_PLANT_RESPONSE:", body);
 
   if (!response.ok) {
     throwApiError(response, body, "Gagal menghapus plant");
@@ -472,6 +484,34 @@ export async function linkDeviceToPlant(plantId, deviceId) {
   return body;
 }
 
+export async function unlinkDeviceFromPlant(plantId, deviceId) {
+  if (plantId == null || String(plantId).trim() === "") {
+    throw new Error("ID plant tidak valid.");
+  }
+
+  const normalizedDeviceId = String(deviceId || "").trim();
+
+  if (!normalizedDeviceId) {
+    throw new Error("Device ID tidak boleh kosong.");
+  }
+
+  const headers = await getAuthHeaders();
+  const response = await fetch(
+    `${BASE_URL}/api/plant/${encodeURIComponent(plantId)}/device/${encodeURIComponent(normalizedDeviceId)}`,
+    {
+      method: "DELETE",
+      headers,
+    },
+  );
+  const body = await parseResponse(response);
+
+  if (!response.ok) {
+    throwApiError(response, body, "Gagal melepas device dari plant.");
+  }
+
+  return body;
+}
+
 export async function fetchPlantDevices(plantId) {
   if (plantId == null || String(plantId).trim() === "") {
     throw new Error("ID plant tidak valid.");
@@ -480,22 +520,19 @@ export async function fetchPlantDevices(plantId) {
   const headers = await getAuthHeaders();
   const url = `${BASE_URL}/api/plant/${encodeURIComponent(plantId)}/devices`;
 
-  console.log("FETCH_PLANT_DEVICES_URL:", url);
-  console.log("FETCH_PLANT_DEVICES_HAS_TOKEN:", Boolean(headers.Authorization));
+  debug("FETCH_PLANT_DEVICES_URL:", url);
 
-  const response = await fetch(
-    url,
-    {
-      method: "GET",
-      headers,
-    },
-  );
+  const response = await fetch(url, {
+    method: "GET",
+    headers,
+  });
+
   const body = await parseResponse(response);
 
-  console.log("FETCH_PLANT_DEVICES_STATUS:", response.status);
-  console.log("FETCH_PLANT_DEVICES_RESPONSE:", body);
+  debug("FETCH_PLANT_DEVICES_STATUS:", response.status);
 
   if (!response.ok) {
+    debug("FETCH_PLANT_DEVICES_ERROR:", body);
     throwApiError(response, body, "Gagal mengambil data device.");
   }
 

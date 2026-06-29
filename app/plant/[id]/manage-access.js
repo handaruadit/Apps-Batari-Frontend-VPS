@@ -39,7 +39,7 @@ function formatRole(role) {
   const normalizedRole = normalizePlantAccessRole(role);
 
   if (normalizedRole === PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS) {
-    return "Manage Access";
+    return "Admin";
   }
 
   if (normalizedRole === PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY) {
@@ -55,7 +55,7 @@ function getAccessUserId(user) {
 
 export default function ManageAccessScreen() {
   console.log("PLANT_ACCESS_ROLE_VALUES =", PLANT_ACCESS_ROLE_VALUES);
-  
+
   const params = useLocalSearchParams();
   const plantId = getParamValue(params.id);
   const plantName = getParamValue(params.name) || "Plant";
@@ -118,7 +118,7 @@ export default function ManageAccessScreen() {
     if (!normalizedRole) {
       Alert.alert(
         "Tambah Access",
-        "Role tidak valid. Silakan pilih View Only atau Manage Access.",
+        "Role tidak valid. Silakan pilih View Only atau Admin.",
       );
       return;
     }
@@ -169,7 +169,7 @@ export default function ManageAccessScreen() {
                 executeAddUser(user, PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY),
             },
             {
-              text: "Manage Access",
+              text: "Admin",
               onPress: () =>
                 executeAddUser(user, PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS),
             },
@@ -200,7 +200,7 @@ export default function ManageAccessScreen() {
           handleUpdateRole(user, PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY),
       },
       {
-        text: "Manage Access",
+        text: "Admin",
         onPress: () =>
           handleUpdateRole(user, PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS),
       },
@@ -225,7 +225,7 @@ export default function ManageAccessScreen() {
     if (!normalizedRole) {
       Alert.alert(
         "Update Access",
-        "Role tidak valid. Silakan pilih View Only atau Manage Access.",
+        "Role tidak valid. Silakan pilih View Only atau Admin.",
       );
       return;
     }
@@ -278,7 +278,7 @@ export default function ManageAccessScreen() {
         <View style={styles.header}>
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => router.back()}
+            onPress={() => router.replace("/plant")}
             style={[
               styles.backButton,
               {

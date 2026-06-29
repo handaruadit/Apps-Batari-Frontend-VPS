@@ -2,7 +2,7 @@ const DEFAULT_ENV = "vps";
 
 const CONFIG = {
   vps: {
-    BASE_URL: "http://103.31.205.39:3000",
+    BASE_URL: "http://89.116.33.75:3001",
   },
 };
 

@@ -108,9 +108,27 @@ const WEATHER_ICON_SIZE = {
   day: 34,
 };
 const POWER_SERIES_CONFIG = [
-  { key: "production", labelKey: "pv", label: "PV", color: "#1FB7FF", group: "consumption" },
-  { key: "grid", labelKey: "grid", label: "Grid", color: "#FF9300", group: "consumption" },
-  { key: "battery", labelKey: "battery", label: "Battery", color: "#99E500", group: "consumption" },
+  {
+    key: "production",
+    labelKey: "pv",
+    label: "PV",
+    color: "#1FB7FF",
+    group: "consumption",
+  },
+  {
+    key: "grid",
+    labelKey: "grid",
+    label: "Grid",
+    color: "#FF9300",
+    group: "consumption",
+  },
+  {
+    key: "battery",
+    labelKey: "battery",
+    label: "Battery",
+    color: "#99E500",
+    group: "consumption",
+  },
   {
     key: "pvGenerate",
     labelKey: "pvGenerate",
@@ -118,17 +136,86 @@ const POWER_SERIES_CONFIG = [
     color: "#FF4646",
     group: "production",
   },
-  { key: "export", labelKey: "export", label: "Export", color: "#4F46E5", group: "production" },
-  { key: "charge", labelKey: "charge", label: "Charge", color: "#A855F7", group: "production" },
+  // {
+  //   key: "export",
+  //   labelKey: "export",
+  //   label: "Export",
+  //   color: "#4F46E5",
+  //   group: "production",
+  // },
+  // {
+  //   key: "charge",
+  //   labelKey: "charge",
+  //   label: "Charge",
+  //   color: "#A855F7",
+  //   group: "production",
+  // },
+  {
+    key: "load",
+    labelKey: "load",
+    label: "Load",
+    color: "#A855F7",
+    group: "consumption",
+  },
 ];
+const SOC_SELECTED_INFO_CONFIG = {
+  key: "soc",
+  labelKey: "soc",
+  label: "SoC",
+  color: "#FACC15",
+};
+const SELECTED_INFO_PRIMARY_KEYS = ["production", "grid", "battery", "load"];
+const SOC_FIELD_KEYS = [
+  "soc",
+  "SoC",
+  "SOC",
+  "batterySoc",
+  "battery_soc",
+  "stateOfCharge",
+  "state_of_charge",
+  "batteryStateOfCharge",
+];
+const GENERIC_PERCENT_FIELD_KEYS = ["percent", "percentage"];
+const SELECTED_PERCENT_FIELD_KEYS = {
+  production: [
+    "pvPercent",
+    "pvPercentage",
+    "productionPercent",
+    "productionPercentage",
+  ],
+  grid: ["gridPercent", "gridPercentage"],
+  battery: ["batteryPercent", "batteryPercentage"],
+  load: ["loadPercent", "loadPercentage", "consumptionPercent"],
+  pvGenerate: ["pvGeneratePercent", "pvGeneratePercentage"],
+  export: ["exportPercent", "exportPercentage"],
+  charge: ["chargePercent", "chargePercentage"],
+  soc: ["socPercent", "socPercentage", ...SOC_FIELD_KEYS],
+};
+const SELECTED_PERCENT_CATEGORY_KEYS = {
+  pv: ["production"],
+  grid: ["grid"],
+  battery: ["battery"],
+  load: ["load"],
+};
 const getPowerSeriesLabel = (item, t) => t(item?.labelKey) || item?.label || "";
+function getSelectedInfoConfig() {
+  const primaryItems = SELECTED_INFO_PRIMARY_KEYS.map((key) =>
+    POWER_SERIES_CONFIG.find((item) => item.key === key),
+  ).filter(Boolean);
+  const primaryKeySet = new Set(SELECTED_INFO_PRIMARY_KEYS);
+  const extraItems = POWER_SERIES_CONFIG.filter(
+    (item) => !primaryKeySet.has(item.key),
+  );
+
+  return [...primaryItems, ...extraItems, SOC_SELECTED_INFO_CONFIG];
+}
 const OVERVIEW_CHART_SWITCH_STORAGE_KEY = "overviewChartSwitchSettings";
 const getDefaultVisiblePowerSeries = () =>
   POWER_SERIES_CONFIG.reduce((items, item) => {
     items[item.key] = true;
     return items;
   }, {});
-const MENU_TOP_OFFSET = 58;
+const MENU_TOP_OFFSET = 20;
 const MENU_RIGHT_OFFSET = 24;
 
 // Data/source khusus untuk PowerFlowDiagram bawah.
@@ -646,7 +733,9 @@ function getBatteryPointerCoordinates(
   const finalEndY =
     config.verticalLineLength == null
       ? endY
-      : bendY - config.verticalLineLength * scale + (config.lineEndOffsetY || 0) * scale;
+      : bendY -
+        config.verticalLineLength * scale +
+        (config.lineEndOffsetY || 0) * scale;
   const firstSegmentLength = Math.hypot(bendX - startX, bendY - startY);
   const secondSegmentLength = Math.hypot(finalEndX - bendX, finalEndY - bendY);
   const totalLength = firstSegmentLength + secondSegmentLength || 1;
@@ -810,8 +899,7 @@ function lockPointerEndpoint(coordinates, endpointRef) {
       `L ${lockedCoordinates.bendX} ${lockedCoordinates.bendY}`;
 
     if (lockedCoordinates.showEndHorizontalLine !== false) {
-      lockedCoordinates.path +=
-        ` L ${lockedCoordinates.endX} ${lockedCoordinates.endY}`;
+      lockedCoordinates.path += ` L ${lockedCoordinates.endX} ${lockedCoordinates.endY}`;
     }
   } else {
     lockedCoordinates.path =
@@ -871,7 +959,7 @@ const POWER_TYPE_ALIASES = {
 const POWER_CHART_LAYOUT = {
   paddingTop: 52,
   paddingRight: 58,
-  paddingBottom: 42,
+  paddingBottom: 62,
   paddingLeft: 46,
   axisTitleFontSize: 18,
   axisLabelFontSize: 13,
@@ -886,19 +974,26 @@ const POWER_CHART_LAYOUT = {
   switchMarginTop: 10,
 };
 const POWER_CHART_Y_RANGE = {
-  minKw: -6,
+  minKw: -8,
   maxKw: 8,
-  leftTicks: [8, 6, 4, 2, 0, -2, -4, -6],
+  leftTicks: [8, 6, 4, 2, 0, -2, -4, -6, -8],
 };
 const POWER_CHART_MONTH_Y_RANGE = {
-  minMwh: -1.5,
-  maxMwh: 1.5,
-  leftTicks: [1.5, 1, 0.5, 0, -0.5, -1, -1.5],
+  minY: -100,
+  maxY: 100,
+  leftTicks: [100, 75, 50, 25, 0, -25, -50, -75, -100],
 };
+const POWER_CHART_AGGREGATE_UNIT_FALLBACK = "kWh";
 const POWER_CHART_TIME_TICKS = [0, 3, 6, 9, 12, 15, 18, 21, 24];
 const POWER_CHART_MONTH_X_TICKS = [
   1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31,
 ];
+const POWER_CHART_YEAR_Y_RANGE = {
+  minY: -300,
+  maxY: 300,
+  leftTicks: [300, 225, 150, 75, 0, -75, -150, -225, -300],
+};
+const POWER_CHART_YEAR_X_TICKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const POWER_CHART_MARKER = {
   color: "#F8FAFC",
   lineColor: "rgba(248,250,252,0.82)",
@@ -1082,6 +1177,135 @@ function pickObjectValueByAliases(source, aliases) {
   )?.[1];
 }
 
+function getNullableNumber(value) {
+  const number = Number(value);
+
+  return Number.isFinite(number) ? number : null;
+}
+
+function getKeyValueRecordNumber(source, fieldNames) {
+  if (!source || typeof source !== "object" || Array.isArray(source)) {
+    return null;
+  }
+
+  const fieldKey = pickValue(
+    source.key,
+    source.name,
+    source.param,
+    source.parameter,
+    source.type,
+    source.label,
+  );
+
+  if (!matchesApiText(fieldKey, fieldNames)) {
+    return null;
+  }
+
+  return getNullableNumber(
+    pickValue(source.value, source.data, source.reading, source.percent),
+  );
+}
+
+function findFirstNumberByFieldNames(source, fieldNames, visited = new Set()) {
+  if (!source) {
+    return null;
+  }
+
+  if (Array.isArray(source)) {
+    for (const item of source) {
+      const value = findFirstNumberByFieldNames(item, fieldNames, visited);
+
+      if (value !== null) {
+        return value;
+      }
+    }
+
+    return null;
+  }
+
+  if (typeof source !== "object") {
+    return null;
+  }
+
+  if (visited.has(source)) {
+    return null;
+  }
+
+  visited.add(source);
+
+  const recordValue = getKeyValueRecordNumber(source, fieldNames);
+
+  if (recordValue !== null) {
+    return recordValue;
+  }
+
+  const directValue = pickObjectValueByAliases(source, fieldNames);
+  const directNumber = getNullableNumber(directValue);
+
+  if (directNumber !== null) {
+    return directNumber;
+  }
+
+  for (const value of Object.values(source)) {
+    const nestedNumber = findFirstNumberByFieldNames(
+      value,
+      fieldNames,
+      visited,
+    );
+
+    if (nestedNumber !== null) {
+      return nestedNumber;
+    }
+  }
+
+  return null;
+}
+
+function getBackendSocValue(sources) {
+  return findFirstNumberByFieldNames(sources, SOC_FIELD_KEYS);
+}
+
+function getBackendSelectedPercentages(sources, latestResults, latestRequests) {
+  const percentages = Object.entries(SELECTED_PERCENT_FIELD_KEYS).reduce(
+    (items, [key, fieldNames]) => {
+      const value = findFirstNumberByFieldNames(sources, fieldNames);
+
+      if (value !== null) {
+        items[key] = value;
+      }
+
+      return items;
+    },
+    {},
+  );
+
+  latestResults.forEach((result, index) => {
+    const category = latestRequests[index]?.sourceCategory;
+    const targetKeys = SELECTED_PERCENT_CATEGORY_KEYS[category] ?? [];
+
+    if (!targetKeys.length) {
+      return;
+    }
+
+    const value = findFirstNumberByFieldNames(
+      result?.json,
+      GENERIC_PERCENT_FIELD_KEYS,
+    );
+
+    if (value === null) {
+      return;
+    }
+
+    targetKeys.forEach((key) => {
+      if (percentages[key] === undefined) {
+        percentages[key] = value;
+      }
+    });
+  });
+
+  return percentages;
+}
+
 function normalizeRouteParam(value) {
   if (Array.isArray(value)) {
     return normalizeRouteParam(value[0]);
@@ -1161,6 +1385,10 @@ function getYearRange(selectedYear) {
   const safeYear = Number.isFinite(year) ? year : getJakartaDateParts().year;
 
   return Array.from({ length: 5 }, (_, index) => safeYear - 3 + index);
+}
+
+function getChartApiSegment(segment) {
+  return segment === "lifetime" ? "year" : segment;
 }
 
 function getResponsiveChartWidth(windowWidth) {
@@ -1296,7 +1524,11 @@ async function fetchGoogleWeatherForPlant({
   }
 
   const weatherResponse = await fetch(
-    buildGoogleWeatherEndpoint(resolvedLatitude, resolvedLongitude, languageCode),
+    buildGoogleWeatherEndpoint(
+      resolvedLatitude,
+      resolvedLongitude,
+      languageCode,
+    ),
   );
   const weatherJson = await weatherResponse.json().catch(() => null);
 
@@ -1465,10 +1697,11 @@ function parseChartTimestamp(rawTimestamp) {
   );
 
   if (localMatch) {
-    const [, year, month, day, hour, minute, second = "0", millisecond = "0"] =
-      localMatch;
+  const [, year, month, day, hour, minute, second = "0", millisecond = "0"] =
+    localMatch;
 
-    return new Date(
+  return new Date(
+    Date.UTC(
       Number(year),
       Number(month) - 1,
       Number(day),
@@ -1476,8 +1709,9 @@ function parseChartTimestamp(rawTimestamp) {
       Number(minute),
       Number(second),
       Number(millisecond.padEnd(3, "0")),
-    );
-  }
+    ),
+  );
+}
 
   const timezoneMatch = normalizedText.match(
     /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?(?:\.(\d{1,3}))?(Z|([+-])(\d{2}):?(\d{2}))$/,
@@ -1808,34 +2042,50 @@ function getLatestEnergyValues(latestResults) {
   return normalizeLatestEnergyValues(resultWithEnergy?.json);
 }
 
+function getAggregateItemValue(row, key) {
+  const valueKey = key === "production" ? "pv" : key;
+  const rawValue = row?.[valueKey];
+
+  if (rawValue === undefined || rawValue === null || rawValue === "") {
+    return key === "load" ? 0 : null;
+  }
+
+  const value = Number(rawValue);
+
+  return Number.isFinite(value) ? Math.abs(value) : null;
+}
+
+function getChartDataUnit(data, row = null) {
+  const unit = pickValue(
+    row?.unit,
+    data?.unit,
+    POWER_CHART_AGGREGATE_UNIT_FALLBACK,
+  );
+  const unitText = String(unit || "").trim();
+
+  return unitText || POWER_CHART_AGGREGATE_UNIT_FALLBACK;
+}
+
 function normalizeChartSeries(data) {
   if (Array.isArray(data?.items)) {
     return POWER_SERIES_CONFIG.reduce((series, item) => {
       series[item.key] = data.items
         .map((row) => {
-          const valueKey = item.key === "production" ? "pv" : item.key;
-          const rawValue =
-            item.key === "charge"
-              ? getChargeChartValue(row?.charge, row?.battery)
-              : row?.[valueKey];
-          const value =
-            item.key === "battery" || item.key === "charge"
-              ? splitBatteryChargeValue(rawValue, item.key)
-              : Number(rawValue);
+          const value = getAggregateItemValue(row, item.key);
 
-          if (!Number.isFinite(value)) {
+          if (value === null) {
             return null;
           }
 
           return {
-            value: Math.abs(value),
+            value,
             day: row?.day,
             month: row?.month,
             year: row?.year,
             label: row?.label,
             date: row?.date,
             source: data?.source,
-            unit: data?.unit,
+            unit: getChartDataUnit(data, row),
           };
         })
         .filter(Boolean);
@@ -1849,11 +2099,7 @@ function normalizeChartSeries(data) {
     grid: normalizeSeriesRows(data?.grid),
     battery: splitBatteryChargeSeries(data?.battery, "battery"),
     pvGenerate: normalizeSeriesRows(data?.pvGenerate),
-    export: normalizeSeriesRows(data?.export),
-    charge: mergeSeriesRows(
-      splitBatteryChargeSeries(data?.charge, "charge"),
-      splitBatteryChargeSeries(data?.battery, "charge"),
-    ),
+    load: normalizeSeriesRows(data?.load),
   };
   const hasDirectSeries = hasChartSeriesRows(directSeries);
   const production = getApiSeries(data, "pv", "chargePower");
@@ -2018,13 +2264,17 @@ function getDeviceLatestSources(device) {
 
 function getDevicePowerValues(device) {
   return mergePowerValues(
-    ...getDeviceLatestSources(device).map((source) => normalizePowerValues(source)),
+    ...getDeviceLatestSources(device).map((source) =>
+      normalizePowerValues(source),
+    ),
   );
 }
 
 function getDevicesAggregatePowerValues(devices) {
   return sumPowerValues(
-    ...normalizeDeviceList(devices).map((device) => getDevicePowerValues(device)),
+    ...normalizeDeviceList(devices).map((device) =>
+      getDevicePowerValues(device),
+    ),
   );
 }
 
@@ -2107,13 +2357,20 @@ function createDemoChartRow(value, dateFields) {
   };
 }
 
-function buildDemoChartSeries(segment, selectedDay, selectedMonth, selectedYear, yearRange) {
+function buildDemoChartSeries(
+  segment,
+  selectedDay,
+  selectedMonth,
+  selectedYear,
+  yearRange,
+) {
   const series = createEmptyChartSeries();
 
-  if (segment === "year") {
-    const years = Array.isArray(yearRange) && yearRange.length
-      ? yearRange
-      : getYearRange(selectedYear);
+  if (segment === "lifetime") {
+    const years =
+      Array.isArray(yearRange) && yearRange.length
+        ? yearRange
+        : getYearRange(selectedYear);
 
     POWER_SERIES_CONFIG.forEach((item, itemIndex) => {
       series[item.key] = years.map((year, index) => {
@@ -2129,6 +2386,24 @@ function buildDemoChartSeries(segment, selectedDay, selectedMonth, selectedYear,
     return series;
   }
 
+  if (segment === "year") {
+    POWER_SERIES_CONFIG.forEach((item, itemIndex) => {
+      series[item.key] = POWER_CHART_YEAR_X_TICKS.map((month) => {
+        const base = Math.max(0, Number(DEMO_POWER_VALUES[item.key] || 0));
+        const monthlyShape = 0.82 + 0.18 * Math.sin((month / 12) * Math.PI);
+        const factor = monthlyShape + itemIndex * 0.01;
+        return createDemoChartRow(base * 30 * factor, {
+          month,
+          year: selectedYear,
+          label: String(month),
+          date: `${selectedYear}-${String(month).padStart(2, "0")}`,
+        });
+      });
+    });
+
+    return series;
+  }
+
   if (segment === "month") {
     const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
 
@@ -2136,7 +2411,8 @@ function buildDemoChartSeries(segment, selectedDay, selectedMonth, selectedYear,
       series[item.key] = Array.from({ length: daysInMonth }, (_, index) => {
         const day = index + 1;
         const base = Math.max(0, Number(DEMO_POWER_VALUES[item.key] || 0));
-        const dailyShape = 0.72 + 0.22 * Math.sin((day / daysInMonth) * Math.PI);
+        const dailyShape =
+          0.72 + 0.22 * Math.sin((day / daysInMonth) * Math.PI);
         return createDemoChartRow(base * dailyShape * (1 + itemIndex * 0.01), {
           day,
           month: selectedMonth,
@@ -2152,9 +2428,8 @@ function buildDemoChartSeries(segment, selectedDay, selectedMonth, selectedYear,
   POWER_SERIES_CONFIG.forEach((item, itemIndex) => {
     series[item.key] = Array.from({ length: 24 }, (_, hour) => {
       const base = Math.max(0, Number(DEMO_POWER_VALUES[item.key] || 0));
-      const daylight = hour >= 6 && hour <= 18
-        ? Math.sin(((hour - 6) / 12) * Math.PI)
-        : 0.15;
+      const daylight =
+        hour >= 6 && hour <= 18 ? Math.sin(((hour - 6) / 12) * Math.PI) : 0.15;
       const value = base * Math.max(0.08, daylight + itemIndex * 0.015);
 
       return createDemoChartRow(value, {
@@ -2191,6 +2466,7 @@ function buildYearRangeChartSeries(chartResults, yearRange) {
         value: aggregateSeriesRows(normalizedSeries[item.key], year),
         year,
         label: String(year),
+        unit: getChartDataUnit(chartResult?.json?.data),
       };
     });
 
@@ -2491,15 +2767,16 @@ function buildChartEndpoint(
   selectedYear,
   dataSourceDeviceId = null,
 ) {
+  const apiSegment = getChartApiSegment(segment);
   const date = getChartRequestDate(
-    segment,
+    apiSegment,
     selectedDay,
     selectedMonth,
     selectedYear,
   );
   const params = {
     plantId: String(plantId),
-    segment,
+    segment: apiSegment,
     device_id: dataSourceDeviceId,
     deviceId: dataSourceDeviceId,
   };
@@ -2508,7 +2785,7 @@ function buildChartEndpoint(
     params.date = date;
   }
 
-  if (segment === "month") {
+  if (apiSegment === "month") {
     return `${BASE_URL}/api/data/chart/monthly?${buildQueryString({
       plantId: String(plantId),
       month: date,
@@ -2517,7 +2794,7 @@ function buildChartEndpoint(
     })}`;
   }
 
-  if (segment === "year") {
+  if (apiSegment === "year") {
     return `${BASE_URL}/api/data/chart/yearly?${buildQueryString({
       plantId: String(plantId),
       year: date,
@@ -2618,17 +2895,35 @@ function getMonthTickDays(selectedYear, selectedMonth) {
   return POWER_CHART_MONTH_X_TICKS.filter((day) => day <= daysInMonth);
 }
 
-function getAggregateTickValues(segment, selectedYear, selectedMonth, yearRange = []) {
-  if (segment === "year") {
+function getAggregateTickValues(
+  segment,
+  selectedYear,
+  selectedMonth,
+  yearRange = [],
+) {
+  if (segment === "lifetime") {
     return yearRange.length ? yearRange : getYearRange(selectedYear);
+  }
+
+  if (segment === "year") {
+    return POWER_CHART_YEAR_X_TICKS;
   }
 
   return getMonthTickDays(selectedYear, selectedMonth);
 }
 
-function getAggregateItemCount(segment, selectedYear, selectedMonth, yearRange = []) {
-  if (segment === "year") {
+function getAggregateItemCount(
+  segment,
+  selectedYear,
+  selectedMonth,
+  yearRange = [],
+) {
+  if (segment === "lifetime") {
     return (yearRange.length ? yearRange : getYearRange(selectedYear)).length;
+  }
+
+  if (segment === "year") {
+    return POWER_CHART_YEAR_X_TICKS.length;
   }
 
   return new Date(selectedYear, selectedMonth, 0).getDate();
@@ -2642,14 +2937,11 @@ function getAggregateRecordIndex(
   selectedMonth,
   yearRange = [],
 ) {
-  if (segment === "year") {
+  if (segment === "lifetime") {
     const years = yearRange.length ? yearRange : getYearRange(selectedYear);
     const explicitYear = Number(pickValue(record?.year, record?.label));
 
-    if (
-      Number.isFinite(explicitYear) &&
-      years.includes(explicitYear)
-    ) {
+    if (Number.isFinite(explicitYear) && years.includes(explicitYear)) {
       return years.indexOf(explicitYear);
     }
 
@@ -2662,13 +2954,49 @@ function getAggregateRecordIndex(
     return fallbackIndex;
   }
 
+  if (segment === "year") {
+    const monthValue = pickValue(
+      record?.month,
+      record?.dateMonth,
+      record?.label,
+    );
+    const explicitMonth = Number(monthValue);
+
+    if (
+      Number.isFinite(explicitMonth) &&
+      explicitMonth >= 1 &&
+      explicitMonth <= 12
+    ) {
+      return explicitMonth - 1;
+    }
+
+    const yearMonthMatch = String(monthValue ?? "").match(
+      /^(\d{4})-(\d{1,2})$/,
+    );
+    const yearMonthNumber = Number(yearMonthMatch?.[2]);
+
+    if (
+      yearMonthMatch &&
+      Number(yearMonthMatch[1]) === selectedYear &&
+      Number.isFinite(yearMonthNumber) &&
+      yearMonthNumber >= 1 &&
+      yearMonthNumber <= 12
+    ) {
+      return yearMonthNumber - 1;
+    }
+
+    const parsedDate = parseChartTimestamp(getRecordTimestampText(record));
+
+    if (parsedDate && parsedDate.getFullYear() === selectedYear) {
+      return parsedDate.getMonth();
+    }
+
+    return fallbackIndex;
+  }
+
   const explicitDay = Number(pickValue(record?.day, record?.dateDay));
 
-  if (
-    Number.isFinite(explicitDay) &&
-    explicitDay >= 1 &&
-    explicitDay <= 31
-  ) {
+  if (Number.isFinite(explicitDay) && explicitDay >= 1 && explicitDay <= 31) {
     return explicitDay - 1;
   }
 
@@ -2737,6 +3065,101 @@ function buildAggregateChartStacks(
   };
 }
 
+function getAggregateChartUnit(series) {
+  for (const item of POWER_SERIES_CONFIG) {
+    const rows = normalizeSeriesRows(series?.[item.key]);
+    const rowWithUnit = rows.find(
+      (row) => typeof row?.unit === "string" && row.unit.trim(),
+    );
+
+    if (rowWithUnit) {
+      return rowWithUnit.unit.trim();
+    }
+  }
+
+  return POWER_CHART_AGGREGATE_UNIT_FALLBACK;
+}
+
+function roundUpAggregateRangeLimit(value) {
+  const safeValue = Math.abs(Number(value) || 0);
+
+  if (safeValue <= 0) {
+    return POWER_CHART_MONTH_Y_RANGE.maxY;
+  }
+
+  const paddedValue = safeValue * 1.12;
+  const magnitude = 10 ** Math.floor(Math.log10(paddedValue));
+  const normalizedValue = paddedValue / magnitude;
+  const niceValue =
+    normalizedValue <= 1
+      ? 1
+      : normalizedValue <= 1.5
+        ? 1.5
+        : normalizedValue <= 2
+          ? 2
+          : normalizedValue <= 3
+            ? 3
+            : normalizedValue <= 5
+              ? 5
+              : normalizedValue <= 7.5
+                ? 7.5
+                : 10;
+
+  return niceValue * magnitude;
+}
+
+function buildRangeTicks(minY, maxY) {
+  const range = maxY - minY;
+
+  if (range <= 0) {
+    return POWER_CHART_MONTH_Y_RANGE.leftTicks;
+  }
+
+  return [
+    maxY,
+    (maxY * 2) / 3,
+    maxY / 3,
+    0,
+    minY / 3,
+    (minY * 2) / 3,
+    minY,
+  ].map((tick) => (Math.abs(tick) < 1e-9 ? 0 : tick));
+}
+
+function getAggregateChartRange(
+  aggregateStacks,
+  activeConsumptionDatasets,
+  activeProductionDatasets,
+) {
+  let maxPositiveStack = 0;
+  let maxNegativeStack = 0;
+
+  Array.from({ length: aggregateStacks.itemCount }, (_, index) => {
+    const positiveStack = activeConsumptionDatasets.reduce(
+      (sum, item) =>
+        sum + Math.abs(Number(aggregateStacks.values[item.key]?.[index]) || 0),
+      0,
+    );
+    const negativeStack = activeProductionDatasets.reduce(
+      (sum, item) =>
+        sum + Math.abs(Number(aggregateStacks.values[item.key]?.[index]) || 0),
+      0,
+    );
+
+    maxPositiveStack = Math.max(maxPositiveStack, positiveStack);
+    maxNegativeStack = Math.max(maxNegativeStack, negativeStack);
+  });
+
+  const maxY = roundUpAggregateRangeLimit(maxPositiveStack);
+  const minY = -roundUpAggregateRangeLimit(maxNegativeStack);
+
+  return {
+    minY,
+    maxY,
+    leftTicks: buildRangeTicks(minY, maxY),
+  };
+}
+
 function clampSelectedIndex(index, maxIndex) {
   const safeMaxIndex = Math.max(0, Number(maxIndex) || 0);
   const safeIndex = Number(index);
@@ -2753,75 +3176,21 @@ function getSeriesMaxIndex(
   segment,
   selectedYear,
   selectedMonth,
-  dayTimeline = null,
   yearRange = [],
 ) {
-  if (segment === "month" || segment === "year") {
+  if (segment === "month" || segment === "year" || segment === "lifetime") {
     return Math.max(
       0,
-      getAggregateItemCount(segment, selectedYear, selectedMonth, yearRange) - 1,
+      getAggregateItemCount(segment, selectedYear, selectedMonth, yearRange) -
+        1,
     );
   }
 
-  const timeline = dayTimeline ?? buildDayChartTimeline(series);
-
-  if (timeline.length) {
-    return Math.max(0, timeline.length - 1);
+  if (segment === "day") {
+    return 287;
   }
 
-  const maxLength = POWER_SERIES_CONFIG.reduce((length, item) => {
-    const seriesLength = normalizeSeriesRows(series?.[item.key]).length;
-    return Math.max(length, seriesLength);
-  }, 0);
-
-  return Math.max(0, maxLength - 1);
-}
-
-function buildDayChartTimeline(series) {
-  const timestamps = new Map();
-  let fallbackLength = 0;
-
-  POWER_SERIES_CONFIG.forEach((item) => {
-    const rows = normalizeSeriesRows(series?.[item.key]);
-    fallbackLength = Math.max(fallbackLength, rows.length);
-
-    rows.forEach((row) => {
-      const timestamp = getRecordTimestampValue(row);
-
-      if (timestamp !== null) {
-        timestamps.set(timestamp, { timestamp });
-      }
-    });
-  });
-
-  const sortedTimeline = Array.from(timestamps.values()).sort(
-    (left, right) => left.timestamp - right.timestamp,
-  );
-
-  if (sortedTimeline.length) {
-    return sortedTimeline;
-  }
-
-  return Array.from({ length: fallbackLength }, (_, index) => ({
-    timestamp: null,
-    fallbackIndex: index,
-  }));
-}
-
-function getTimeRatioFromTimestamp(timestamp) {
-  const date = new Date(timestamp);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  const ratio =
-    (date.getHours() +
-      date.getMinutes() / 60 +
-      date.getSeconds() / 3600) /
-    24;
-
-  return Math.min(Math.max(ratio, 0), 1);
+  return 0;
 }
 
 function getDefaultChartSelectedIndex(
@@ -2830,7 +3199,6 @@ function getDefaultChartSelectedIndex(
   selectedYear,
   selectedMonth,
   currentTime,
-  dayTimeline = [],
   yearRange = [],
 ) {
   if (maxIndex <= 0) {
@@ -2848,6 +3216,14 @@ function getDefaultChartSelectedIndex(
   }
 
   if (segment === "year") {
+    if (selectedYear === now.year) {
+      return clampSelectedIndex(now.month - 1, maxIndex);
+    }
+
+    return 0;
+  }
+
+  if (segment === "lifetime") {
     const years = yearRange.length ? yearRange : getYearRange(selectedYear);
     const selectedYearIndex = years.indexOf(selectedYear);
 
@@ -2856,80 +3232,21 @@ function getDefaultChartSelectedIndex(
       : 0;
   }
 
-  if (dayTimeline.length) {
-    const currentTimestamp = currentTime.getTime();
-    let nearestIndex = 0;
-    let nearestDistance = Infinity;
+  const totalMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
 
-    dayTimeline.forEach((item, index) => {
-      if (item.timestamp === null) {
-        return;
-      }
+  const slotIndex = Math.floor(totalMinutes / 5);
 
-      const distance = Math.abs(item.timestamp - currentTimestamp);
-
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestIndex = index;
-      }
-    });
-
-    if (Number.isFinite(nearestDistance)) {
-      return clampSelectedIndex(nearestIndex, maxIndex);
-    }
-  }
-
-  const hourProgress =
-    currentTime.getHours() / 24 +
-    currentTime.getMinutes() / 1440 +
-    currentTime.getSeconds() / 86400;
-
-  return clampSelectedIndex(hourProgress * maxIndex, maxIndex);
+  return clampSelectedIndex(slotIndex, maxIndex);
 }
-
-function getSelectedIndexFromX(
-  x,
-  pad,
-  innerWidth,
-  maxIndex,
-  segment = "day",
-  dayTimeline = [],
-) {
+function getSelectedIndexFromX(x, pad, innerWidth, maxIndex, segment = "day") {
   if (!Number.isFinite(x) || innerWidth <= 0 || maxIndex <= 0) {
     return 0;
   }
 
   const progress = Math.min(Math.max((x - pad.left) / innerWidth, 0), 1);
 
-  if (segment === "month" || segment === "year") {
+  if (segment === "month" || segment === "year" || segment === "lifetime") {
     return clampSelectedIndex(progress * (maxIndex + 1) - 0.5, maxIndex);
-  }
-
-  if (dayTimeline.length) {
-    let nearestIndex = 0;
-    let nearestDistance = Infinity;
-
-    dayTimeline.forEach((item, index) => {
-      const ratio =
-        item.timestamp !== null
-          ? getTimeRatioFromTimestamp(item.timestamp)
-          : maxIndex <= 0
-            ? 0
-            : index / maxIndex;
-
-      if (ratio === null) {
-        return;
-      }
-
-      const distance = Math.abs(ratio - progress);
-
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestIndex = index;
-      }
-    });
-
-    return clampSelectedIndex(nearestIndex, maxIndex);
   }
 
   return clampSelectedIndex(progress * maxIndex, maxIndex);
@@ -2941,7 +3258,6 @@ function getSelectedMarkerX(
   innerWidth,
   maxIndex,
   segment = "day",
-  dayTimeline = [],
 ) {
   if (innerWidth <= 0 || maxIndex <= 0) {
     return pad.left;
@@ -2949,71 +3265,55 @@ function getSelectedMarkerX(
 
   const safeIndex = clampSelectedIndex(selectedIndex, maxIndex);
 
-  if (segment === "month" || segment === "year") {
+  if (segment === "month" || segment === "year" || segment === "lifetime") {
     return pad.left + ((safeIndex + 0.5) / (maxIndex + 1)) * innerWidth;
-  }
-
-  const timelineItem = dayTimeline[safeIndex];
-  const timeRatio =
-    timelineItem?.timestamp !== null && timelineItem?.timestamp !== undefined
-      ? getTimeRatioFromTimestamp(timelineItem.timestamp)
-      : null;
-
-  if (timeRatio !== null) {
-    return pad.left + timeRatio * innerWidth;
   }
 
   return pad.left + (safeIndex / maxIndex) * innerWidth;
 }
 
-function getDaySeriesRecordAtIndex(
-  rows,
-  selectedIndex,
-  maxIndex,
-  dayTimeline = [],
-) {
+function getDaySeriesRecordAtIndex(rows, selectedIndex, maxIndex) {
   const normalizedRows = normalizeSeriesRows(rows);
 
   if (!normalizedRows.length) {
     return null;
   }
 
-  const timelineItem = dayTimeline[clampSelectedIndex(selectedIndex, maxIndex)];
-
-  if (timelineItem?.timestamp !== null && timelineItem?.timestamp !== undefined) {
-    let nearestRecord = null;
-    let nearestDistance = Infinity;
-
-    normalizedRows.forEach((row) => {
+  const selectedSlotIndex = clampSelectedIndex(selectedIndex, maxIndex);
+  const timestampedRows = normalizedRows
+    .map((row) => {
       const rowTimestamp = getRecordTimestampValue(row);
 
       if (rowTimestamp === null) {
-        return;
+        return null;
       }
 
-      const distance = Math.abs(rowTimestamp - timelineItem.timestamp);
+      const rowDate = new Date(rowTimestamp);
 
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearestRecord = row;
+      if (Number.isNaN(rowDate.getTime())) {
+        return null;
       }
-    });
 
-    if (nearestRecord) {
-      return nearestRecord;
-    }
+      const rowTotalMinutes =
+        rowDate.getHours() * 60 +
+        rowDate.getMinutes() +
+        rowDate.getSeconds() / 60;
+
+      return {
+        row,
+        slotIndex: clampSelectedIndex(rowTotalMinutes / 5, maxIndex),
+      };
+    })
+    .filter(Boolean);
+
+  if (timestampedRows.length) {
+    return (
+      timestampedRows.find((item) => item.slotIndex === selectedSlotIndex)
+        ?.row ?? null
+    );
   }
 
-  if (normalizedRows.length === 1 || maxIndex <= 0) {
-    return normalizedRows[0];
-  }
-
-  const rowIndex = clampSelectedIndex(
-    (selectedIndex / maxIndex) * (normalizedRows.length - 1),
-    normalizedRows.length - 1,
-  );
-
-  return normalizedRows[rowIndex] ?? null;
+  return null;
 }
 
 function getSelectedChartValues({
@@ -3022,10 +3322,9 @@ function getSelectedChartValues({
   selectedIndex,
   maxIndex,
   aggregateStacks,
-  dayTimeline = [],
 }) {
   return POWER_SERIES_CONFIG.reduce((values, item) => {
-    if (segment === "month" || segment === "year") {
+    if (segment === "month" || segment === "year" || segment === "lifetime") {
       values[item.key] = Math.abs(
         Number(aggregateStacks.values[item.key]?.[selectedIndex]) || 0,
       );
@@ -3036,7 +3335,6 @@ function getSelectedChartValues({
       series?.[item.key],
       selectedIndex,
       maxIndex,
-      dayTimeline,
     );
     const value = getApiNumber(record);
 
@@ -3045,42 +3343,11 @@ function getSelectedChartValues({
   }, {});
 }
 
-function getSelectedDayLabel(series, selectedIndex, maxIndex, dayTimeline = []) {
-  const timelineItem = dayTimeline[clampSelectedIndex(selectedIndex, maxIndex)];
-
-  if (timelineItem?.timestamp !== null && timelineItem?.timestamp !== undefined) {
-    const parsedDate = new Date(timelineItem.timestamp);
-
-    if (!Number.isNaN(parsedDate.getTime())) {
-      return `${String(parsedDate.getHours()).padStart(2, "0")}:${String(
-        parsedDate.getMinutes(),
-      ).padStart(2, "0")}`;
-    }
-  }
-
-  for (const item of POWER_SERIES_CONFIG) {
-    const record = getDaySeriesRecordAtIndex(
-      series?.[item.key],
-      selectedIndex,
-      maxIndex,
-      dayTimeline,
-    );
-    const parsedDate = parseChartTimestamp(getRecordTimestampText(record));
-
-    if (parsedDate) {
-      return `${String(parsedDate.getHours()).padStart(2, "0")}:${String(
-        parsedDate.getMinutes(),
-      ).padStart(2, "0")}`;
-    }
-  }
-
-  if (maxIndex <= 0) {
-    return "00:00";
-  }
-
-  const totalMinutes = Math.round((selectedIndex / maxIndex) * 24 * 60);
-  const hour = Math.min(23, Math.floor(totalMinutes / 60));
-  const minute = totalMinutes >= 24 * 60 ? 59 : totalMinutes % 60;
+function getSelectedDayLabel(selectedIndex, maxIndex) {
+  const slotIndex = clampSelectedIndex(selectedIndex, maxIndex);
+  const totalMinutes = slotIndex * 5;
+  const hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
 
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
@@ -3088,10 +3355,8 @@ function getSelectedDayLabel(series, selectedIndex, maxIndex, dayTimeline = []) 
 function getSelectedChartLabel({
   t,
   segment,
-  series,
   selectedIndex,
   maxIndex,
-  dayTimeline = [],
   yearRange = [],
 }) {
   if (segment === "month") {
@@ -3099,26 +3364,19 @@ function getSelectedChartLabel({
   }
 
   if (segment === "year") {
-    const years = yearRange.length ? yearRange : getYearRange(new Date().getFullYear());
+    return String(selectedIndex + 1);
+  }
+
+  if (segment === "lifetime") {
+    const years = yearRange.length
+      ? yearRange
+      : getYearRange(new Date().getFullYear());
     const label = years[selectedIndex];
 
     return label ? String(label) : String(selectedIndex + 1);
   }
 
-  return getSelectedDayLabel(series, selectedIndex, maxIndex, dayTimeline);
-}
-
-function getSafePercent(value, total) {
-  const safeValue = Math.abs(Number(value) || 0);
-  const safeTotal = Math.abs(Number(total) || 0);
-
-  if (!safeTotal) {
-    return 0;
-  }
-
-  const percent = (safeValue / safeTotal) * 100;
-
-  return Number.isFinite(percent) ? percent : 0;
+  return getSelectedDayLabel(selectedIndex, maxIndex);
 }
 
 function formatSelectedChartValue(value, unit) {
@@ -3135,10 +3393,20 @@ function formatSelectedChartPercent(value) {
   const number = Number(value);
 
   if (!Number.isFinite(number)) {
-    return "0.0";
+    return "--";
   }
 
   return number.toFixed(1);
+}
+
+function formatSocPercentValue(value) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number)) {
+    return "--";
+  }
+
+  return `${Number.isInteger(number) ? number.toFixed(0) : number.toFixed(1)}%`;
 }
 
 function getSelectedDateText(selectedDay, selectedMonth, selectedYear) {
@@ -3298,17 +3566,28 @@ function DailyOverviewChart({
   selectedMonth = 1,
   selectedYear = new Date().getFullYear(),
   yearRange = [],
+  selectedDataPercentages = {},
+  socValue = null,
 }) {
   const { colors, t, themeMode } = useAppSettings();
   const isLightMode = themeMode === "light";
   const chartTextColor = isLightMode ? colors.text : appColors.text;
-  const chartMutedColor = isLightMode ? colors.textMuted : "rgba(248,250,252,0.52)";
-  const chartGridColor = isLightMode ? "rgba(8,174,234,0.18)" : "rgba(248,250,252,0.12)";
-  const chartSubGridColor = isLightMode ? "rgba(8,174,234,0.12)" : "rgba(248,250,252,0.1)";
-  const chartStrongLineColor = isLightMode ? colors.text : "rgba(248,250,252,0.42)";
+  const chartMutedColor = isLightMode
+    ? colors.textMuted
+    : "rgba(248,250,252,0.52)";
+  const chartGridColor = isLightMode
+    ? "rgba(8,174,234,0.18)"
+    : "rgba(248,250,252,0.12)";
+  const chartSubGridColor = isLightMode
+    ? "rgba(8,174,234,0.12)"
+    : "rgba(248,250,252,0.1)";
+  const chartStrongLineColor = isLightMode
+    ? colors.text
+    : "rgba(248,250,252,0.42)";
   const isCompactChart = chartWidth < 320;
   const isLandscapeMode = mode === "landscape";
-  const isAggregateSegment = segment === "month" || segment === "year";
+  const isAggregateSegment =
+    segment === "month" || segment === "year" || segment === "lifetime";
   const pad = {
     top: isLandscapeMode
       ? LANDSCAPE_CHART_LAYOUT.axisTopPadding
@@ -3329,15 +3608,6 @@ function DailyOverviewChart({
         ? 40
         : POWER_CHART_LAYOUT.paddingLeft,
   };
-  const yTicks = isAggregateSegment
-    ? POWER_CHART_MONTH_Y_RANGE.leftTicks
-    : POWER_CHART_Y_RANGE.leftTicks;
-  const minY = isAggregateSegment
-    ? POWER_CHART_MONTH_Y_RANGE.minMwh
-    : POWER_CHART_Y_RANGE.minKw;
-  const maxY = isAggregateSegment
-    ? POWER_CHART_MONTH_Y_RANGE.maxMwh
-    : POWER_CHART_Y_RANGE.maxKw;
   const innerWidth = Math.max(0, chartWidth - pad.left - pad.right);
   const innerHeight = chartHeight - pad.top - pad.bottom;
   const timeTicks = getResponsiveChartTimeTicks(innerWidth);
@@ -3354,13 +3624,11 @@ function DailyOverviewChart({
     selectedMonth,
     yearRange,
   );
-  const dayTimeline = useMemo(() => buildDayChartTimeline(series), [series]);
   const selectedMaxIndex = getSeriesMaxIndex(
     series,
     segment,
     selectedYear,
     selectedMonth,
-    dayTimeline,
     yearRange,
   );
   const [selectedIndex, setSelectedIndex] = useState(() =>
@@ -3370,7 +3638,6 @@ function DailyOverviewChart({
       selectedYear,
       selectedMonth,
       currentTime,
-      dayTimeline,
       yearRange,
     ),
   );
@@ -3381,7 +3648,6 @@ function DailyOverviewChart({
     selectedYear,
     selectedMonth,
     currentTime,
-    dayTimeline,
     yearRange,
   );
   const chartIdleTimerRef = useRef(null);
@@ -3391,7 +3657,6 @@ function DailyOverviewChart({
   latestDefaultIndexRef.current = selectedDefaultIndex;
   latestMaxIndexRef.current = selectedMaxIndex;
   const chartGesturePad = useMemo(() => ({ left: pad.left }), [pad.left]);
-  const zeroY = pad.top + ((maxY - 0) / (maxY - minY)) * innerHeight;
   const barWidth = Math.max(
     4,
     Math.min(14, innerWidth / Math.max(aggregateStacks.itemCount * 2.4, 1)),
@@ -3409,7 +3674,6 @@ function DailyOverviewChart({
     innerWidth,
     selectedMaxIndex,
     segment,
-    dayTimeline,
   );
   const datasets = POWER_SERIES_CONFIG.map((item) => ({
     ...item,
@@ -3422,41 +3686,60 @@ function DailyOverviewChart({
   const activeProductionDatasets = activeDatasets.filter(
     (item) => item.group === "production",
   );
-  const selectedUnit = isAggregateSegment ? "MWh" : "kW";
+  const aggregateRange =
+  isAggregateSegment
+    ? segment === "month"
+      ? POWER_CHART_MONTH_Y_RANGE
+      : segment === "year" || segment === "lifetime"
+        ? POWER_CHART_YEAR_Y_RANGE
+        : getAggregateChartRange(
+            aggregateStacks,
+            activeConsumptionDatasets,
+            activeProductionDatasets,
+          )
+    : null;
+  const yTicks = isAggregateSegment
+    ? aggregateRange.leftTicks
+    : POWER_CHART_Y_RANGE.leftTicks;
+  const minY = isAggregateSegment
+    ? aggregateRange.minY
+    : POWER_CHART_Y_RANGE.minKw;
+  const maxY = isAggregateSegment
+    ? aggregateRange.maxY
+    : POWER_CHART_Y_RANGE.maxKw;
+  const zeroY = pad.top + ((maxY - 0) / (maxY - minY)) * innerHeight;
+  const selectedUnit = isAggregateSegment
+    ? getAggregateChartUnit(series)
+    : "kW";
   const selectedValues = getSelectedChartValues({
     series,
     segment,
     selectedIndex,
     maxIndex: selectedMaxIndex,
     aggregateStacks,
-    dayTimeline,
   });
-  const selectedTotalConsumption =
-    selectedValues.production + selectedValues.grid + selectedValues.battery;
-  const selectedTotalProduction =
-    selectedValues.pvGenerate + selectedValues.export + selectedValues.charge;
   const selectedLabel = getSelectedChartLabel({
     t,
     segment,
-    series,
     selectedIndex,
     maxIndex: selectedMaxIndex,
-    dayTimeline,
     yearRange,
   });
-  const selectedInfoRows = POWER_SERIES_CONFIG.filter(
-    (item) => visibleSeries[item.key],
-  ).map((item) => {
+  const selectedInfoRows = getSelectedInfoConfig().map((item) => {
+    if (item.key === "soc") {
+      return {
+        ...item,
+        value: socValue,
+        percent: selectedDataPercentages.soc ?? socValue,
+      };
+    }
+
     const value = selectedValues[item.key] || 0;
-    const total =
-      item.group === "production"
-        ? selectedTotalProduction
-        : selectedTotalConsumption;
 
     return {
       ...item,
       value,
-      percent: getSafePercent(value, total),
+      percent: selectedDataPercentages[item.key] ?? null,
     };
   });
   const selectedDateText = getSelectedDateText(
@@ -3513,7 +3796,9 @@ function DailyOverviewChart({
   const setSelectedIndexFromUser = useCallback(
     (nextIndex) => {
       hasManualChartSelectionRef.current = true;
-      setSelectedIndex(clampSelectedIndex(nextIndex, latestMaxIndexRef.current));
+      setSelectedIndex(
+        clampSelectedIndex(nextIndex, latestMaxIndexRef.current),
+      );
       scheduleChartIdleReturn();
     },
     [scheduleChartIdleReturn],
@@ -3531,7 +3816,6 @@ function DailyOverviewChart({
               innerWidth,
               selectedMaxIndex,
               segment,
-              dayTimeline,
             ),
           );
         },
@@ -3543,7 +3827,6 @@ function DailyOverviewChart({
               innerWidth,
               selectedMaxIndex,
               segment,
-              dayTimeline,
             ),
           );
         },
@@ -3552,7 +3835,6 @@ function DailyOverviewChart({
       }),
     [
       chartGesturePad,
-      dayTimeline,
       innerWidth,
       scheduleChartIdleReturn,
       segment,
@@ -3589,8 +3871,7 @@ function DailyOverviewChart({
 
   const getYForValue = (value) =>
     pad.top +
-    ((maxY - clampChartValue(value, minY, maxY)) / (maxY - minY)) *
-      innerHeight;
+    ((maxY - clampChartValue(value, minY, maxY)) / (maxY - minY)) * innerHeight;
   const renderMonthBarSegment = (item, dayIndex, startValue, endValue) => {
     if (startValue === endValue) {
       return null;
@@ -3598,8 +3879,7 @@ function DailyOverviewChart({
 
     const x =
       pad.left +
-      ((dayIndex + 0.5) / Math.max(aggregateStacks.itemCount, 1)) *
-        innerWidth -
+      ((dayIndex + 0.5) / Math.max(aggregateStacks.itemCount, 1)) * innerWidth -
       barWidth / 2;
     const yStart = getYForValue(startValue);
     const yEnd = getYForValue(endValue);
@@ -3624,42 +3904,41 @@ function DailyOverviewChart({
         isLandscapeMode && styles.chartLandscapeSection,
       ]}
     >
-      {showCurrentTime && (
+      {/* {showCurrentTime && (
         <Text style={[styles.chartCurrentTimeText, { color: colors.textSoft }]}>
           {currentTimeLabel}
         </Text>
-      )}
+      )} */}
 
       <View style={styles.chartCanvasWrap}>
         <Svg width={chartWidth} height={chartHeight}>
-        <Defs>
-          {datasets.map((item) => (
-            <LinearGradient
-              key={`${item.key}-gradient`}
-              id={`${item.key}Gradient${gradientSuffix}`}
-              x1="0"
-              y1="0"
-              x2="0"
-              y2="1"
-            >
-              <Stop offset="0" stopColor={item.color} stopOpacity="0.28" />
-              <Stop offset="1" stopColor={item.color} stopOpacity="0" />
-            </LinearGradient>
-          ))}
-        </Defs>
+          <Defs>
+            {datasets.map((item) => (
+              <LinearGradient
+                key={`${item.key}-gradient`}
+                id={`${item.key}Gradient${gradientSuffix}`}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <Stop offset="0" stopColor={item.color} stopOpacity="0.28" />
+                <Stop offset="1" stopColor={item.color} stopOpacity="0" />
+              </LinearGradient>
+            ))}
+          </Defs>
 
-        <SvgText
-          x={4}
-          y={26}
-          fontSize={POWER_CHART_LAYOUT.axisTitleFontSize}
-          fill={chartTextColor}
-          fontWeight="500"
-          textAnchor="start"
-        >
-          {isAggregateSegment ? "MWh" : "kW"}
-        </SvgText>
+          <SvgText
+            x={4}
+            y={26}
+            fontSize={POWER_CHART_LAYOUT.axisTitleFontSize}
+            fill={chartTextColor}
+            fontWeight="500"
+            textAnchor="start"
+          >
+            {selectedUnit}
+          </SvgText>
 
-        {!isAggregateSegment && (
           <SvgText
             x={chartWidth - 4}
             y={26}
@@ -3670,34 +3949,37 @@ function DailyOverviewChart({
           >
             {t("percentage")}
           </SvgText>
-        )}
 
-        {yTicks.map((value) => {
-          const y = pad.top + ((maxY - value) / (maxY - minY)) * innerHeight;
-          const percentage = Math.round(((value - minY) / (maxY - minY)) * 100);
+          {yTicks.map((value) => {
+            const y = pad.top + ((maxY - value) / (maxY - minY)) * innerHeight;
 
-          return (
-            <Fragment key={`chart-y-${value}`}>
-              <Line
-                x1={pad.left}
-                y1={y}
-                x2={chartWidth - pad.right}
-                y2={y}
-                stroke={chartGridColor}
-                strokeWidth="1"
-              />
+            const percentageBase = isAggregateSegment
+              ? Math.max(Math.abs(maxY), Math.abs(minY), 1)
+              : POWER_CHART_Y_RANGE.maxKw;
 
-              <SvgText
-                x={pad.left - 8}
-                y={y + 5}
-                fontSize={POWER_CHART_LAYOUT.axisLabelFontSize}
-                fill={chartMutedColor}
-                textAnchor="end"
-              >
-                {value.toFixed(1)}
-              </SvgText>
+            const percentage = Math.round((value / percentageBase) * 100);
 
-              {!isAggregateSegment && (
+            return (
+              <Fragment key={`chart-y-${value}`}>
+                <Line
+                  x1={pad.left}
+                  y1={y}
+                  x2={chartWidth - pad.right}
+                  y2={y}
+                  stroke={chartGridColor}
+                  strokeWidth="1"
+                />
+
+                <SvgText
+                  x={pad.left - 8}
+                  y={y + 5}
+                  fontSize={POWER_CHART_LAYOUT.axisLabelFontSize}
+                  fill={chartMutedColor}
+                  textAnchor="end"
+                >
+                  {value.toFixed(1)}
+                </SvgText>
+
                 <SvgText
                   x={chartWidth - pad.right + 8}
                   y={y + 5}
@@ -3707,177 +3989,186 @@ function DailyOverviewChart({
                 >
                   {percentage}%
                 </SvgText>
-              )}
-            </Fragment>
-          );
-        })}
-
-        {(isAggregateSegment ? aggregateTicks : timeTicks).map((tick, tickIndex) => {
-          const aggregateTickPosition =
-            segment === "year" ? tickIndex + 1 : tick;
-          const x = isAggregateSegment
-            ? pad.left +
-              ((aggregateTickPosition - 0.5) /
-                Math.max(aggregateStacks.itemCount, 1)) *
-                innerWidth
-            : pad.left + (tick / 24) * innerWidth;
-
-          return (
-            <Fragment key={`chart-x-${tick}`}>
-              <Line
-                x1={x}
-                y1={pad.top}
-                x2={x}
-                y2={chartHeight - pad.bottom}
-                stroke={chartSubGridColor}
-                strokeWidth="1"
-              />
-
-              <SvgText
-                x={x}
-                y={chartHeight - 12}
-                fontSize={timeLabelFontSize}
-                fill={chartMutedColor}
-                textAnchor="middle"
-              >
-                {isAggregateSegment ? tick : formatChartHour(tick)}
-              </SvgText>
-            </Fragment>
-          );
-        })}
-
-        {isAggregateSegment && (
-          <Line
-            x1={pad.left}
-            y1={zeroY}
-            x2={chartWidth - pad.right}
-            y2={zeroY}
-            stroke={chartStrongLineColor}
-            strokeWidth="1.2"
-          />
-        )}
-
-        {!isAggregateSegment && showCurrentTime && (
-          <Line
-            x1={currentTimeX}
-            y1={pad.top}
-            x2={currentTimeX}
-            y2={chartHeight - pad.bottom}
-            stroke="rgba(147,197,253,0.62)"
-            strokeWidth="1.4"
-            strokeDasharray="7 7"
-          />
-        )}
-
-        {isAggregateSegment &&
-          Array.from({ length: aggregateStacks.itemCount }, (_, dayIndex) => {
-            let positiveStack = 0;
-            let negativeStack = 0;
-
-            return (
-              <Fragment key={`month-bars-${dayIndex}`}>
-                {activeConsumptionDatasets.map((item) => {
-                  const value = Math.min(
-                    Math.abs(aggregateStacks.values[item.key]?.[dayIndex] || 0),
-                    POWER_CHART_MONTH_Y_RANGE.maxMwh - positiveStack,
-                  );
-                  const startValue = positiveStack;
-                  const endValue = positiveStack + Math.max(0, value);
-
-                  positiveStack = endValue;
-                  return renderMonthBarSegment(
-                    item,
-                    dayIndex,
-                    startValue,
-                    endValue,
-                  );
-                })}
-                {activeProductionDatasets.map((item) => {
-                  const value = Math.min(
-                    Math.abs(aggregateStacks.values[item.key]?.[dayIndex] || 0),
-                    Math.abs(POWER_CHART_MONTH_Y_RANGE.minMwh) -
-                      Math.abs(negativeStack),
-                  );
-                  const startValue = negativeStack;
-                  const endValue = negativeStack - Math.max(0, value);
-
-                  negativeStack = endValue;
-                  return renderMonthBarSegment(
-                    item,
-                    dayIndex,
-                    startValue,
-                    endValue,
-                  );
-                })}
               </Fragment>
             );
           })}
 
-        {!isAggregateSegment && activeDatasets.map((item) => (
-          <Path
-            key={`${item.key}-area`}
-            d={buildSmoothAreaPath(
-              item.data,
-              minY,
-              maxY,
-              chartWidth,
-              chartHeight,
-              pad,
-            )}
-            fill={`url(#${item.key}Gradient${gradientSuffix})`}
-          />
-        ))}
+          {(isAggregateSegment ? aggregateTicks : timeTicks).map(
+            (tick, tickIndex) => {
+              const aggregateTickPosition =
+                segment === "lifetime" ? tickIndex + 1 : tick;
+              const x = isAggregateSegment
+                ? pad.left +
+                  ((aggregateTickPosition - 0.5) /
+                    Math.max(aggregateStacks.itemCount, 1)) *
+                    innerWidth
+                : pad.left + (tick / 24) * innerWidth;
 
-        {!isAggregateSegment && activeDatasets.map((item) => (
-          <Path
-            key={`${item.key}-line`}
-            d={buildSmoothLinePath(
-              item.data,
-              minY,
-              maxY,
-              chartWidth,
-              chartHeight,
-              pad,
-            )}
-            stroke={item.color}
-            strokeWidth={POWER_CHART_LAYOUT.lineStrokeWidth}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-          />
-        ))}
+              return (
+                <Fragment key={`chart-x-${tick}`}>
+                  <Line
+                    x1={x}
+                    y1={pad.top}
+                    x2={x}
+                    y2={chartHeight - pad.bottom}
+                    stroke={chartSubGridColor}
+                    strokeWidth="1"
+                  />
 
-        {!isAggregateSegment && activeDatasets.map((item) => {
-          const point = getLatestChartPoint(
-            item.data,
-            minY,
-            maxY,
-            chartWidth,
-            chartHeight,
-            pad,
-          );
+                  <SvgText
+                    x={x}
+                    y={chartHeight - 12}
+                    fontSize={timeLabelFontSize}
+                    fill={chartMutedColor}
+                    textAnchor="middle"
+                  >
+                    {isAggregateSegment ? tick : formatChartHour(tick)}
+                  </SvgText>
+                </Fragment>
+              );
+            },
+          )}
 
-          return point ? (
-            <SvgCircle
-              key={`${item.key}-current-point`}
-              cx={point.x}
-              cy={point.y}
-              r={POWER_CHART_LAYOUT.pointRadius + 1}
-              fill={item.color}
-              stroke={isLightMode ? colors.bubble : "rgba(248,250,252,0.82)"}
-              strokeWidth="1.4"
+          {isAggregateSegment && (
+            <Line
+              x1={pad.left}
+              y1={zeroY}
+              x2={chartWidth - pad.right}
+              y2={zeroY}
+              stroke={chartStrongLineColor}
+              strokeWidth="1.2"
             />
-          ) : null;
-        })}
-        <Line
-          x1={selectedMarkerX}
-          y1={pad.top}
-          x2={selectedMarkerX}
-          y2={chartHeight - pad.bottom}
-          stroke={isLightMode ? colors.accent : POWER_CHART_MARKER.lineColor}
-          strokeWidth="1.6"
-          strokeDasharray="5 6"
-        />
+          )}
+
+          {!isAggregateSegment && showCurrentTime && (
+            <Line
+              x1={currentTimeX}
+              y1={pad.top}
+              x2={currentTimeX}
+              y2={chartHeight - pad.bottom}
+              stroke="rgba(147,197,253,0.62)"
+              strokeWidth="1.4"
+              strokeDasharray="7 7"
+            />
+          )}
+
+          {isAggregateSegment &&
+            Array.from({ length: aggregateStacks.itemCount }, (_, dayIndex) => {
+              let positiveStack = 0;
+              let negativeStack = 0;
+
+              return (
+                <Fragment key={`month-bars-${dayIndex}`}>
+                  {activeConsumptionDatasets.map((item) => {
+                    const value = Math.min(
+                      Math.abs(
+                        aggregateStacks.values[item.key]?.[dayIndex] || 0,
+                      ),
+                      Math.max(0, maxY - positiveStack),
+                    );
+                    const startValue = positiveStack;
+                    const endValue = positiveStack + Math.max(0, value);
+
+                    positiveStack = endValue;
+                    return renderMonthBarSegment(
+                      item,
+                      dayIndex,
+                      startValue,
+                      endValue,
+                    );
+                  })}
+                  {activeProductionDatasets.map((item) => {
+                    const value = Math.min(
+                      Math.abs(
+                        aggregateStacks.values[item.key]?.[dayIndex] || 0,
+                      ),
+                      Math.max(0, Math.abs(minY) - Math.abs(negativeStack)),
+                    );
+                    const startValue = negativeStack;
+                    const endValue = negativeStack - Math.max(0, value);
+
+                    negativeStack = endValue;
+                    return renderMonthBarSegment(
+                      item,
+                      dayIndex,
+                      startValue,
+                      endValue,
+                    );
+                  })}
+                </Fragment>
+              );
+            })}
+
+          {!isAggregateSegment &&
+            activeDatasets.map((item) => (
+              <Path
+                key={`${item.key}-area`}
+                d={buildSmoothAreaPath(
+                  item.data,
+                  minY,
+                  maxY,
+                  chartWidth,
+                  chartHeight,
+                  pad,
+                )}
+                fill={`url(#${item.key}Gradient${gradientSuffix})`}
+              />
+            ))}
+
+          {!isAggregateSegment &&
+            activeDatasets.map((item) => (
+              <Path
+                key={`${item.key}-line`}
+                d={buildSmoothLinePath(
+                  item.data,
+                  minY,
+                  maxY,
+                  chartWidth,
+                  chartHeight,
+                  pad,
+                )}
+                stroke={item.color}
+                strokeWidth={POWER_CHART_LAYOUT.lineStrokeWidth}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            ))}
+
+          {!isAggregateSegment &&
+            activeDatasets.map((item) => {
+              const point = getLatestChartPoint(
+                item.data,
+                minY,
+                maxY,
+                chartWidth,
+                chartHeight,
+                pad,
+              );
+
+              return point ? (
+                <SvgCircle
+                  key={`${item.key}-current-point`}
+                  cx={point.x}
+                  cy={point.y}
+                  r={POWER_CHART_LAYOUT.pointRadius + 1}
+                  fill={item.color}
+                  stroke={
+                    isLightMode ? colors.bubble : "rgba(248,250,252,0.82)"
+                  }
+                  strokeWidth="1.4"
+                />
+              ) : null;
+            })}
+          <Line
+            x1={selectedMarkerX}
+            y1={pad.top}
+            x2={selectedMarkerX}
+            y2={chartHeight - pad.bottom}
+            stroke={isLightMode ? colors.accent : POWER_CHART_MARKER.lineColor}
+            strokeWidth="1.6"
+            strokeDasharray="5 6"
+          />
         </Svg>
         <View
           {...chartPanResponder.panHandlers}
@@ -3899,89 +4190,73 @@ function DailyOverviewChart({
                 borderLeftWidth: POWER_CHART_MARKER.triangleSize,
                 borderRightWidth: POWER_CHART_MARKER.triangleSize,
                 borderTopWidth: POWER_CHART_MARKER.triangleSize + 2,
-                borderTopColor: isLightMode ? colors.accent : POWER_CHART_MARKER.color,
+                borderTopColor: isLightMode
+                  ? colors.accent
+                  : POWER_CHART_MARKER.color,
               },
             ]}
           />
         </View>
-        {!!onFullscreenPress && (
-          <TouchableOpacity
-            activeOpacity={0.78}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            onPress={onFullscreenPress}
-            style={[
-              styles.chartFullscreenButton,
-              isLightMode && {
-                backgroundColor: colors.bubble,
-                borderColor: colors.bubbleBorder,
-              },
-            ]}
-          >
-            <Ionicons
-              name="expand-outline"
-              size={18}
-              color={colors.accent}
-            />
-          </TouchableOpacity>
-        )}
       </View>
 
       {showSwitches && (
         <View style={styles.chartSwitchRow}>
-        {datasets.map((item) => {
-          const isActive = visibleSeries[item.key];
-          const switchLabel = getPowerSeriesLabel(item, t);
+          {datasets.map((item) => {
+            const isActive = visibleSeries[item.key];
+            const switchLabel = getPowerSeriesLabel(item, t);
 
-          return (
-            <View key={item.key} style={styles.chartSwitchItem}>
-              <TouchableOpacity
-                activeOpacity={0.82}
-                onPress={() => onToggleSeries(item.key)}
-                style={[
-                  styles.chartSwitchButton,
-                  {
-                    backgroundColor: isActive
-                      ? `${item.color}35`
-                      : isLightMode
-                        ? `${item.color}18`
-                        : "rgba(248,250,252,0.18)",
-                    borderWidth: isLightMode ? 1 : 0,
-                    borderColor: isLightMode ? colors.bubbleBorder : "transparent",
-                  },
-                ]}
-              >
-                <View
+            return (
+              <View key={item.key} style={styles.chartSwitchItem}>
+                <TouchableOpacity
+                  activeOpacity={0.82}
+                  onPress={() => onToggleSeries(item.key)}
                   style={[
-                    styles.chartSwitchKnob,
+                    styles.chartSwitchButton,
                     {
                       backgroundColor: isActive
-                        ? `${item.color}CC`
+                        ? `${item.color}35`
                         : isLightMode
-                          ? `${item.color}8A`
-                          : "rgba(248,250,252,0.45)",
-                      transform: [
-                        {
-                          translateX: isActive
-                            ? POWER_CHART_LAYOUT.switchWidth -
-                              POWER_CHART_LAYOUT.switchHeight
-                            : 0,
-                        },
-                      ],
+                          ? `${item.color}18`
+                          : "rgba(248,250,252,0.18)",
+                      borderWidth: isLightMode ? 1 : 0,
+                      borderColor: isLightMode
+                        ? colors.bubbleBorder
+                        : "transparent",
                     },
                   ]}
-                />
-              </TouchableOpacity>
-              <Text
-                style={[styles.chartSwitchLabel, { color: item.color }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.72}
-              >
-                {switchLabel}
-              </Text>
-            </View>
-          );
-        })}
+                >
+                  <View
+                    style={[
+                      styles.chartSwitchKnob,
+                      {
+                        backgroundColor: isActive
+                          ? `${item.color}CC`
+                          : isLightMode
+                            ? `${item.color}8A`
+                            : "rgba(248,250,252,0.45)",
+                        transform: [
+                          {
+                            translateX: isActive
+                              ? POWER_CHART_LAYOUT.switchWidth -
+                                POWER_CHART_LAYOUT.switchHeight
+                              : 0,
+                          },
+                        ],
+                      },
+                    ]}
+                  />
+                </TouchableOpacity>
+                <Text
+                  style={[styles.chartSwitchLabel, { color: item.color }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.72}
+                >
+                  {switchLabel}
+                </Text>
+              </View>
+            );
+          })}
         </View>
       )}
 
@@ -3996,15 +4271,21 @@ function DailyOverviewChart({
           ]}
         >
           <View style={styles.chartSelectedInfoHeader}>
-            <Text style={[styles.chartSelectedInfoTitle, { color: chartTextColor }]}>
+            <Text
+              style={[styles.chartSelectedInfoTitle, { color: chartTextColor }]}
+            >
               {t("selectedData")}
             </Text>
-            <Text style={[styles.chartSelectedInfoMeta, { color: colors.textSoft }]}>
+            <Text
+              style={[styles.chartSelectedInfoMeta, { color: colors.textSoft }]}
+            >
               {segment === "day"
                 ? `${t("time")}: ${selectedLabel}`
                 : segment === "month"
                   ? `${t("date")}: ${selectedLabel.replace(`${t("date")} `, "")}`
-                  : `${t("year")}: ${selectedLabel}`}
+                  : segment === "year"
+                    ? `${t("month")}: ${selectedLabel}`
+                    : `${t("year")}: ${selectedLabel}`}
             </Text>
           </View>
 
@@ -4018,17 +4299,43 @@ function DailyOverviewChart({
                   ]}
                 />
                 <Text
-                  style={[styles.chartSelectedInfoLabel, { color: colors.textMuted }]}
+                  style={[
+                    styles.chartSelectedInfoLabel,
+                    {
+                      color:
+                        item.key === "soc"
+                          ? isLightMode
+                            ? "#A16207"
+                            : item.color
+                          : colors.textMuted,
+                    },
+                  ]}
                   numberOfLines={1}
                 >
                   {getPowerSeriesLabel(item, t)}
                 </Text>
                 <Text
-                  style={[styles.chartSelectedInfoValue, { color: colors.text }]}
+                  style={[
+                    styles.chartSelectedInfoValue,
+                    {
+                      color:
+                        item.key === "soc"
+                          ? isLightMode
+                            ? "#A16207"
+                            : item.color
+                          : colors.text,
+                    },
+                  ]}
                   numberOfLines={1}
                 >
-                  {formatSelectedChartValue(item.value, selectedUnit)}{" "}
-                  {selectedUnit} ({formatSelectedChartPercent(item.percent)}%)
+                  {item.key === "soc"
+                    ? formatSocPercentValue(item.value)
+                    : `${formatSelectedChartValue(
+                        item.value,
+                        selectedUnit,
+                      )} ${selectedUnit} (${formatSelectedChartPercent(
+                        item.percent,
+                      )}%)`}
                 </Text>
               </View>
             ))}
@@ -4047,11 +4354,7 @@ function DailyOverviewChart({
             {isSavingCsv ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Ionicons
-                name="save-outline"
-                size={16}
-                color="#FFFFFF"
-              />
+              <Ionicons name="save-outline" size={16} color="#FFFFFF" />
             )}
             <Text style={[styles.chartSavePdfText, { color: "#FFFFFF" }]}>
               {isSavingCsv ? t("saving") : t("saveAsCsv")}
@@ -4067,8 +4370,12 @@ export default function OverviewScreen() {
   const insets = useSafeAreaInsets();
   const { colors, language, t, themeMode } = useAppSettings();
   const isLightMode = themeMode === "light";
-  const navigationColor = isLightMode ? appColors.screen : "rgba(248,250,252,0.88)";
-  const pointerLineColor = isLightMode ? colors.accent : GRID_POINTER_CONFIG.lineColor;
+  const navigationColor = isLightMode
+    ? appColors.screen
+    : "rgba(248,250,252,0.88)";
+  const pointerLineColor = isLightMode
+    ? colors.accent
+    : GRID_POINTER_CONFIG.lineColor;
   const { selectedDevice } = useContext(AuthContext);
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -4284,12 +4591,16 @@ export default function OverviewScreen() {
             setSelectedDataSource("plant");
           }
         } catch (error) {
-          console.warn("Failed to load plant devices:", error?.message || error);
+          console.warn(
+            "Failed to load plant devices:",
+            error?.message || error,
+          );
         }
 
         const sourceDevices = selectedSourceDeviceId
           ? latestPlantDevices.filter(
-              (device) => String(device.dataSourceId) === selectedSourceDeviceId,
+              (device) =>
+                String(device.dataSourceId) === selectedSourceDeviceId,
             )
           : latestPlantDevices;
         const latestRequests = POWER_LATEST_ENDPOINT_CONFIG.flatMap((item) =>
@@ -4300,7 +4611,7 @@ export default function OverviewScreen() {
           ),
         );
         const chartEndpoints =
-          activeSegment === "year"
+          activeSegment === "lifetime"
             ? chartYearRange.map((year) =>
                 buildChartEndpoint(
                   activeSegment,
@@ -4323,7 +4634,7 @@ export default function OverviewScreen() {
               ];
         const chartEndpoint = chartEndpoints[0];
         const chartDate = getChartRequestDate(
-          activeSegment,
+          getChartApiSegment(activeSegment),
           selectedDay,
           selectedMonth,
           selectedYear,
@@ -4342,8 +4653,11 @@ export default function OverviewScreen() {
           ...latestRequests.map((item) => requestJson(item.endpoint, headers)),
         ]);
         const chartResults =
-          activeSegment === "year"
-            ? [chartResult, ...latestResults.splice(0, chartEndpoints.length - 1)]
+          activeSegment === "lifetime"
+            ? [
+                chartResult,
+                ...latestResults.splice(0, chartEndpoints.length - 1),
+              ]
             : [chartResult];
 
         const plants = Array.isArray(plantResult?.json?.data)
@@ -4353,6 +4667,18 @@ export default function OverviewScreen() {
           plants.find((item) => String(item.id) === String(resolvedPlantId)) ??
           selectedDevice ??
           {};
+        const backendDataSources = [
+          ...latestResults.map((item) => item?.json).filter(Boolean),
+          ...chartResults.map((item) => item?.json).filter(Boolean),
+          plantInfo,
+          ...sourceDevices,
+        ];
+        const backendSocValue = getBackendSocValue(backendDataSources);
+        const backendSelectedDataPercentages = getBackendSelectedPercentages(
+          backendDataSources,
+          latestResults,
+          latestRequests,
+        );
 
         let googleWeather = null;
         try {
@@ -4382,7 +4708,7 @@ export default function OverviewScreen() {
           (item) => item?.ok && item?.json?.data != null,
         );
         const chartSeries = chartRequestSucceeded
-          ? activeSegment === "year"
+          ? activeSegment === "lifetime"
             ? buildYearRangeChartSeries(chartResults, chartYearRange)
             : mergeChartSeries(normalizeChartSeries(chartResult.json.data))
           : createEmptyChartSeries();
@@ -4392,7 +4718,10 @@ export default function OverviewScreen() {
           date: chartDate,
           status: chartResults.map((item) => item?.status).join(","),
           ok: chartRequestSucceeded,
-          error: chartResults.map((item) => item?.error).filter(Boolean).join("; "),
+          error: chartResults
+            .map((item) => item?.error)
+            .filter(Boolean)
+            .join("; "),
           counts: getChartSeriesCounts(chartSeries),
         });
         const fallbackChartSeries =
@@ -4435,14 +4764,15 @@ export default function OverviewScreen() {
           : effectiveMonitoringState.isOnline
             ? apiEnergyValues
             : ZERO_ENERGY_VALUES;
-        const realtimeChartSampleSeries = isSelectedCurrentDay(
-          activeSegment,
-          selectedDay,
-          selectedMonth,
-          selectedYear,
-        ) && effectiveMonitoringState.isOnline
-          ? createRealtimeChartSampleSeries(displayPowerValues)
-          : createEmptyChartSeries();
+        const realtimeChartSampleSeries =
+          isSelectedCurrentDay(
+            activeSegment,
+            selectedDay,
+            selectedMonth,
+            selectedYear,
+          ) && effectiveMonitoringState.isOnline
+            ? createRealtimeChartSampleSeries(displayPowerValues)
+            : createEmptyChartSeries();
 
         setFetchedData((current) => {
           const currentChartSeries =
@@ -4599,6 +4929,10 @@ export default function OverviewScreen() {
               0,
             energy: displayEnergyValues.energy,
             energyPercent: displayEnergyValues.energyPercent,
+            soc: effectiveMonitoringState.isOnline ? backendSocValue : null,
+            selectedDataPercentages: effectiveMonitoringState.isOnline
+              ? backendSelectedDataPercentages
+              : {},
             isDeviceOnline: effectiveMonitoringState.isOnline,
             latestDataTimestamp: effectiveMonitoringState.latestTimestamp,
             status: pickValue(
@@ -4737,11 +5071,15 @@ export default function OverviewScreen() {
       upsLoad: pickNumber(isDeviceOnline ? fetchedData?.upsLoad : 0),
       load: pickNumber(isDeviceOnline ? fetchedData?.load : 0),
       energy: isDeviceOnline
-        ? fetchedData?.energy ?? ZERO_ENERGY_VALUES.energy
+        ? (fetchedData?.energy ?? ZERO_ENERGY_VALUES.energy)
         : ZERO_ENERGY_VALUES.energy,
       energyPercent: isDeviceOnline
-        ? fetchedData?.energyPercent ?? ZERO_ENERGY_VALUES.energyPercent
+        ? (fetchedData?.energyPercent ?? ZERO_ENERGY_VALUES.energyPercent)
         : ZERO_ENERGY_VALUES.energyPercent,
+      soc: isDeviceOnline ? pickFiniteNumber(fetchedData?.soc) : null,
+      selectedDataPercentages: isDeviceOnline
+        ? (fetchedData?.selectedDataPercentages ?? {})
+        : {},
       status: pickValue(fetchedData?.status, selectedDevice?.status, "--"),
       isDeviceOnline,
       latestDataTimestamp: fetchedData?.latestDataTimestamp ?? null,
@@ -4754,10 +5092,11 @@ export default function OverviewScreen() {
     () => buildProductionPowerFlowData(plantData, isCurrentDemoPlant),
     [isCurrentDemoPlant, plantData],
   );
-  const weatherLocation = [plantData.city, plantData.province]
-    .map((item) => String(item || "").trim())
-    .filter(Boolean)
-    .join(", ") || "-";
+  const weatherLocation =
+    [plantData.city, plantData.province]
+      .map((item) => String(item || "").trim())
+      .filter(Boolean)
+      .join(", ") || "-";
   const currentTemperature = pickNumber(
     plantData.weatherTemperature,
     getTemperatureNumber(plantData.weather),
@@ -4794,6 +5133,58 @@ export default function OverviewScreen() {
     ],
   };
 
+  const goPrevMonth = () => {
+    const date = new Date(selectedYear, selectedMonth - 1, 1);
+
+    date.setMonth(date.getMonth() - 1);
+
+    setSelectedMonth(date.getMonth() + 1);
+    setSelectedYear(date.getFullYear());
+
+    const daysInMonth = new Date(
+      date.getFullYear(),
+      date.getMonth() + 1,
+      0,
+    ).getDate();
+
+    if (selectedDay > daysInMonth) {
+      setSelectedDay(daysInMonth);
+    }
+  };
+
+  const goNextMonth = () => {
+    const date = new Date(selectedYear, selectedMonth - 1, 1);
+
+    date.setMonth(date.getMonth() + 1);
+
+    const today = new Date();
+    const currentMonth =
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear();
+
+    setSelectedMonth(date.getMonth() + 1);
+    setSelectedYear(date.getFullYear());
+
+    const daysInMonth = new Date(
+      date.getFullYear(),
+      date.getMonth() + 1,
+      0,
+    ).getDate();
+
+    if (currentMonth) {
+      setSelectedDay(Math.min(selectedDay, today.getDate()));
+    } else if (selectedDay > daysInMonth) {
+      setSelectedDay(daysInMonth);
+    }
+  };
+
+  const goPrevYear = () => {
+    setSelectedYear((year) => year - 1);
+  };
+
+  const goNextYear = () => {
+    setSelectedYear((year) => year + 1);
+  };
   const handleRefreshOverview = async () => {
     setPlantMenuVisible(false);
     await fetchOverviewData({ showLoading: true });
@@ -4803,7 +5194,10 @@ export default function OverviewScreen() {
     setPlantMenuVisible(false);
 
     if (!plantData.canAddDatalogger) {
-      Alert.alert("Access denied", "Anda tidak memiliki izin menambah datalogger.");
+      Alert.alert(
+        "Access denied",
+        "Anda tidak memiliki izin menambah datalogger.",
+      );
       return;
     }
 
@@ -5137,7 +5531,11 @@ export default function OverviewScreen() {
     fontSize: BATTERY_BUBBLE_CONFIG.valueFontSize * bubbleScale,
   };
   const gridPointerCoordinates = lockPointerEndpoint(
-    getGridPointerCoordinates(houseOverlayLayout, gridBubbleLayout, bubbleScale),
+    getGridPointerCoordinates(
+      houseOverlayLayout,
+      gridBubbleLayout,
+      bubbleScale,
+    ),
     gridPointerEndRef,
   );
   const batteryPointerCoordinates = getBatteryPointerCoordinates(
@@ -5150,7 +5548,11 @@ export default function OverviewScreen() {
     pvPointerEndRef,
   );
   const loadPointerCoordinates = lockPointerEndpoint(
-    getLoadPointerCoordinates(houseOverlayLayout, loadBubbleLayout, bubbleScale),
+    getLoadPointerCoordinates(
+      houseOverlayLayout,
+      loadBubbleLayout,
+      bubbleScale,
+    ),
     loadPointerEndRef,
   );
   const shouldAnimateGridPointer =
@@ -5170,8 +5572,7 @@ export default function OverviewScreen() {
   const pvPointerDotSize = PV_POINTER_CONFIG.dotSize * bubbleScale;
   const pvPointerGlowSize = PV_POINTER_CONFIG.dotSize * 2.8 * bubbleScale;
   const loadPointerDotSize = LOAD_POINTER_CONFIG.dotSize * bubbleScale;
-  const loadPointerGlowSize =
-    LOAD_POINTER_CONFIG.dotSize * 2.8 * bubbleScale;
+  const loadPointerGlowSize = LOAD_POINTER_CONFIG.dotSize * 2.8 * bubbleScale;
   const gridPointerDotX = gridPointerCoordinates
     ? gridPointerProgress.interpolate({
         inputRange: [
@@ -5550,7 +5951,9 @@ export default function OverviewScreen() {
             </Text>
 
             <View style={styles.plantMetaRow}>
-              <Text style={[styles.plantProductionMeta, { color: colors.accent }]}>
+              <Text
+                style={[styles.plantProductionMeta, { color: colors.accent }]}
+              >
                 {productionMeta}
               </Text>
             </View>
@@ -5575,10 +5978,14 @@ export default function OverviewScreen() {
         style={[styles.container, { backgroundColor: colors.screen }]}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View
+        {/* Weather Card */}
+        {/* <Animated.View
           style={[
             styles.headerCard,
-            { backgroundColor: colors.bubble, borderColor: colors.bubbleBorder },
+            {
+              backgroundColor: colors.bubble,
+              borderColor: colors.bubbleBorder,
+            },
             weatherCardAnimatedStyle,
           ]}
         >
@@ -5627,7 +6034,9 @@ export default function OverviewScreen() {
           >
             {weatherForecastDays.map((item) => (
               <View key={item.day} style={styles.weatherDayItem}>
-                <Text style={[styles.weatherDayNumber, { color: colors.textMuted }]}>
+                <Text
+                  style={[styles.weatherDayNumber, { color: colors.textMuted }]}
+                >
                   {item.day}
                 </Text>
                 <Ionicons
@@ -5643,7 +6052,7 @@ export default function OverviewScreen() {
               </View>
             ))}
           </ScrollView>
-        </Animated.View>
+        </Animated.View> */}
 
         <Modal
           visible={plantMenuVisible}
@@ -5718,7 +6127,9 @@ export default function OverviewScreen() {
               ]}
             >
               <ActivityIndicator size="large" color={colors.accent} />
-              <Text style={[styles.refreshLoadingTitle, { color: colors.text }]}>
+              <Text
+                style={[styles.refreshLoadingTitle, { color: colors.text }]}
+              >
                 {t("loading")}
               </Text>
             </View>
@@ -5762,9 +6173,7 @@ export default function OverviewScreen() {
                     </Text>
                     <Ionicons
                       name={
-                        dataSourceMenuVisible
-                          ? "chevron-up"
-                          : "chevron-down"
+                        dataSourceMenuVisible ? "chevron-up" : "chevron-down"
                       }
                       size={15}
                       color={colors.accent}
@@ -6271,9 +6680,12 @@ export default function OverviewScreen() {
             </View>
           </View>
 
-          <View style={styles.dashboardSection}>
+          {/* Monthly Savings */}
+          {/* <View style={styles.dashboardSection}>
             <View style={styles.monthlySavingsSection}>
-              <Text style={[styles.dashboardSectionTitle, { color: colors.text }]}>
+              <Text
+                style={[styles.dashboardSectionTitle, { color: colors.text }]}
+              >
                 {t("monthlySavings")}
               </Text>
 
@@ -6293,7 +6705,12 @@ export default function OverviewScreen() {
                       },
                     ]}
                   >
-                    <Text style={[styles.monthlySavingMonth, { color: colors.text }]}>
+                    <Text
+                      style={[
+                        styles.monthlySavingMonth,
+                        { color: colors.text },
+                      ]}
+                    >
                       {t(item.monthKey)}
                     </Text>
                     <Ionicons
@@ -6301,7 +6718,12 @@ export default function OverviewScreen() {
                       size={DASHBOARD_LAYOUT.monthlyIconSize}
                       color={colors.accent}
                     />
-                    <Text style={[styles.monthlySavingValue, { color: colors.text }]}>
+                    <Text
+                      style={[
+                        styles.monthlySavingValue,
+                        { color: colors.text },
+                      ]}
+                    >
                       {item.value}
                     </Text>
                   </View>
@@ -6323,20 +6745,28 @@ export default function OverviewScreen() {
                   <Ionicons
                     name={item.icon}
                     size={DASHBOARD_LAYOUT.impactIconSize}
-                  color={colors.accent}
+                    color={colors.accent}
                   />
-                  <Text style={[styles.environmentImpactValue, { color: colors.text }]}>
+                  <Text
+                    style={[
+                      styles.environmentImpactValue,
+                      { color: colors.text },
+                    ]}
+                  >
                     {item.value}
                   </Text>
                   <Text
-                    style={[styles.environmentImpactLabel, { color: colors.textMuted }]}
+                    style={[
+                      styles.environmentImpactLabel,
+                      { color: colors.textMuted },
+                    ]}
                   >
                     {t(item.labelKey)}
                   </Text>
                 </View>
               ))}
             </View>
-          </View>
+          </View> */}
 
           <View
             style={[
@@ -6369,7 +6799,10 @@ export default function OverviewScreen() {
                     styles.segmentText,
                     activeSegment === "day" && styles.segmentTextActive,
                     isLightMode && {
-                      color: activeSegment === "day" ? colors.bubble : colors.textMuted,
+                      color:
+                        activeSegment === "day"
+                          ? colors.bubble
+                          : colors.textMuted,
                     },
                   ]}
                 >
@@ -6394,7 +6827,9 @@ export default function OverviewScreen() {
                     activeSegment === "month" && styles.segmentTextActive,
                     isLightMode && {
                       color:
-                        activeSegment === "month" ? colors.bubble : colors.textMuted,
+                        activeSegment === "month"
+                          ? colors.bubble
+                          : colors.textMuted,
                     },
                   ]}
                 >
@@ -6414,59 +6849,123 @@ export default function OverviewScreen() {
                     styles.segmentText,
                     activeSegment === "year" && styles.segmentTextActive,
                     isLightMode && {
-                      color: activeSegment === "year" ? colors.bubble : colors.textMuted,
+                      color:
+                        activeSegment === "year"
+                          ? colors.bubble
+                          : colors.textMuted,
                     },
                   ]}
                 >
                   {t("year")}
                 </Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.segmentButton,
+                  activeSegment === "lifetime" && styles.segmentButtonActive,
+                ]}
+                onPress={() => setActiveSegment("lifetime")}
+              >
+                <Text
+                  style={[
+                    styles.segmentText,
+                    activeSegment === "lifetime" && styles.segmentTextActive,
+                    isLightMode && {
+                      color:
+                        activeSegment === "lifetime"
+                          ? colors.bubble
+                          : colors.textMuted,
+                    },
+                  ]}
+                >
+                  Lifetime
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {activeSegment === "day" ? (
-              <View style={styles.dayPickerWrap}>
-                <ScrollView
-                  ref={dayPickerScrollRef}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.dayPickerContent}
-                >
-                  {dayOptions.map((day) => {
-                    const isSelected = day === selectedDay;
+              <>
+                <View style={styles.monthNavigation}>
+                  <TouchableOpacity
+                    onPress={goPrevMonth}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons
+                      name="chevron-back"
+                      size={24}
+                      color={colors.text}
+                    />
+                  </TouchableOpacity>
 
-                    return (
-                      <TouchableOpacity
-                        key={day}
-                        style={[
-                          styles.dayChip,
-                          isLightMode && {
-                            borderColor: colors.bubbleBorder,
-                            backgroundColor: colors.bubble,
-                          },
-                          isSelected && styles.dayChipActive,
-                        ]}
-                        onPress={() => setSelectedDay(day)}
-                      >
-                        <Text
+                  <Text
+                    style={[styles.monthNavigationText, { color: colors.text }]}
+                  >
+                    {new Date(
+                      selectedYear,
+                      selectedMonth - 1,
+                    ).toLocaleDateString("en-US", {
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </Text>
+
+                  <TouchableOpacity
+                    onPress={goNextMonth}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons
+                      name="chevron-forward"
+                      size={24}
+                      color={colors.text}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.dayPickerWrap}>
+                  <ScrollView
+                    ref={dayPickerScrollRef}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.dayPickerContent}
+                  >
+                    {dayOptions.map((day) => {
+                      const isSelected = day === selectedDay;
+
+                      return (
+                        <TouchableOpacity
+                          key={day}
                           style={[
-                            styles.dayChipText,
-                            isSelected && styles.dayChipTextActive,
+                            styles.dayChip,
                             isLightMode && {
-                              color: isSelected ? colors.bubble : colors.text,
+                              borderColor: colors.bubbleBorder,
+                              backgroundColor: colors.bubble,
                             },
+                            isSelected && styles.dayChipActive,
                           ]}
+                          onPress={() => setSelectedDay(day)}
                         >
-                          {day}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
+                          <Text
+                            style={[
+                              styles.dayChipText,
+                              isSelected && styles.dayChipTextActive,
+                              isLightMode && {
+                                color: isSelected ? colors.bubble : colors.text,
+                              },
+                            ]}
+                          >
+                            {day}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
 
-                <Text style={[styles.dateText, { color: colors.textSoft }]}>
-                  {`${selectedDay} ${selectedMonthLabel} ${selectedYear}`}
-                </Text>
-              </View>
+                  <Text style={[styles.dateText, { color: colors.textSoft }]}>
+                    {`${selectedDay} ${selectedMonthLabel} ${selectedYear}`}
+                  </Text>
+                </View>
+              </>
             ) : activeSegment === "month" ? (
               <View style={styles.dayPickerWrap}>
                 <ScrollView
@@ -6513,6 +7012,38 @@ export default function OverviewScreen() {
               </View>
             ) : activeSegment === "year" ? (
               <View style={styles.dayPickerWrap}>
+                <View style={styles.monthNavigation}>
+                  <TouchableOpacity
+                    onPress={goPrevYear}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons
+                      name="chevron-back"
+                      size={24}
+                      color={colors.text}
+                    />
+                  </TouchableOpacity>
+
+                  <Text
+                    style={[styles.monthNavigationText, { color: colors.text }]}
+                  >
+                    {selectedYear}
+                  </Text>
+
+                  <TouchableOpacity
+                    onPress={goNextYear}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons
+                      name="chevron-forward"
+                      size={24}
+                      color={colors.text}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : activeSegment === "lifetime" ? (
+              <View style={styles.dayPickerWrap}>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -6558,7 +7089,8 @@ export default function OverviewScreen() {
 
             {(activeSegment === "day" ||
               activeSegment === "month" ||
-              activeSegment === "year") && (
+              activeSegment === "year" ||
+              activeSegment === "lifetime") && (
               <>
                 {isChartLoading ? (
                   <View
@@ -6568,7 +7100,12 @@ export default function OverviewScreen() {
                     ]}
                   >
                     <ActivityIndicator size="large" color={colors.accent} />
-                    <Text style={[styles.chartLoadingText, { color: colors.textSoft }]}>
+                    <Text
+                      style={[
+                        styles.chartLoadingText,
+                        { color: colors.textSoft },
+                      ]}
+                    >
                       {t("loadingChart")}
                     </Text>
                   </View>
@@ -6585,6 +7122,8 @@ export default function OverviewScreen() {
                     selectedMonth={selectedMonth}
                     selectedYear={selectedYear}
                     yearRange={chartYearRange}
+                    selectedDataPercentages={plantData.selectedDataPercentages}
+                    socValue={plantData.soc}
                     plantName={plantData.plantName}
                   />
                 )}
@@ -6620,11 +7159,7 @@ export default function OverviewScreen() {
               onPress={() => setIsChartLandscapeVisible(false)}
               style={styles.chartLandscapeBackButton}
             >
-              <Ionicons
-                name="chevron-back"
-                size={32}
-                color={navigationColor}
-              />
+              <Ionicons name="chevron-back" size={32} color={navigationColor} />
             </TouchableOpacity>
           </View>
 
@@ -6655,7 +7190,12 @@ export default function OverviewScreen() {
                   ]}
                 >
                   <ActivityIndicator size="large" color={colors.accent} />
-                  <Text style={[styles.chartLoadingText, { color: colors.textSoft }]}>
+                  <Text
+                    style={[
+                      styles.chartLoadingText,
+                      { color: colors.textSoft },
+                    ]}
+                  >
                     {t("loadingChart")}
                   </Text>
                 </View>
@@ -6675,6 +7215,8 @@ export default function OverviewScreen() {
                   selectedMonth={selectedMonth}
                   selectedYear={selectedYear}
                   yearRange={chartYearRange}
+                  selectedDataPercentages={plantData.selectedDataPercentages}
+                  socValue={plantData.soc}
                   plantName={plantData.plantName}
                 />
               )}
@@ -7234,20 +7776,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
-  chartFullscreenButton: {
-    position: "absolute",
-    right: 4,
-    bottom: 10,
-    zIndex: 4,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(2,7,19,0.72)",
-    borderWidth: 1,
-    borderColor: "rgba(8,174,234,0.32)",
-  },
   chartCurrentTimeText: {
     color: appColors.textSoft,
     fontFamily: appFont,
@@ -7565,14 +8093,15 @@ const styles = StyleSheet.create({
   },
   dataSourceDropdownWrap: {
     position: "absolute",
-    top: 8,
+    top: 320,
     right: 8,
     zIndex: 20,
-    width: 152,
+    width: 140,
   },
   dataSourceDropdownButton: {
-    minHeight: 34,
-    borderRadius: 10,
+    minHeight: 20,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
     paddingHorizontal: 10,
     flexDirection: "row",
     alignItems: "center",
@@ -7590,12 +8119,13 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   dataSourceDropdownMenu: {
-    marginTop: 6,
-    borderRadius: 10,
-    backgroundColor: "rgba(2,7,19,0.92)",
+    marginTop: 0,
+    backgroundColor: "rgba(2,7,19,0.72)",
     borderWidth: 1,
     borderColor: "rgba(8,174,234,0.32)",
-    overflow: "hidden",
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
   },
   dataSourceDropdownItem: {
     minHeight: 34,
@@ -7696,5 +8226,17 @@ const styles = StyleSheet.create({
     marginTop: 2,
     maxWidth: "100%",
     textAlign: "center",
+  },
+  monthNavigation: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+
+  monthNavigationText: {
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
