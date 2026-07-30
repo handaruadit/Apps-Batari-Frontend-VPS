@@ -1,5 +1,7 @@
+//===== (Imports) ======
 import Svg, { Path } from 'react-native-svg';
 
+//===== (SolarIcon) ======
 export default function SolarIcon({ color = '#0EA5E9', size = 24 }) {
   return (
     <Svg

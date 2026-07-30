@@ -1,63 +1,76 @@
-/**
- * ============================================================
- * AUTH TOKEN HELPER (REFACTORED)
- * Mengelola JWT, session login, remember me, dan data user
- * menggunakan AsyncStorage.
- * ============================================================
- */
-
+//===== (Imports) ======
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// 1. STORAGE KEYS TERPUSAT
+//===== (Storage Keys) ======
 export const KEYS = {
   TOKEN: 'userToken',
   REMEMBER: 'rememberMe',
   USER: 'userInfo',
 };
 
-// 2. UTILS: GENERIC STORAGE HANDLER (Mencegah pengulangan try-catch)
+//===== (storage) ======
 const storage = {
   get: async (key, isJson = false) => {
     try {
-      const val = await AsyncStorage.getItem(key);
-      return isJson && val ? JSON.parse(val) : val;
-    } catch { return null; }  
+      const value = await AsyncStorage.getItem(key);
+      return isJson && value ? JSON.parse(value) : value;
+    } catch {
+      return null;
+    }
   },
-  set: async (key, val) => {
-    if (!val) return;
-    try { await AsyncStorage.setItem(key, typeof val === 'object' ? JSON.stringify(val) : String(val)); } catch {}
+  set: async (key, value) => {
+    if (!value) return;
+
+    try {
+      await AsyncStorage.setItem(
+        key,
+        typeof value === 'object' ? JSON.stringify(value) : String(value),
+      );
+    } catch {
+      // Storage failure is intentionally non-fatal for compatibility.
+    }
   },
   remove: (key) => AsyncStorage.removeItem(key).catch(() => {}),
 };
 
-// 3. PRIVATE HELPER: DECODE JWT LEBIH RINGKAS
+//===== (decodeBase64) ======
 const decodeBase64 = (encoded) => {
   try {
     const padded = encoded.replace(/-/g, '+').replace(/_/g, '/');
     const normalized = padded + '='.repeat((4 - (padded.length % 4)) % 4);
-    
-    // Fallback dekripsi Base64
-    return typeof atob === 'function' ? atob(normalized) 
-         : global?.atob ? global.atob(normalized) 
-         : globalThis?.Buffer ? globalThis.Buffer.from(normalized, 'base64').toString('utf-8') 
-         : null;
-  } catch { return null; }
+
+    if (typeof atob === 'function') return atob(normalized);
+    if (global?.atob) return global.atob(normalized);
+    if (globalThis?.Buffer) {
+      return globalThis.Buffer.from(normalized, 'base64').toString('utf-8');
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
 };
 
-// 4. JWT HELPERS
+//===== (parseJwt) ======
 export const parseJwt = (token) => {
-  try { return token ? JSON.parse(decodeBase64(token.split('.')[1])) : null; } catch { return null; }
+  try {
+    return token ? JSON.parse(decodeBase64(token.split('.')[1])) : null;
+  } catch {
+    return null;
+  }
 };
 
+//===== (isTokenValid) ======
 export const isTokenValid = (token) => {
   const exp = parseJwt(token)?.exp;
   return exp ? exp * 1000 > Date.now() : false;
 };
 
+//===== (getUserFromToken) ======
 export const getUserFromToken = (token) => {
   const payload = parseJwt(token);
   if (!payload) return null;
-  
+
   return {
     id: payload.id ?? payload.userId ?? payload.sub ?? null,
     email: payload.email ?? null,
@@ -66,33 +79,38 @@ export const getUserFromToken = (token) => {
   };
 };
 
-// 5. WRAPPER FUNGSI SPESIFIK (One-liners)
+//===== (Token Storage) ======
 export const getToken = () => storage.get(KEYS.TOKEN);
 export const saveToken = (token) => storage.set(KEYS.TOKEN, token);
 export const removeToken = () => storage.remove(KEYS.TOKEN);
 
+//===== (User Storage) ======
 export const getUserInfo = () => storage.get(KEYS.USER, true);
 export const saveUserInfo = (user) => storage.set(KEYS.USER, user);
 export const removeUserInfo = () => storage.remove(KEYS.USER);
 
+//===== (Remember Me Storage) ======
 export const getRememberMe = () => storage.get(KEYS.REMEMBER);
-export const setRememberMe = (remember) => remember ? storage.set(KEYS.REMEMBER, 'true') : storage.remove(KEYS.REMEMBER);
+export const setRememberMe = (remember) =>
+  remember ? storage.set(KEYS.REMEMBER, 'true') : storage.remove(KEYS.REMEMBER);
+//===== (removeRememberMe) ======
 export const removeRememberMe = () => storage.remove(KEYS.REMEMBER);
 
-// 6. AUTH SESSION LOGIC
-export const clearAuth = () => AsyncStorage.multiRemove(Object.values(KEYS)).catch(() => {});
+//===== (clearAuth) ======
+export const clearAuth = () =>
+  AsyncStorage.multiRemove(Object.values(KEYS)).catch(() => {});
 
+//===== (getValidRememberedToken) ======
 export const getValidRememberedToken = async () => {
-  // Gunakan Promise.all agar I/O storage berjalan paralel (lebih cepat)
   const [token, rememberMe] = await Promise.all([getToken(), getRememberMe()]);
 
   if (token) {
     if (rememberMe === 'true' && isTokenValid(token)) {
       return token;
     }
-    // Jika ada token tapi tidak remember me atau token expired, bersihkan
+
     await clearAuth();
   }
-  
+
   return null;
 };

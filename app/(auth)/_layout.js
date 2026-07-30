@@ -1,6 +1,8 @@
+//===== (Imports) ======
 import { Stack } from 'expo-router';
 import { appColors } from '@/config/theme';
 
+//===== (AuthLayout) ======
 export default function AuthLayout() {
   return (
     <Stack

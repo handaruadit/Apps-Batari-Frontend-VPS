@@ -1,11 +1,9 @@
+//===== (Jest Configuration) ======
 module.exports = {
-  preset: 'react-native',
+  preset: 'jest-expo',
   setupFilesAfterEnv: ['<rootDir>/setupTests.js'],
-  transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|@react-navigation|expo|expo-router|@expo)/)'
-  ],
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/$1'
+    '^@/(.*)$': '<rootDir>/$1',
   },
   testPathIgnorePatterns: ['<rootDir>/node_modules/'],
   collectCoverageFrom: [
@@ -15,14 +13,14 @@ module.exports = {
     '!**/coverage/**',
     '!**/*.test.{js,jsx}',
     '!**/setupTests.js',
-    '!**/jest.config.js'
+    '!**/jest.config.js',
   ],
   coverageThreshold: {
     global: {
       lines: 70,
       functions: 75,
       branches: 60,
-      statements: 70
-    }
-  }
+      statements: 70,
+    },
+  },
 };

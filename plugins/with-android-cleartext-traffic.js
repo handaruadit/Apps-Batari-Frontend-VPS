@@ -1,5 +1,7 @@
+//===== (Imports) ======
 const { withAndroidManifest } = require("expo/config-plugins");
 
+//===== (withAndroidCleartextTraffic) ======
 module.exports = function withAndroidCleartextTraffic(config) {
   return withAndroidManifest(config, (config) => {
     const application = config.modResults.manifest.application?.[0];

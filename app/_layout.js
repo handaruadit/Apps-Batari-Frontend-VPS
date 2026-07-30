@@ -1,3 +1,4 @@
+//===== (Imports) ======
 import {
   getUserFromToken,
   getUserInfo,
@@ -21,12 +22,15 @@ import {
 } from '../context/AppSettingsContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+//===== (Constants) ======
 const BATARI_LOGO = require('../assets/images/batari-logo.jpeg');
 
+//===== (clamp) ======
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+//===== (Layout) ======
 export default function Layout() {
   return (
     <AppSettingsProvider>
@@ -35,10 +39,12 @@ export default function Layout() {
   );
 }
 
+//===== (RootLayoutContent) ======
 function RootLayoutContent() {
   const { colors } = useAppSettings();
   const { width, height } = useWindowDimensions();
 
+  //===== (Responsive Splash Metrics) ======
   const isCompactHeight = height < 720;
   const logoSize = clamp(width * 0.24, isCompactHeight ? 72 : 84, 100);
 
@@ -49,6 +55,7 @@ function RootLayoutContent() {
   );
 }
 
+//===== (SessionGate) ======
 function SessionGate({ colors, logoSize }) {
   const router = useRouter();
   const { setUser } = useContext(AuthContext);
@@ -57,7 +64,9 @@ function SessionGate({ colors, logoSize }) {
   const [sessionReady, setSessionReady] = useState(false);
   const [nextRoute, setNextRoute] = useState('/(auth)/login');
 
+  //===== (Session Check Effect) ======
   useEffect(() => {
+    //===== (checkSession) ======
     const checkSession = async () => {
       try {
         const token = await getValidRememberedToken();
@@ -83,6 +92,7 @@ function SessionGate({ colors, logoSize }) {
     checkSession();
   }, [setUser]);
 
+  //===== (handleBootSplashPress) ======
   const handleBootSplashPress = () => {
     if (!sessionReady) return;
 
@@ -90,6 +100,7 @@ function SessionGate({ colors, logoSize }) {
     router.replace(nextRoute);
   };
 
+  //===== (Render) ======
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.screen }}>
       <Stack
@@ -128,6 +139,7 @@ function SessionGate({ colors, logoSize }) {
   );
 }
 
+//===== (Styles) ======
 const styles = StyleSheet.create({
   bootSplash: {
     ...StyleSheet.absoluteFillObject,

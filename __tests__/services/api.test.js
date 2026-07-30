@@ -1,182 +1,86 @@
-import { apiGet, apiPost } from '@/services/api';
+//===== (Imports) ======
+import { apiRequest, parseApiResponse } from '@/services/apiClient';
+import { clearAuth, getToken, isTokenValid } from '@/auth/token';
 
-global.fetch = jest.fn();
+//===== (Mocks) ======
+jest.mock('@/auth/token', () => ({
+  clearAuth: jest.fn(async () => undefined),
+  getToken: jest.fn(async () => 'valid-token'),
+  isTokenValid: jest.fn(() => true),
+}));
 
-describe('API Service', () => {
+//===== (createResponse) ======
+function createResponse({ ok = true, status = 200, body = '{}' } = {}) {
+  return {
+    ok,
+    status,
+    statusText: ok ? 'OK' : 'Error',
+    text: jest.fn(async () => body),
+  };
+}
+
+//===== (API Client Tests) ======
+describe('apiClient', () => {
   beforeEach(() => {
-    fetch.mockClear();
+    global.fetch.mockReset();
+    clearAuth.mockClear();
+    getToken.mockResolvedValue('valid-token');
+    isTokenValid.mockReturnValue(true);
   });
 
-  describe('apiGet', () => {
-    it('successfully fetches data', async () => {
-      const mockData = { success: true, data: [] };
-      fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockData,
-      });
+  it('sends an authenticated GET request', async () => {
+    global.fetch.mockResolvedValue(
+      createResponse({ body: JSON.stringify({ data: [1] }) }),
+    );
 
-      const result = await apiGet('/test');
+    const result = await apiRequest('/api/plant/');
 
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/test'),
-        expect.objectContaining({
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        })
-      );
-      expect(result).toEqual(mockData);
-    });
-
-    it('throws error on 404 response', async () => {
-      fetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-      });
-
-      await expect(apiGet('/test')).rejects.toThrow('GET /test gagal: 404');
-    });
-
-    it('throws error on 500 response', async () => {
-      fetch.mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-      });
-
-      await expect(apiGet('/test')).rejects.toThrow('GET /test gagal: 500');
-    });
-
-    it('throws error on network error', async () => {
-      fetch.mockRejectedValueOnce(new Error('Network error'));
-
-      await expect(apiGet('/test')).rejects.toThrow('Network error');
-    });
-
-    it('sends correct headers', async () => {
-      const mockData = { data: [] };
-      fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockData,
-      });
-
-      await apiGet('/api/test');
-
-      expect(fetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          headers: { 'Content-Type': 'application/json' }
-        })
-      );
-    });
-
-    it('handles empty response', async () => {
-      const mockData = {};
-      fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockData,
-      });
-
-      const result = await apiGet('/test');
-      expect(result).toEqual({});
-    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/plant/'),
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer valid-token',
+        }),
+      }),
+    );
+    expect(result.body).toEqual({ data: [1] });
   });
 
-  describe('apiPost', () => {
-    it('successfully posts data', async () => {
-      const mockBody = { name: 'Test', value: 123 };
-      const mockData = { success: true };
-      fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockData,
-      });
+  it('serializes a public POST request body', async () => {
+    global.fetch.mockResolvedValue(createResponse());
 
-      const result = await apiPost('/test', mockBody);
-
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('/test'),
-        expect.objectContaining({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(mockBody)
-        })
-      );
-      expect(result).toEqual(mockData);
+    await apiRequest('/api/auth/login', {
+      auth: false,
+      method: 'POST',
+      body: { email: 'user@example.com' },
     });
 
-    it('throws error on failed request', async () => {
-      const mockBody = { name: 'Test' };
-      fetch.mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-      });
-
-      await expect(apiPost('/test', mockBody)).rejects.toThrow('POST /test gagal: 400');
-    });
-
-    it('throws error on network error', async () => {
-      const mockBody = { name: 'Test' };
-      fetch.mockRejectedValueOnce(new Error('Network error'));
-
-      await expect(apiPost('/test', mockBody)).rejects.toThrow('Network error');
-    });
-
-    it('sends JSON body correctly', async () => {
-      const mockBody = { data: 'test value' };
-      fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true }),
-      });
-
-      await apiPost('/test', mockBody);
-
-      expect(fetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          body: JSON.stringify(mockBody)
-        })
-      );
-    });
-
-    it('handles complex nested objects', async () => {
-      const complexBody = {
-        user: { id: 1, name: 'Test' },
-        items: [{ id: 1 }, { id: 2 }],
-      };
-      fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ success: true }),
-      });
-
-      await apiPost('/test', complexBody);
-
-      expect(fetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          body: JSON.stringify(complexBody)
-        })
-      );
-    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/auth/login'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ email: 'user@example.com' }),
+      }),
+    );
   });
 
-  describe('Error handling', () => {
-    it('handles timeout errors', async () => {
-      fetch.mockImplementationOnce(() => {
-        return new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Timeout')), 100);
-        });
-      });
+  it('clears an invalid session before making a request', async () => {
+    isTokenValid.mockReturnValue(false);
 
-      await expect(apiGet('/test')).rejects.toThrow('Timeout');
+    await expect(apiRequest('/api/plant/')).rejects.toMatchObject({
+      code: 'AUTH_EXPIRED',
     });
+    expect(clearAuth).toHaveBeenCalledTimes(1);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
 
-    it('handles malformed JSON response', async () => {
-      fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => {
-          throw new Error('Invalid JSON');
-        },
-      });
+  it('keeps non-JSON response text available for domain errors', async () => {
+    const response = createResponse({ body: '<pre>Backend unavailable</pre>' });
 
-      await expect(apiGet('/test')).rejects.toThrow('Invalid JSON');
+    await expect(parseApiResponse(response)).resolves.toEqual({
+      raw: '<pre>Backend unavailable</pre>',
+      message: 'Backend unavailable',
     });
   });
 });

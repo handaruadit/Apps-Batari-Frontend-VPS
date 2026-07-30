@@ -1,11 +1,14 @@
+//===== (Imports) ======
 import { Platform } from "react-native";
 
+//===== (Typography Constants) ======
 export const appFont = Platform.select({
   android: "sans-serif",
   ios: "Helvetica Neue",
   default: "System",
 });
 
+//===== (Color Constants) ======
 export const appColors = {
   screen: "#020713",
   bubble: "#111827",
@@ -35,6 +38,7 @@ export const colorSchemes = {
   light: lightColors,
 };
 
+//===== (getAppColors) ======
 export function getAppColors(themeMode = "dark") {
   return colorSchemes[themeMode] || colorSchemes.dark;
 }

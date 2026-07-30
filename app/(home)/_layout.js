@@ -1,13 +1,16 @@
+//===== (Imports) ======
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { View, useWindowDimensions } from "react-native";
 import SolarIcon from "@/components/SolarIcon";
 import { useAppSettings } from "@/context/AppSettingsContext";
 
+//===== (HomeLayout) ======
 export default function MainLayout() {
   const { colors, t } = useAppSettings();
   const { width, height } = useWindowDimensions();
 
+  //===== (Responsive Tab Metrics) ======
   const isSmallScreen = width < 380;
   const isShortScreen = height < 720;
 
@@ -20,6 +23,7 @@ export default function MainLayout() {
   const solarIconSize = isSmallScreen ? 30 : 34;
   const iconBoxSize = isSmallScreen ? 30 : 34;
 
+  //===== (Render) ======
   return (
     <Tabs
       screenOptions={{

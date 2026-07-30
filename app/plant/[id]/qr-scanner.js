@@ -1,9 +1,11 @@
+//===== (Imports) ======
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { appColors, appFont } from "@/config/theme";
 
+//===== (Qr Scanner Screen) ======
 export default function QrScannerScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -36,6 +38,7 @@ export default function QrScannerScreen() {
   );
 }
 
+//===== (Styles) ======
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,

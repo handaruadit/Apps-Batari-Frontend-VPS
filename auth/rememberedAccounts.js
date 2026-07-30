@@ -1,12 +1,16 @@
+//===== (Imports) ======
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 
+//===== (Constants) ======
 const REMEMBERED_ACCOUNTS_KEY = "rememberedAccounts";
 
+//===== (cleanEmailValue) ======
 function cleanEmailValue(email) {
   return email.trim().toLowerCase();
 }
 
+//===== (getPasswordKey) ======
 function getPasswordKey(email) {
   const cleanEmail = cleanEmailValue(email);
   const safeEmail = cleanEmail.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -14,6 +18,7 @@ function getPasswordKey(email) {
   return `rememberedPassword.${safeEmail}`;
 }
 
+//===== (getRememberedAccounts) ======
 export async function getRememberedAccounts() {
   try {
     const data = await AsyncStorage.getItem(REMEMBERED_ACCOUNTS_KEY);
@@ -25,6 +30,7 @@ export async function getRememberedAccounts() {
   }
 }
 
+//===== (saveRememberedAccount) ======
 export async function saveRememberedAccount(email, password) {
   if (!email || !password) return;
 
@@ -44,6 +50,7 @@ export async function saveRememberedAccount(email, password) {
   await SecureStore.setItemAsync(getPasswordKey(cleanEmail), password);
 }
 
+//===== (getRememberedPassword) ======
 export async function getRememberedPassword(email) {
   if (!email) return "";
 
@@ -55,6 +62,7 @@ export async function getRememberedPassword(email) {
   }
 }
 
+//===== (removeRememberedAccount) ======
 export async function removeRememberedAccount(email) {
   if (!email) return;
 

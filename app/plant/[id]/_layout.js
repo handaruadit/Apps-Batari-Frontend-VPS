@@ -1,16 +1,17 @@
+//===== (Imports) ======
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { appColors } from "@/config/theme";
 import { useAppSettings } from "@/context/AppSettingsContext";
 
+//===== (Hidden Screens) ======
 const hiddenScreens = [
-  "data",
   "Add-device",
   "manage-access",
   "qr-scanner",
-  "sub-plant",
 ];
 
+//===== (Plant Detail Layout) ======
 export default function PlantDetailLayout() {
   const { colors, themeMode } = useAppSettings();
   const isLightMode = themeMode === "light";

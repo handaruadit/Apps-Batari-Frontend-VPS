@@ -1,129 +1,89 @@
-import React from 'react';
-import { render } from '@testing-library/react-native';
-import { AuthProvider, AuthContext } from '@/context/AuthContext';
+//===== (Imports) ======
+import React, { useContext } from 'react';
+import { Pressable, Text } from 'react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
+import { AuthContext, AuthProvider } from '@/context/AuthContext';
+import { clearAuth } from '@/auth/token';
+import { router } from 'expo-router';
 
+//===== (Mocks) ======
+jest.mock('@/auth/token', () => ({
+  clearAuth: jest.fn(async () => undefined),
+}));
+
+jest.mock('expo-router', () => ({
+  router: {
+    replace: jest.fn(),
+  },
+}));
+
+//===== (ContextConsumer) ======
+function ContextConsumer() {
+  const context = useContext(AuthContext);
+
+  return (
+    <>
+      <Text testID='user'>{context.user?.name || 'no-user'}</Text>
+      <Text testID='device'>{context.selectedDevice?.name || 'no-device'}</Text>
+      <Text testID='plant-count'>{String(context.plant.length)}</Text>
+      <Pressable onPress={() => context.setUser({ name: 'User Baru' })}>
+        <Text>set-user</Text>
+      </Pressable>
+      <Pressable onPress={() => context.setSelectedDevice({ name: 'Device Baru' })}>
+        <Text>set-device</Text>
+      </Pressable>
+      <Pressable onPress={() => context.setPlant([{ id: 1 }])}>
+        <Text>set-plant</Text>
+      </Pressable>
+      <Pressable onPress={context.logout}>
+        <Text>logout</Text>
+      </Pressable>
+    </>
+  );
+}
+
+//===== (renderContext) ======
+function renderContext() {
+  return render(
+    <AuthProvider>
+      <ContextConsumer />
+    </AuthProvider>,
+  );
+}
+
+//===== (AuthContext Tests) ======
 describe('AuthContext', () => {
-  it('provides default values', () => {
-    const TestComponent = () => {
-      const context = React.useContext(AuthContext);
-      expect(context.user).toBeNull();
-      expect(context.selectedDevice).toBeNull();
-      expect(context.devices).toHaveLength(5);
-      return null;
-    };
-
-    render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
-    );
+  beforeEach(() => {
+    clearAuth.mockClear();
+    router.replace.mockClear();
   });
 
-  it('sets user correctly', () => {
-    const mockUser = { id: 1, name: 'Test User' };
+  it('provides the current default state', () => {
+    const screen = renderContext();
 
-    const TestComponent = () => {
-      const { user, setUser } = React.useContext(AuthContext);
-      React.useEffect(() => {
-        setUser(mockUser);
-      }, [setUser]);
-      return null;
-    };
-
-    const { getByText } = render(
-      <AuthProvider>
-        <TestComponent />
-        <>{mockUser?.name || 'No User'}</>
-      </AuthProvider>
-    );
-
-    expect(getByText('Test User')).toBeTruthy();
+    expect(screen.getByTestId('user').props.children).toBe('no-user');
+    expect(screen.getByTestId('device').props.children).toBe('no-device');
+    expect(screen.getByTestId('plant-count').props.children).toBe('0');
   });
 
-  it('sets selectedDevice correctly', () => {
-    const mockDevice = { id: 1, name: 'Test Device' };
+  it('updates user, selected device, and plant state', () => {
+    const screen = renderContext();
 
-    const TestComponent = () => {
-      const { selectedDevice, setSelectedDevice } = React.useContext(AuthContext);
-      React.useEffect(() => {
-        setSelectedDevice(mockDevice);
-      }, [setSelectedDevice]);
-      return null;
-    };
+    fireEvent.press(screen.getByText('set-user'));
+    fireEvent.press(screen.getByText('set-device'));
+    fireEvent.press(screen.getByText('set-plant'));
 
-    const { getByText } = render(
-      <AuthProvider>
-        <TestComponent />
-        <>{mockDevice?.name || 'No Device'}</>
-      </AuthProvider>
-    );
-
-    expect(getByText('Test Device')).toBeTruthy();
+    expect(screen.getByTestId('user').props.children).toBe('User Baru');
+    expect(screen.getByTestId('device').props.children).toBe('Device Baru');
+    expect(screen.getByTestId('plant-count').props.children).toBe('1');
   });
 
-  it('sets devices correctly', () => {
-    const newDevices = [
-      { id: 1, name: 'Device 1' },
-      { id: 2, name: 'Device 2' },
-    ];
+  it('clears auth state and returns to login', async () => {
+    const screen = renderContext();
 
-    const TestComponent = () => {
-      const { devices, setDevices } = React.useContext(AuthContext);
-      React.useEffect(() => {
-        setDevices(newDevices);
-      }, [setDevices]);
-      return <>{`Devices count: ${devices.length}`}</>;
-    };
+    fireEvent.press(screen.getByText('logout'));
 
-    const { getByText } = render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
-    );
-
-    expect(getByText('Devices count: 2')).toBeTruthy();
-  });
-
-  it('has correct initial devices data', () => {
-    const TestComponent = () => {
-      const { devices } = React.useContext(AuthContext);
-      return <>{`${devices[0].name} - ${devices[1].name}`}</>;
-    };
-
-    const { getByText } = render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
-    );
-
-    expect(getByText('Adit - Catur')).toBeTruthy();
-  });
-
-  it('context provides setUser function', () => {
-    const TestComponent = () => {
-      const { setUser } = React.useContext(AuthContext);
-      expect(typeof setUser).toBe('function');
-      return null;
-    };
-
-    render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
-    );
-  });
-
-  it('context provides setDevices function', () => {
-    const TestComponent = () => {
-      const { setDevices } = React.useContext(AuthContext);
-      expect(typeof setDevices).toBe('function');
-      return null;
-    };
-
-    render(
-      <AuthProvider>
-        <TestComponent />
-      </AuthProvider>
-    );
+    await waitFor(() => expect(clearAuth).toHaveBeenCalledTimes(1));
+    expect(router.replace).toHaveBeenCalledWith('/(auth)/login');
   });
 });

@@ -1,5 +1,7 @@
+//===== (Imports) ======
 import { Stack } from 'expo-router';
 
+//===== (MainLayout) ======
 export default function MainLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>

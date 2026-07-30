@@ -1,65 +1,80 @@
+//===== (Imports) ======
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 import DeviceCard from '@/components/DeviceCard';
+import {
+  formatCityProvince,
+  getPlantConnectionStatus,
+} from '@/components/device-card/helpers';
 
-describe('DeviceCard', () => {
-  const mockDevice = {
+//===== (Fixtures) ======
+const NOW = new Date('2026-07-30T04:00:00.000Z').getTime();
+
+function createDevice(overrides = {}) {
+  return {
     id: 1,
-    name: 'Adit',
-    sn: 'SN-938472615',
-    location: 'Jakarta',
-    category: 'Solar',
-    system_type: 'Solar System',
+    name: 'Plant Jakarta',
+    city: 'Jakarta',
+    province: 'DKI Jakarta',
+    latestDataStatusTimestamp: new Date(NOW - 5 * 60 * 1000).toISOString(),
+    ...overrides,
   };
+}
 
-  it('renders device information correctly', () => {
-    const { getByText } = render(<DeviceCard device={mockDevice} />);
-
-    expect(getByText('Adit')).toBeTruthy();
-    expect(getByText('SN: SN-938472615')).toBeTruthy();
-    expect(getByText('Jakarta')).toBeTruthy();
-    expect(getByText('Solar')).toBeTruthy();
+//===== (DeviceCard Tests) ======
+describe('DeviceCard', () => {
+  beforeAll(() => {
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
   });
 
-  it('calls onPress when card is pressed', () => {
+  afterAll(() => {
+    Date.now.mockRestore();
+  });
+
+  it('renders the current plant summary', () => {
+    const screen = render(<DeviceCard device={createDevice()} />);
+
+    expect(screen.getByText('Plant Jakarta')).toBeTruthy();
+    expect(screen.getByText('Jakarta, DKI Jakarta')).toBeTruthy();
+    expect(screen.getByText('Online')).toBeTruthy();
+  });
+
+  it('calls onPress with the native card interaction', () => {
     const onPress = jest.fn();
-    const { getByText } = render(
-      <DeviceCard device={mockDevice} onPress={onPress} />
+    const screen = render(
+      <DeviceCard device={createDevice()} onPress={onPress} />,
     );
 
-    fireEvent.press(getByText('Adit'));
+    fireEvent.press(screen.getByText('Plant Jakarta'));
 
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it('handles undefined category', () => {
-    const deviceWithoutCategory = { ...mockDevice, category: undefined };
-    const { getByText } = render(<DeviceCard device={deviceWithoutCategory} />);
+  it('uses a dash when city and province are unavailable', () => {
+    const screen = render(
+      <DeviceCard device={createDevice({ city: null, province: null })} />,
+    );
 
-    expect(getByText('Other')).toBeTruthy();
+    expect(screen.getByText('-')).toBeTruthy();
+  });
+});
+
+//===== (DeviceCard Helper Tests) ======
+describe('DeviceCard helpers', () => {
+  it('formats the available city and province values', () => {
+    expect(formatCityProvince({ city: 'Bandung', province: 'Jawa Barat' })).toBe(
+      'Bandung, Jawa Barat',
+    );
+    expect(formatCityProvince({ city: '', province: '' })).toBe('-');
   });
 
-  it('handles undefined location', () => {
-    const deviceWithoutLocation = { ...mockDevice, location: undefined };
-    const { getByText } = render(<DeviceCard device={deviceWithoutLocation} />);
+  it('marks data older than fifteen minutes as offline', () => {
+    const status = getPlantConnectionStatus(
+      createDevice({
+        latestDataStatusTimestamp: new Date(NOW - 16 * 60 * 1000).toISOString(),
+      }),
+    );
 
-    expect(getByText('-')).toBeTruthy();
-  });
-
-  it('renders with all props present', () => {
-    const { getByText, queryByText } = render(<DeviceCard device={mockDevice} />);
-
-    expect(getByText('Adit')).toBeTruthy();
-    expect(getByText('SN: SN-938472615')).toBeTruthy();
-    expect(getByText('Jakarta')).toBeTruthy();
-    expect(getByText('Solar')).toBeTruthy();
-  });
-
-  it('does not call onPress when not provided', () => {
-    const { getByText } = render(<DeviceCard device={mockDevice} />);
-
-    expect(() => {
-      fireEvent.press(getByText('Adit'));
-    }).not.toThrow();
+    expect(status).toMatchObject({ key: 'offline', isOnline: false });
   });
 });
