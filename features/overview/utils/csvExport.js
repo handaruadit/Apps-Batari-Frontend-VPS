@@ -32,7 +32,7 @@ export function formatCsvCellValue(value) {
     return "";
   }
 
-  return Math.abs(number).toFixed(2);
+  return number.toFixed(2);
 }
 
 //===== (escapeCsvCell) ======
@@ -52,11 +52,10 @@ export function buildDailyCsvRows(series) {
     items[time] = {
       time,
       production: "",
+      load: "",
       grid: "",
       battery: "",
       pvGenerate: "",
-      export: "",
-      charge: "",
     };
     return items;
   }, {});
@@ -88,21 +87,19 @@ export function buildDailyCsv({ series }) {
   const header = [
     "Waktu",
     "PV",
+    "Load",
     "Grid",
     "Battery",
     "PV Generate",
-    "Export",
-    "Charge",
   ];
   const csvRows = rows.map((row) =>
     [
       row.time,
       row.production,
+      row.load,
       row.grid,
       row.battery,
       row.pvGenerate,
-      row.export,
-      row.charge,
     ]
       .map(escapeCsvCell)
       .join(","),
@@ -133,4 +130,3 @@ export async function shareDailyChartCsv({ series, dateText, unavailableMessage 
     UTI: "public.comma-separated-values-text",
   });
 }
-

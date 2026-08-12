@@ -1,19 +1,20 @@
 //===== (Imports) ======
 import { Ionicons } from '@expo/vector-icons';
-import { ActivityIndicator, Modal, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import DailyOverviewChart from './DailyOverviewChart';
+import OverviewChart from './charts/OverviewChart';
 import styles from '../styles/overview.styles';
 
 //===== (LandscapeChartModal) ======
 export default function LandscapeChartModal({
   activeSegment,
+  chartError,
+  chartStatus,
   chartCurrentTime,
   chartYearRange,
   colors,
   dailySeries,
   isChartLandscapeVisible,
-  isChartLoading,
   isLandscapeChartRotated,
   isLightMode,
   landscapeChartHeight,
@@ -75,47 +76,25 @@ export default function LandscapeChartModal({
               },
             ]}
           >
-            {isChartLoading ? (
-              <View
-                style={[
-                  styles.chartLoadingWrap,
-                  {
-                    width: landscapeChartWidth,
-                    minHeight: landscapeChartHeight,
-                  },
-                ]}
-              >
-                <ActivityIndicator size="large" color={colors.accent} />
-                <Text
-                  style={[
-                    styles.chartLoadingText,
-                    { color: colors.textSoft },
-                  ]}
-                >
-                  {t("loadingChart")}
-                </Text>
-              </View>
-            ) : (
-              <DailyOverviewChart
-                series={dailySeries}
-                chartWidth={landscapeChartWidth}
-                chartHeight={landscapeChartHeight}
-                visibleSeries={visiblePowerSeries}
-                onToggleSeries={togglePowerSeries}
-                currentTime={chartCurrentTime}
-                showCurrentTime={false}
-                showSwitches={false}
-                mode="landscape"
-                segment={activeSegment}
-                selectedDay={selectedDay}
-                selectedMonth={selectedMonth}
-                selectedYear={selectedYear}
-                yearRange={chartYearRange}
-                selectedDataPercentages={plantData.selectedDataPercentages}
-                socValue={plantData.soc}
-                plantName={plantData.plantName}
-              />
-            )}
+            <OverviewChart
+              chartError={chartError}
+              chartStatus={chartStatus}
+              chartWidth={landscapeChartWidth}
+              chartHeight={landscapeChartHeight}
+              currentTime={chartCurrentTime}
+              lastTimestamp={plantData.latestDataTimestamp}
+              mode="landscape"
+              onToggleSeries={togglePowerSeries}
+              period={activeSegment}
+              selectedDay={selectedDay}
+              selectedMonth={selectedMonth}
+              selectedYear={selectedYear}
+              series={dailySeries}
+              showCurrentTime={false}
+              showLegend={false}
+              visibleSeries={visiblePowerSeries}
+              yearRange={chartYearRange}
+            />
           </View>
         </View>
       </SafeAreaView>

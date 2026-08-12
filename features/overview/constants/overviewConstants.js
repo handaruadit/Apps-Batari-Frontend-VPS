@@ -1,13 +1,4 @@
-//===== (Imports) ======
-import { Dimensions } from "react-native";
-
 //===== (Overview Constants) ======
-//===== (screenWidth) ======
-export const screenWidth = Dimensions.get("window").width;
-
-//===== (CHART_WIDTH) ======
-export const CHART_WIDTH = screenWidth - 60;
-
 //===== (CHART_HEIGHT) ======
 export const CHART_HEIGHT = 250;
 
@@ -22,9 +13,6 @@ export const LANDSCAPE_CHART_LAYOUT = {
   axisBottomPadding: 26,
   axisLeftPadding: 38,
 };
-
-//===== (CHART_STORAGE_PREFIX) ======
-export const CHART_STORAGE_PREFIX = "batari:overview-chart:";
 
 //===== (DEBUG_CHART) ======
 export const DEBUG_CHART = process.env.EXPO_PUBLIC_DEBUG_CHART === "true";
@@ -54,13 +42,20 @@ export const WEATHER_LAYOUT = {
   dayIconMarginBottom: 16,
 };
 
-//===== (POWER_SERIES_CONFIG) ======
+//========== POWER SERIES ==========
 export const POWER_SERIES_CONFIG = [
   {
     key: "production",
     labelKey: "pv",
     label: "PV",
     color: "#1FB7FF",
+    group: "consumption",
+  },
+  {
+    key: "load",
+    labelKey: "load",
+    label: "Load",
+    color: "#B96CFF",
     group: "consumption",
   },
   {
@@ -81,39 +76,65 @@ export const POWER_SERIES_CONFIG = [
     key: "pvGenerate",
     labelKey: "pvGenerate",
     label: "PV Generate",
-    color: "#FF4646",
+    color: "#EF4444",
     group: "production",
   },
-  // {
-  //   key: "export",
-  //   labelKey: "export",
-  //   label: "Export",
-  //   color: "#4F46E5",
-  //   group: "production",
-  // },
-  // {
-  //   key: "charge",
-  //   labelKey: "charge",
-  //   label: "Charge",
-  //   color: "#A855F7",
-  //   group: "production",
-  // },
+];
+
+//========== ENERGY SERIES ==========
+export const ENERGY_SERIES_CONFIG = [
+  {
+    key: "production",
+    labelKey: "pv",
+    label: "PV",
+    color: "#1FB7FF",
+    group: "consumption",
+  },
   {
     key: "load",
     labelKey: "load",
     label: "Load",
-    color: "#A855F7",
+    color: "#B96CFF",
     group: "consumption",
+  },
+  {
+    key: "grid",
+    labelKey: "grid",
+    label: "Grid",
+    color: "#FF9300",
+    group: "consumption",
+  },
+  {
+    key: "battery",
+    labelKey: "battery",
+    label: "Battery",
+    color: "#99E500",
+    group: "consumption",
+  },
+  {
+    key: "pvGenerate",
+    labelKey: "pvGenerate",
+    label: "PV Generate",
+    color: "#EF4444",
+    group: "production",
   },
 ];
 
-//===== (SOC_SELECTED_INFO_CONFIG) ======
-export const SOC_SELECTED_INFO_CONFIG = {
+//========== SOC SERIES ==========
+export const SOC_SERIES_CONFIG = {
   key: "soc",
   labelKey: "soc",
   label: "SoC",
   color: "#FACC15",
+  group: "battery",
 };
+
+export const DAY_SERIES_CONFIG = [
+  ...POWER_SERIES_CONFIG,
+  SOC_SERIES_CONFIG,
+];
+
+export const SOC_SELECTED_INFO_CONFIG = SOC_SERIES_CONFIG;
 
 //===== (SELECTED_INFO_PRIMARY_KEYS) ======
 export const SELECTED_INFO_PRIMARY_KEYS = ["production", "grid", "battery", "load"];
@@ -128,6 +149,10 @@ export const SOC_FIELD_KEYS = [
   "stateOfCharge",
   "state_of_charge",
   "batteryStateOfCharge",
+  "socPercent",
+  "socPercentage",
+  "batterySocPercent",
+  "batterySocPercentage",
 ];
 
 //===== (GENERIC_PERCENT_FIELD_KEYS) ======
@@ -159,7 +184,7 @@ export const SELECTED_PERCENT_CATEGORY_KEYS = {
 };
 
 //===== (OVERVIEW_CHART_SWITCH_STORAGE_KEY) ======
-export const OVERVIEW_CHART_SWITCH_STORAGE_KEY = "overviewChartSwitchSettings";
+export const OVERVIEW_CHART_SWITCH_STORAGE_KEY = "overviewChartSeriesVisibility:v3";
 
 //===== (MENU_TOP_OFFSET) ======
 export const MENU_TOP_OFFSET = 20;
@@ -478,6 +503,7 @@ export const POWER_LATEST_ENDPOINT_CONFIG = [
 //===== (POWER_CATEGORY_ALIASES) ======
 export const POWER_CATEGORY_ALIASES = {
   pv: ["pv", "solar"],
+  production: ["production"],
   grid: ["grid"],
   battery: ["battery", "baterai"],
   load: ["load", "out"],
@@ -488,16 +514,18 @@ export const POWER_TYPE_ALIASES = {
   power: ["power"],
   chargePower: ["chargePower", "charge_power", "chargepower"],
   vaPower: ["vaPower", "va_power", "vapower"],
+  pvGenerate: ["pvGenerate", "pv_generate", "pvgenerate"],
+  soc: ["soc", "stateOfCharge", "state_of_charge"],
 };
 
 //===== (POWER_CHART_LAYOUT) ======
 export const POWER_CHART_LAYOUT = {
-  paddingTop: 52,
-  paddingRight: 58,
-  paddingBottom: 62,
-  paddingLeft: 46,
-  axisTitleFontSize: 18,
-  axisLabelFontSize: 13,
+  paddingTop: 24,
+  paddingRight: 12,
+  paddingBottom: 34,
+  paddingLeft: 44,
+  axisTitleFontSize: 13,
+  axisLabelFontSize: 11,
   timeLabelFontSize: 12,
   currentTimeFontSize: 13,
   lineStrokeWidth: 1.6,
@@ -509,66 +537,17 @@ export const POWER_CHART_LAYOUT = {
   switchMarginTop: 10,
 };
 
-//===== (POWER_CHART_Y_RANGE) ======
-export const POWER_CHART_Y_RANGE = {
-  minKw: -8,
-  maxKw: 8,
-  leftTicks: [8, 6, 4, 2, 0, -2, -4, -6, -8],
-};
-
-//===== (POWER_CHART_MONTH_Y_RANGE) ======
-export const POWER_CHART_MONTH_Y_RANGE = {
-  minY: -100,
-  maxY: 100,
-  leftTicks: [100, 75, 50, 25, 0, -25, -50, -75, -100],
-};
-
 //===== (POWER_CHART_AGGREGATE_UNIT_FALLBACK) ======
 export const POWER_CHART_AGGREGATE_UNIT_FALLBACK = "kWh";
 
 //===== (POWER_CHART_TIME_TICKS) ======
 export const POWER_CHART_TIME_TICKS = [0, 3, 6, 9, 12, 15, 18, 21, 24];
 
-//===== (POWER_CHART_MONTH_X_TICKS) ======
-export const POWER_CHART_MONTH_X_TICKS = [
-  1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31,
-];
-
-//===== (POWER_CHART_YEAR_Y_RANGE) ======
-export const POWER_CHART_YEAR_Y_RANGE = {
-  minY: -300,
-  maxY: 300,
-  leftTicks: [300, 225, 150, 75, 0, -75, -150, -225, -300],
-};
-
-//===== (POWER_CHART_YEAR_X_TICKS) ======
-export const POWER_CHART_YEAR_X_TICKS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
-//===== (POWER_CHART_MARKER) ======
-export const POWER_CHART_MARKER = {
-  color: "#F8FAFC",
-  lineColor: "rgba(248,250,252,0.82)",
-  hitSlop: 18,
-  triangleSize: 9,
-};
-
-//===== (POWER_CHART_IDLE_RETURN_MS) ======
-export const POWER_CHART_IDLE_RETURN_MS = 5 * 60 * 1000;
-
 //===== (POWER_CHART_DAY_CHIP_STEP) ======
 export const POWER_CHART_DAY_CHIP_STEP = 50;
 
 //===== (POWER_CHART_MONTH_CHIP_STEP) ======
 export const POWER_CHART_MONTH_CHIP_STEP = 104;
-
-//===== (POWER_CHART_LOADING_DELAY_MS) ======
-export const POWER_CHART_LOADING_DELAY_MS = 1200;
-
-//===== (POWER_CHART_HISTORY_MAX_POINTS) ======
-export const POWER_CHART_HISTORY_MAX_POINTS = 720;
-
-//===== (POWER_CHART_SAMPLE_MIN_GAP_MS) ======
-export const POWER_CHART_SAMPLE_MIN_GAP_MS = 60 * 1000;
 
 //===== (MONITORING_ONLINE_THRESHOLD_MS) ======
 export const MONITORING_ONLINE_THRESHOLD_MS = 15 * 60 * 1000;
@@ -601,8 +580,8 @@ export const ZERO_POWER_VALUES = {
 //===== (POWER_CHART_RESPONSIVE_WIDTH) ======
 export const POWER_CHART_RESPONSIVE_WIDTH = {
   min: 240,
-  max: 520,
-  horizontalGap: 60,
+  max: 720,
+  horizontalGap: 56,
   compactInnerWidth: 260,
   mediumInnerWidth: 340,
 };

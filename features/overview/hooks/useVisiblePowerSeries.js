@@ -2,8 +2,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useState } from "react";
 import {
+  DAY_SERIES_CONFIG,
   OVERVIEW_CHART_SWITCH_STORAGE_KEY,
-  POWER_SERIES_CONFIG,
 } from "../constants/overviewConstants";
 import { getDefaultVisiblePowerSeries } from "../utils/powerFlow";
 
@@ -35,7 +35,7 @@ export function useVisiblePowerSeries() {
         }
 
         const defaults = getDefaultVisiblePowerSeries();
-        const nextVisibleSeries = POWER_SERIES_CONFIG.reduce((items, item) => {
+        const nextVisibleSeries = DAY_SERIES_CONFIG.reduce((items, item) => {
           items[item.key] =
             typeof parsedValue[item.key] === "boolean"
               ? parsedValue[item.key]

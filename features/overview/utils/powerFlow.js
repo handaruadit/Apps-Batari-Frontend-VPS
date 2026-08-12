@@ -3,6 +3,7 @@ import { Easing } from "react-native";
 import {
   BATTERY_POINTER_CONFIG,
   BUBBLE_BASE_POSITION,
+  DAY_SERIES_CONFIG,
   GRID_POINTER_CONFIG,
   LOAD_POINTER_CONFIG,
   LOWER_POWER_FLOW_DUMMY_DATA,
@@ -35,8 +36,8 @@ export function getSelectedInfoConfig() {
 
 //===== (getDefaultVisiblePowerSeries) ======
 export const getDefaultVisiblePowerSeries = () =>
-  POWER_SERIES_CONFIG.reduce((items, item) => {
-    items[item.key] = true;
+  DAY_SERIES_CONFIG.reduce((items, item) => {
+    items[item.key] = item.key === "production" || item.key === "load";
     return items;
   }, {});
 
@@ -478,4 +479,3 @@ export function getPointerAnimationEasing(config) {
 
   return Easing.linear;
 }
-

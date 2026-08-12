@@ -1,8 +1,10 @@
 //===== (Imports) ======
 import {
+  DAY_SERIES_CONFIG,
   MONITORING_ONLINE_THRESHOLD_MS,
   POWER_CHART_AGGREGATE_UNIT_FALLBACK,
   POWER_SERIES_CONFIG,
+  SOC_FIELD_KEYS,
 } from "../constants/overviewConstants";
 import {
   collectMonitoringTimestamps,
@@ -202,12 +204,60 @@ export function getAggregateItemValue(row, key) {
   const rawValue = row?.[valueKey];
 
   if (rawValue === undefined || rawValue === null || rawValue === "") {
-    return key === "load" ? 0 : null;
+    return null;
   }
 
   const value = Number(rawValue);
 
-  return Number.isFinite(value) ? Math.abs(value) : null;
+  return Number.isFinite(value) ? value : null;
+}
+
+//===== (normalizeSocSeries) ======
+export function normalizeSocSeries(data) {
+  const directRows = [data?.soc, data?.SoC, data?.SOC].flatMap((candidate) =>
+    Array.isArray(candidate) ? candidate : candidate == null ? [] : [candidate],
+  );
+  const typedRecord = getApiRecord(data, "battery", "soc");
+  const typedRows = Array.isArray(typedRecord)
+    ? typedRecord
+    : typedRecord == null
+      ? []
+      : [typedRecord];
+  const embeddedSources = [
+    ...(Array.isArray(data) ? data : []),
+    ...(Array.isArray(data?.battery) ? data.battery : []),
+  ];
+  const embeddedRows = embeddedSources.filter(
+    (record) => pickObjectValueByAliases(record, SOC_FIELD_KEYS) !== undefined,
+  );
+
+  const socRecords = [
+    ...directRows.map((record) => ({ allowGenericPercent: true, record })),
+    ...typedRows.map((record) => ({ allowGenericPercent: true, record })),
+    ...embeddedRows.map((record) => ({ allowGenericPercent: false, record })),
+  ];
+
+  return socRecords
+    .map(({ allowGenericPercent, record }) => {
+      const directSoc = pickObjectValueByAliases(record, SOC_FIELD_KEYS);
+      const genericPercent = allowGenericPercent
+        ? pickObjectValueByAliases(record, ["percentage", "percent"])
+        : undefined;
+      const rawValue = directSoc ?? genericPercent ?? getApiNumber(record);
+
+      if (rawValue === null || rawValue === undefined || rawValue === "") {
+        return null;
+      }
+
+      const value = Number(rawValue);
+
+      if (!Number.isFinite(value) || value < 0 || value > 100) {
+        return null;
+      }
+
+      return typeof record === "object" ? { ...record, value } : { value };
+    })
+    .filter(Boolean);
 }
 
 //===== (getChartDataUnit) ======
@@ -254,29 +304,41 @@ export function normalizeChartSeries(data) {
   const directSeries = {
     production: normalizeSeriesRows(data?.production),
     grid: normalizeSeriesRows(data?.grid),
-    battery: splitBatteryChargeSeries(data?.battery, "battery"),
-    pvGenerate: normalizeSeriesRows(data?.pvGenerate),
+    battery: normalizeSeriesRows(data?.battery),
     load: normalizeSeriesRows(data?.load),
+    pvGenerate: normalizeSeriesRows(data?.pvGenerate),
+    soc: normalizeSocSeries(data),
   };
-  const hasDirectSeries = hasChartSeriesRows(directSeries);
   const production = getApiSeries(data, "pv", "chargePower");
   const pvPower = getApiSeries(data, "pv", "power");
   const batteryPower = getApiSeries(data, "battery", "power");
-
-  if (hasDirectSeries) {
-    return directSeries;
-  }
+  const loadPower = getApiSeries(data, "load", "power");
+  const pvGenerate = mergeSeriesRows(
+    getApiSeries(data, "production", "pvGenerate"),
+    getApiSeries(data, "pv", "pvGenerate"),
+  );
 
   return {
-    production: production.length ? production : pvPower,
-    grid: getApiSeries(data, "grid", "power"),
-    battery: splitBatteryChargeSeries(batteryPower, "battery"),
-    pvGenerate: normalizeSeriesRows(data?.pvGenerate),
-    export: normalizeSeriesRows(data?.export),
-    charge: mergeSeriesRows(
-      splitBatteryChargeSeries(data?.charge, "charge"),
-      splitBatteryChargeSeries(batteryPower, "charge"),
-    ),
+    production: directSeries.production.length
+      ? directSeries.production
+      : production.length
+        ? production
+        : pvPower,
+    grid: directSeries.grid.length
+      ? directSeries.grid
+      : getApiSeries(data, "grid", "power"),
+    battery: directSeries.battery.length
+      ? directSeries.battery
+      : batteryPower,
+    load: directSeries.load.length
+      ? directSeries.load
+      : loadPower.length
+        ? loadPower
+        : getApiSeries(data, "load", "vaPower"),
+    pvGenerate: directSeries.pvGenerate.length
+      ? directSeries.pvGenerate
+      : pvGenerate,
+    soc: directSeries.soc,
   };
 }
 
@@ -318,7 +380,7 @@ export function mergeSeriesRows(...seriesParts) {
 
 //===== (mergeChartSeries) ======
 export function mergeChartSeries(...seriesGroups) {
-  return POWER_SERIES_CONFIG.reduce((merged, item) => {
+  return DAY_SERIES_CONFIG.reduce((merged, item) => {
     merged[item.key] = mergeSeriesRows(
       ...seriesGroups.map((group) => group?.[item.key]),
     );
@@ -474,6 +536,5 @@ export function getDevicesMonitoringState(devices) {
 
 //===== (hasChartSeriesRows) ======
 export function hasChartSeriesRows(series) {
-  return POWER_SERIES_CONFIG.some((item) => series?.[item.key]?.length);
+  return DAY_SERIES_CONFIG.some((item) => series?.[item.key]?.length);
 }
-

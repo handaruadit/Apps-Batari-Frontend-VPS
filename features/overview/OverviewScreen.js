@@ -9,9 +9,7 @@ import {
   PLANT_HEADER_BOX,
   PLANT_HEADER_BUTTON,
   POWER_CHART_DAY_CHIP_STEP,
-  POWER_CHART_LOADING_DELAY_MS,
   POWER_CHART_MONTH_CHIP_STEP,
-  POWER_SERIES_CONFIG,
   ZERO_ENERGY_VALUES,
 } from "./constants/overviewConstants";
 import { useOverviewData } from "./hooks/useOverviewData";
@@ -19,10 +17,7 @@ import { useVisiblePowerSeries } from "./hooks/useVisiblePowerSeries";
 import styles from "./styles/overview.styles";
 import { pickFiniteNumber, pickNumber, pickValue } from "./utils/apiData";
 import {
-  buildFallbackSeries,
-  buildZeroSeries,
   createEmptyChartSeries,
-  getChartFallbackValue,
   getResponsiveChartWidth,
 } from "./utils/chartData";
 import {
@@ -85,7 +80,6 @@ export default function OverviewScreen() {
   const [selectedMonth, setSelectedMonth] = useState(initialJakartaDate.month);
   const [selectedYear, setSelectedYear] = useState(initialJakartaDate.year);
   const [plantMenuVisible, setPlantMenuVisible] = useState(false);
-  const [isChartLoading, setIsChartLoading] = useState(true);
   const [isChartLandscapeVisible, setIsChartLandscapeVisible] = useState(false);
   const [chartCurrentTime, setChartCurrentTime] = useState(() => new Date());
   const { togglePowerSeries, visiblePowerSeries } = useVisiblePowerSeries();
@@ -100,7 +94,9 @@ export default function OverviewScreen() {
     [initialJakartaDate.year],
   );
   const {
+    chartError,
     chartSelectionKey,
+    chartStatus,
     fetchedData,
     fetchOverviewData,
     focusRefreshKey,
@@ -121,9 +117,7 @@ export default function OverviewScreen() {
   const weatherCardAnim = useRef(new Animated.Value(0)).current;
   const dayPickerScrollRef = useRef(null);
   const monthPickerScrollRef = useRef(null);
-  const chartLoadingTimerRef = useRef(null);
   const todayParts = getJakartaDateParts();
-  const todayDay = todayParts.day;
   const todayMonth = todayParts.month;
   const todayYear = todayParts.year;
   //===== (Data Source Options) ======
@@ -342,46 +336,12 @@ export default function OverviewScreen() {
     });
   };
 
-  const isFutureDaySelection =
-    activeSegment === "day" &&
-    new Date(selectedYear, selectedMonth - 1, selectedDay) >
-      new Date(todayYear, todayMonth - 1, todayDay);
-
-  const isFutureMonthSelection =
-    activeSegment === "month" &&
-    (selectedYear > todayYear ||
-      (selectedYear === todayYear && selectedMonth > todayMonth));
-
-  const isFutureYearSelection = false;
-
-  const isFutureSelection =
-    isFutureDaySelection || isFutureMonthSelection || isFutureYearSelection;
-  //===== (Daily Chart Series) ======
+  //===== (Historical Chart Series) ======
   const dailySeries = useMemo(() => {
-    return POWER_SERIES_CONFIG.reduce((items, item, index) => {
-      const apiSeries = plantData.chartSeries?.[item.key];
-
-      if (isFutureSelection) {
-        items[item.key] = buildZeroSeries();
-        return items;
-      }
-
-      if (activeSegment !== "day") {
-        items[item.key] = Array.isArray(apiSeries) ? apiSeries : [];
-        return items;
-      }
-
-      items[item.key] =
-        Array.isArray(apiSeries) && apiSeries.length
-          ? apiSeries
-          : buildFallbackSeries(
-              getChartFallbackValue(item.key, plantData),
-              index,
-            );
-
-      return items;
-    }, {});
-  }, [activeSegment, isFutureSelection, plantData]);
+    return fetchedData?.chartSelectionKey === chartSelectionKey
+      ? plantData.chartSeries
+      : createEmptyChartSeries();
+  }, [chartSelectionKey, fetchedData?.chartSelectionKey, plantData.chartSeries]);
 
 
   const monthOptions = [
@@ -429,29 +389,6 @@ export default function OverviewScreen() {
     return () => cancelAnimationFrame(frame);
   }, [activeSegment, selectedDay, selectedMonth, selectedYear]);
 
-  //===== (manageChartLoadingState) ======
-  useEffect(() => {
-    if (chartLoadingTimerRef.current) {
-      clearTimeout(chartLoadingTimerRef.current);
-    }
-
-    if (!chartSelectionKey) {
-      setIsChartLoading(false);
-      return undefined;
-    }
-
-    setIsChartLoading(true);
-    chartLoadingTimerRef.current = setTimeout(() => {
-      setIsChartLoading(false);
-    }, POWER_CHART_LOADING_DELAY_MS);
-
-    return () => {
-      if (chartLoadingTimerRef.current) {
-        clearTimeout(chartLoadingTimerRef.current);
-      }
-    };
-  }, [chartSelectionKey]);
-
   //===== (scrollMonthPicker) ======
   useEffect(() => {
     if (activeSegment !== "month") {
@@ -486,7 +423,7 @@ export default function OverviewScreen() {
   useEffect(() => {
     const clock = setInterval(() => {
       setChartCurrentTime(new Date());
-    }, 1000);
+    }, 60 * 1000);
 
     return () => clearInterval(clock);
   }, []);
@@ -724,6 +661,8 @@ export default function OverviewScreen() {
 
           <OverviewChartSection
             activeSegment={activeSegment}
+            chartError={chartError}
+            chartStatus={chartStatus}
             chartCurrentTime={chartCurrentTime}
             chartYearRange={chartYearRange}
             colors={colors}
@@ -734,7 +673,6 @@ export default function OverviewScreen() {
             goNextYear={goNextYear}
             goPrevMonth={goPrevMonth}
             goPrevYear={goPrevYear}
-            isChartLoading={isChartLoading}
             isLightMode={isLightMode}
             monthOptions={monthOptions}
             monthPickerScrollRef={monthPickerScrollRef}
@@ -761,12 +699,13 @@ export default function OverviewScreen() {
 
       <LandscapeChartModal
         activeSegment={activeSegment}
+        chartError={chartError}
+        chartStatus={chartStatus}
         chartCurrentTime={chartCurrentTime}
         chartYearRange={chartYearRange}
         colors={colors}
         dailySeries={dailySeries}
         isChartLandscapeVisible={isChartLandscapeVisible}
-        isChartLoading={isChartLoading}
         isLandscapeChartRotated={isLandscapeChartRotated}
         isLightMode={isLightMode}
         landscapeChartHeight={landscapeChartHeight}

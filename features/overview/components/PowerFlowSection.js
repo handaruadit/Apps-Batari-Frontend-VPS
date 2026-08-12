@@ -616,9 +616,6 @@ export default function PowerFlowSection({
         </View>
       </View>
 
-      <Text style={[styles.powerFlowTitle, { color: colors.text }]}>
-        {t("selfConsumptionProductionRatio")}
-      </Text>
       <View
         style={[
           styles.powerFlowWrapper,

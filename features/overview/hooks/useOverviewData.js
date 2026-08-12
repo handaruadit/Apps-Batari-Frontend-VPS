@@ -25,20 +25,12 @@ import {
 import {
   buildChartEndpoint,
   buildChartSelectionKey,
-  buildDemoChartSeries,
   buildLatestPowerRequests,
   buildYearRangeChartSeries,
   createEmptyChartSeries,
-  createRealtimeChartSampleSeries,
   debugChartLog,
   getChartRequestDate,
   getChartSeriesCounts,
-  isSelectedCurrentDay,
-  loadStoredChartSeries,
-  mergeAndLimitChartSeries,
-  removeStoredChartSeries,
-  saveStoredChartSeries,
-  shouldAppendRealtimeChartSample,
 } from '../utils/chartData';
 import { getChartApiSegment } from '../utils/dateTime';
 import {
@@ -47,7 +39,6 @@ import {
   getDevicesMonitoringState,
   getLatestEnergyValues,
   hasAnyPowerValue,
-  hasChartSeriesRows,
   mergeChartSeries,
   mergePowerValues,
   normalizeChartSeries,
@@ -73,6 +64,11 @@ export function useOverviewData({
   const [plantDevices, setPlantDevices] = useState([]);
   const [focusRefreshKey, setFocusRefreshKey] = useState(0);
   const [isRefreshLoading, setIsRefreshLoading] = useState(false);
+  const [chartRequestState, setChartRequestState] = useState({
+    key: null,
+    status: "loading",
+    error: null,
+  });
   const plantDevicesRef = useRef([]);
 
   //===== (Chart Selection Key) ======
@@ -307,6 +303,16 @@ export function useOverviewData({
             ? buildYearRangeChartSeries(chartResults, chartYearRange)
             : mergeChartSeries(normalizeChartSeries(chartResult.json.data))
           : createEmptyChartSeries();
+        setChartRequestState({
+          key: chartSelectionKey,
+          status: chartRequestSucceeded ? "ready" : "error",
+          error: chartRequestSucceeded
+            ? null
+            : chartResults
+                .map((item) => item?.error)
+                .filter(Boolean)
+                .join("; ") || "Unable to load chart data.",
+        });
         debugChartLog("response", {
           plantId: resolvedPlantId,
           segment: activeSegment,
@@ -319,10 +325,6 @@ export function useOverviewData({
             .join("; "),
           counts: getChartSeriesCounts(chartSeries),
         });
-        const fallbackChartSeries =
-          chartRequestSucceeded || activeSegment !== "day"
-            ? createEmptyChartSeries()
-            : await loadStoredChartSeries(chartSelectionKey);
         const apiPowerValues = mergePowerValues(
           ...latestResults.map((item, index) =>
             normalizeLatestPowerValues(
@@ -359,51 +361,14 @@ export function useOverviewData({
           : effectiveMonitoringState.isOnline
             ? apiEnergyValues
             : ZERO_ENERGY_VALUES;
-        const realtimeChartSampleSeries =
-          isSelectedCurrentDay(
-            activeSegment,
-            selectedDay,
-            selectedMonth,
-            selectedYear,
-          ) && effectiveMonitoringState.isOnline
-            ? createRealtimeChartSampleSeries(displayPowerValues)
-            : createEmptyChartSeries();
-
         setFetchedData((current) => {
           const currentChartSeries =
             current?.chartSelectionKey === chartSelectionKey
               ? current?.chartSeries
               : createEmptyChartSeries();
-          const demoChartSeries = isCurrentDemoPlant
-            ? buildDemoChartSeries(
-                activeSegment,
-                selectedDay,
-                selectedMonth,
-                selectedYear,
-                chartYearRange,
-              )
-            : null;
-          const baseChartSeries =
-            isCurrentDemoPlant && !hasChartSeriesRows(chartSeries)
-              ? demoChartSeries
-              : chartRequestSucceeded
-                ? chartSeries
-                : hasChartSeriesRows(fallbackChartSeries)
-                  ? fallbackChartSeries
-                  : currentChartSeries;
-          let nextChartSeries = mergeAndLimitChartSeries(baseChartSeries);
-
-          if (
-            shouldAppendRealtimeChartSample(
-              nextChartSeries,
-              realtimeChartSampleSeries,
-            )
-          ) {
-            nextChartSeries = mergeAndLimitChartSeries(
-              nextChartSeries,
-              realtimeChartSampleSeries,
-            );
-          }
+          const nextChartSeries = chartRequestSucceeded
+            ? chartSeries
+            : currentChartSeries;
 
           return {
             ...current,
@@ -542,11 +507,13 @@ export function useOverviewData({
           };
         });
 
-        if (chartRequestSucceeded && !hasChartSeriesRows(chartSeries)) {
-          await removeStoredChartSeries(chartSelectionKey);
-        }
       } catch (error) {
         console.error("Error fetching plant data:", error);
+        setChartRequestState({
+          key: chartSelectionKey,
+          status: "error",
+          error: error?.message || "Unable to load chart data.",
+        });
       } finally {
         if (showLoading) {
           setIsRefreshLoading(false);
@@ -578,24 +545,22 @@ export function useOverviewData({
     }, []),
   );
 
-  //===== (appendRealtimeChartSample) ======
+  //===== (resetChartRequestState) ======
   useEffect(() => {
-    if (
-      activeSegment !== "day" ||
-      !fetchedData?.chartSelectionKey ||
-      !hasChartSeriesRows(fetchedData.chartSeries)
-    ) {
-      return;
-    }
-
-    saveStoredChartSeries(
-      fetchedData.chartSelectionKey,
-      fetchedData.chartSeries,
-    );
-  }, [activeSegment, fetchedData?.chartSelectionKey, fetchedData?.chartSeries]);
+    setChartRequestState({
+      key: chartSelectionKey,
+      status: "loading",
+      error: null,
+    });
+  }, [chartSelectionKey]);
 
   return {
+    chartError: chartRequestState.error,
     chartSelectionKey,
+    chartStatus:
+      chartRequestState.key === chartSelectionKey
+        ? chartRequestState.status
+        : "loading",
     fetchedData,
     fetchOverviewData,
     focusRefreshKey,

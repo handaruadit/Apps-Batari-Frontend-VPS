@@ -1,12 +1,14 @@
 //===== (Imports) ======
 import { Ionicons } from '@expo/vector-icons';
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import DailyOverviewChart from './DailyOverviewChart';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import OverviewChart from './charts/OverviewChart';
 import styles from '../styles/overview.styles';
 
 //===== (OverviewChartSection) ======
 export default function OverviewChartSection({
   activeSegment,
+  chartError,
+  chartStatus,
   chartCurrentTime,
   chartYearRange,
   colors,
@@ -17,7 +19,6 @@ export default function OverviewChartSection({
   goNextYear,
   goPrevMonth,
   goPrevYear,
-  isChartLoading,
   isLightMode,
   monthOptions,
   monthPickerScrollRef,
@@ -359,48 +360,22 @@ export default function OverviewChartSection({
         </View>
       ) : null}
 
-      {(activeSegment === "day" ||
-        activeSegment === "month" ||
-        activeSegment === "year" ||
-        activeSegment === "lifetime") && (
-        <>
-          {isChartLoading ? (
-            <View
-              style={[
-                styles.chartLoadingWrap,
-                { width: overviewChartWidth },
-              ]}
-            >
-              <ActivityIndicator size="large" color={colors.accent} />
-              <Text
-                style={[
-                  styles.chartLoadingText,
-                  { color: colors.textSoft },
-                ]}
-              >
-                {t("loadingChart")}
-              </Text>
-            </View>
-          ) : (
-            <DailyOverviewChart
-              series={dailySeries}
-              chartWidth={overviewChartWidth}
-              visibleSeries={visiblePowerSeries}
-              onToggleSeries={togglePowerSeries}
-              currentTime={chartCurrentTime}
-              onFullscreenPress={() => setIsChartLandscapeVisible(true)}
-              segment={activeSegment}
-              selectedDay={selectedDay}
-              selectedMonth={selectedMonth}
-              selectedYear={selectedYear}
-              yearRange={chartYearRange}
-              selectedDataPercentages={plantData.selectedDataPercentages}
-              socValue={plantData.soc}
-              plantName={plantData.plantName}
-            />
-          )}
-        </>
-      )}
+      <OverviewChart
+        chartError={chartError}
+        chartStatus={chartStatus}
+        chartWidth={overviewChartWidth}
+        currentTime={chartCurrentTime}
+        lastTimestamp={plantData.latestDataTimestamp}
+        onFullscreenPress={() => setIsChartLandscapeVisible(true)}
+        onToggleSeries={togglePowerSeries}
+        period={activeSegment}
+        selectedDay={selectedDay}
+        selectedMonth={selectedMonth}
+        selectedYear={selectedYear}
+        series={dailySeries}
+        visibleSeries={visiblePowerSeries}
+        yearRange={chartYearRange}
+      />
     </View>
   );
 }
