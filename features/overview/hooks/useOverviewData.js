@@ -70,6 +70,21 @@ export function useOverviewData({
     error: null,
   });
   const plantDevicesRef = useRef([]);
+  const activePlantIdRef = useRef(resolvedPlantId);
+
+  //===== (Reset Plant Scoped State) ======
+  useEffect(() => {
+    activePlantIdRef.current = resolvedPlantId;
+    plantDevicesRef.current = [];
+    setFetchedData(null);
+    setPlantDevices([]);
+    setSelectedDataSource("plant");
+    setChartRequestState({
+      key: null,
+      status: "loading",
+      error: null,
+    });
+  }, [resolvedPlantId, setSelectedDataSource]);
 
   //===== (Chart Selection Key) ======
   const chartSelectionKey = useMemo(() => {
@@ -146,6 +161,7 @@ export function useOverviewData({
   //===== (fetchOverviewData) ======
   const fetchOverviewData = useCallback(
     async ({ showLoading = false } = {}) => {
+      const requestPlantId = resolvedPlantId;
       try {
         if (showLoading) {
           setIsRefreshLoading(true);
@@ -165,6 +181,9 @@ export function useOverviewData({
 
         try {
           const deviceResult = await fetchPlantDevices(resolvedPlantId);
+          if (String(activePlantIdRef.current) !== String(requestPlantId)) {
+            return;
+          }
           latestPlantDevices = normalizeDeviceList(deviceResult?.devices);
           plantDevicesRef.current = latestPlantDevices;
           setPlantDevices((currentDevices) =>
@@ -243,6 +262,9 @@ export function useOverviewData({
           ...chartEndpoints.map((endpoint) => requestJson(endpoint, headers)),
           ...latestRequests.map((item) => requestJson(item.endpoint, headers)),
         ]);
+        if (String(activePlantIdRef.current) !== String(requestPlantId)) {
+          return;
+        }
         const chartResults =
           activeSegment === "lifetime"
             ? [
@@ -515,7 +537,10 @@ export function useOverviewData({
           error: error?.message || "Unable to load chart data.",
         });
       } finally {
-        if (showLoading) {
+        if (
+          showLoading &&
+          String(activePlantIdRef.current) === String(requestPlantId)
+        ) {
           setIsRefreshLoading(false);
         }
       }

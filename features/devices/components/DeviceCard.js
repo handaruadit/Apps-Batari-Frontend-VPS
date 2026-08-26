@@ -31,6 +31,19 @@ export default function DeviceCard({
   colors,
   themeMode,
 }) {
+  const isStationTelemetry = String(item.device_id || "").startsWith(
+    "DEYE_STATION_",
+  );
+  const deviceTitle = isStationTelemetry
+    ? "Plant Telemetry"
+    : item.deviceType || `${t("inverter")} ${index + 1}`;
+  const connectionLabel =
+    item.connectStatus === 1
+      ? "Online"
+      : item.connectStatus === 0
+        ? "Offline"
+        : null;
+
   return (
     <View
       style={[
@@ -44,7 +57,7 @@ export default function DeviceCard({
     >
       <View style={styles.cardTopRow}>
         <Text style={[styles.inverterTitle, { color: colors.text }]}>
-          {t("inverter")} {index + 1}
+          {deviceTitle}
         </Text>
 
         {canUnlinkDevice && (
@@ -71,6 +84,15 @@ export default function DeviceCard({
           {item.device_id || "-"}
         </Text>
       </View>
+
+      {connectionLabel && (
+        <View style={styles.infoBlock}>
+          <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Status</Text>
+          <Text style={[styles.infoValue, { color: colors.text }]}>
+            {connectionLabel}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.infoBlock}>
         <Text style={[styles.metricLabel, { color: colors.textMuted }]}>

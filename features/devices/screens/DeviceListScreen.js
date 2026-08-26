@@ -5,7 +5,7 @@ import {
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
-import { useCallback, useContext, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -114,6 +114,17 @@ export default function PerangkatScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const activePlantIdRef = useRef(resolvedPlantId);
+
+  //===== (Reset Plant Scoped State) ======
+  useEffect(() => {
+    activePlantIdRef.current = resolvedPlantId;
+    setPlant(null);
+    setDevices([]);
+    setCanUnlinkDevice(false);
+    setErrorMessage("");
+    setIsLoading(true);
+  }, [resolvedPlantId]);
 
   //===== (handleDeleteDevice) ======
   const handleDeleteDevice = (deviceId) => {
@@ -179,6 +190,7 @@ export default function PerangkatScreen() {
   //===== (loadDevices) ======
   const loadDevices = useCallback(
     async ({ refreshing = false } = {}) => {
+      const requestPlantId = resolvedPlantId;
       console.log("PERANGKAT_ROUTE_IDS:", {
         localId,
         localPlantId,
@@ -204,6 +216,9 @@ export default function PerangkatScreen() {
       try {
         setErrorMessage("");
         const result = await fetchPlantDevices(resolvedPlantId);
+        if (String(activePlantIdRef.current) !== String(requestPlantId)) {
+          return;
+        }
         console.log("DEVICE_RESPONSE", result);
 
         const nextPlant = result?.plant || null;
@@ -230,8 +245,10 @@ export default function PerangkatScreen() {
         setErrorMessage(error.message || "Gagal mengambil data device.");
         Alert.alert("Gagal", error.message || "Gagal mengambil data device.");
       } finally {
-        setIsLoading(false);
-        setIsRefreshing(false);
+        if (String(activePlantIdRef.current) === String(requestPlantId)) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+        }
       }
     },
     // The original screen refreshes when the selected device id changes.
