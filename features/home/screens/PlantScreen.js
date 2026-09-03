@@ -313,7 +313,7 @@ export default function PlantScreen() {
     setActiveMenuPlantId(null);
     router.push({
       pathname: "/plant/[id]/Add-device",
-      params: { id: String(device.id) },
+      params: { id: String(device.id), from: "plantList" },
     });
   };
 
