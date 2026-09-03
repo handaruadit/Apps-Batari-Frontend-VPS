@@ -387,7 +387,7 @@ export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
                 POWER_FLOW_LAYOUT.gridBlockWidth,
                 layoutScale,
               ),
-              height: scaleValue(
+              minHeight: scaleValue(
                 POWER_FLOW_LAYOUT.gridBlockHeight,
                 layoutScale,
               ),

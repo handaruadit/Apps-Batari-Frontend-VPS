@@ -7,8 +7,14 @@ export const plantStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: appColors.screen,
+  },
+  contentWrapper: {
+    flex: 1,
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
     paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingTop: 4,
   },
   header: {
     flexDirection: "row",

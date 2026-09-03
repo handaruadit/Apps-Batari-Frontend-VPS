@@ -104,80 +104,6 @@ export default function PowerFlowSection({
             setHouseOverlayLayout(nativeEvent.layout)
           }
         >
-          <View style={styles.dataSourceDropdownWrap}>
-            <TouchableOpacity
-              activeOpacity={0.82}
-              style={[
-                styles.dataSourceDropdownButton,
-                isLightMode && {
-                  backgroundColor: colors.bubble,
-                  borderColor: colors.bubbleBorder,
-                },
-              ]}
-              onPress={() =>
-                setDataSourceMenuVisible((current) => !current)
-              }
-            >
-              <Text
-                style={[
-                  styles.dataSourceDropdownText,
-                  { color: colors.text },
-                ]}
-                numberOfLines={1}
-              >
-                {selectedDataSourceLabel}
-              </Text>
-              <Ionicons
-                name={
-                  dataSourceMenuVisible ? "chevron-up" : "chevron-down"
-                }
-                size={15}
-                color={colors.accent}
-              />
-            </TouchableOpacity>
-
-            {dataSourceMenuVisible && (
-              <View
-                style={[
-                  styles.dataSourceDropdownMenu,
-                  isLightMode && {
-                    backgroundColor: colors.bubble,
-                    borderColor: colors.bubbleBorder,
-                  },
-                ]}
-              >
-                {dataSourceOptions.map((item) => {
-                  const isSelected = item.key === selectedDataSource;
-
-                  return (
-                    <TouchableOpacity
-                      key={item.key}
-                      activeOpacity={0.78}
-                      style={styles.dataSourceDropdownItem}
-                      onPress={() => {
-                        setSelectedDataSource(item.key);
-                        setDataSourceMenuVisible(false);
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.dataSourceDropdownItemText,
-                          {
-                            color: isSelected
-                              ? colors.accent
-                              : colors.text,
-                          },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {item.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-          </View>
 
           <Image
             source={require("@/assets/images/Asset App Batari Alternative.png")}
@@ -616,6 +542,83 @@ export default function PowerFlowSection({
         </View>
       </View>
 
+      <View style={styles.dataSourceDropdownRow}>
+        <View style={styles.dataSourceDropdownWrap}>
+          <TouchableOpacity
+            activeOpacity={0.82}
+            style={[
+              styles.dataSourceDropdownButton,
+              dataSourceMenuVisible && styles.dataSourceDropdownButtonOpen,
+              isLightMode && {
+                backgroundColor: colors.bubble,
+                borderColor: colors.bubbleBorder,
+              },
+            ]}
+            onPress={() =>
+              setDataSourceMenuVisible((current) => !current)
+            }
+          >
+            <Text
+              style={[
+                styles.dataSourceDropdownText,
+                { color: colors.text },
+              ]}
+              numberOfLines={1}
+            >
+              {selectedDataSourceLabel}
+            </Text>
+            <Ionicons
+              name={
+                dataSourceMenuVisible ? "chevron-up" : "chevron-down"
+              }
+              size={15}
+              color={colors.accent}
+            />
+          </TouchableOpacity>
+
+          {dataSourceMenuVisible && (
+            <View
+              style={[
+                styles.dataSourceDropdownMenu,
+                isLightMode && {
+                  backgroundColor: colors.bubble,
+                  borderColor: colors.bubbleBorder,
+                },
+              ]}
+            >
+              {dataSourceOptions.map((item) => {
+                const isSelected = item.key === selectedDataSource;
+
+                return (
+                  <TouchableOpacity
+                    key={item.key}
+                    activeOpacity={0.78}
+                    style={styles.dataSourceDropdownItem}
+                    onPress={() => {
+                      setSelectedDataSource(item.key);
+                      setDataSourceMenuVisible(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.dataSourceDropdownItemText,
+                        {
+                          color: isSelected
+                            ? colors.accent
+                            : colors.text,
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
+      </View>
       <View
         style={[
           styles.powerFlowWrapper,

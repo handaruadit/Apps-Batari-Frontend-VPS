@@ -8,18 +8,32 @@ const BATTERY_GROUP_KEYS = new Set([
   "setting_bms",
 ]);
 
-const DEFAULT_BATTERY_PARAMS = [
-  "power",
-  "cells_1",
-  "cells_2",
-  "cells_3",
-  "cells_4",
-  "voltage",
-  "current",
-  "soc",
-  "cycle",
-  "alarm",
-];
+const MANDATORY_BATTERY_PARAMS = ["power", "voltage", "current", "soc"];
+
+//===== (hasValidParameterValue) ======
+function hasValidParameterValue(value) {
+  if (value === null || value === undefined) {
+    return false;
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (
+      trimmed === "" ||
+      trimmed === "-" ||
+      trimmed.toLowerCase() === "null" ||
+      trimmed.toLowerCase() === "undefined"
+    ) {
+      return false;
+    }
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value);
+  }
+
+  return true;
+}
 
 //===== (formatValue) ======
 function formatValue(value) {
@@ -132,7 +146,21 @@ function pushBatteryParameter(rows, seenKeys, label, value, t) {
     return;
   }
 
+  const isMandatory = MANDATORY_BATTERY_PARAMS.includes(normalizedKey);
+
+  if (!isMandatory && !hasValidParameterValue(value)) {
+    return;
+  }
+
   if (seenKeys.has(normalizedKey)) {
+    const existingIndex = rows.findIndex((r) => r.key === normalizedKey);
+    if (
+      existingIndex !== -1 &&
+      !hasValidParameterValue(rows[existingIndex].value) &&
+      hasValidParameterValue(value)
+    ) {
+      rows[existingIndex].value = value;
+    }
     return;
   }
 
@@ -140,7 +168,7 @@ function pushBatteryParameter(rows, seenKeys, label, value, t) {
   rows.push({
     key: normalizedKey,
     label: formatBatteryParameterLabel(safeLabel, t),
-    value,
+    value: isMandatory && !hasValidParameterValue(value) ? 0 : value,
   });
 }
 
@@ -327,32 +355,47 @@ export function getBatteryParameterRows(device, t) {
     collectBatterySource(source, rows, seenKeys, t);
   });
 
-  DEFAULT_BATTERY_PARAMS.forEach((key) => {
-    pushBatteryParameter(rows, seenKeys, key, 0, t);
+  // Pastikan parameter wajib (power, voltage, current, soc) selalu ada
+  MANDATORY_BATTERY_PARAMS.forEach((key) => {
+    if (!seenKeys.has(key)) {
+      pushBatteryParameter(rows, seenKeys, key, 0, t);
+    }
   });
 
-  const defaultOrder = new Map(
-    DEFAULT_BATTERY_PARAMS.map((key, index) => [
-      normalizeParameterKey(key),
-      index,
-    ]),
+  // Filter parameter selain wajib yang tidak memiliki nilai valid
+  const validRows = rows.filter(
+    (row) =>
+      MANDATORY_BATTERY_PARAMS.includes(row.key) ||
+      hasValidParameterValue(row.value),
   );
 
-  return rows.sort((left, right) => {
-    const leftOrder = defaultOrder.get(left.key);
-    const rightOrder = defaultOrder.get(right.key);
+  const mandatoryOrder = new Map(
+    MANDATORY_BATTERY_PARAMS.map((key, index) => [key, index]),
+  );
 
-    if (leftOrder !== undefined && rightOrder !== undefined) {
-      return leftOrder - rightOrder;
+  return validRows.sort((left, right) => {
+    const leftMandatory = mandatoryOrder.get(left.key);
+    const rightMandatory = mandatoryOrder.get(right.key);
+
+    if (leftMandatory !== undefined && rightMandatory !== undefined) {
+      return leftMandatory - rightMandatory;
     }
 
-    if (leftOrder !== undefined) {
+    if (leftMandatory !== undefined) {
       return -1;
     }
 
-    if (rightOrder !== undefined) {
+    if (rightMandatory !== undefined) {
       return 1;
     }
+
+    const leftCell = left.key.match(/^cells?_(\d+)$/);
+    const rightCell = right.key.match(/^cells?_(\d+)$/);
+    if (leftCell && rightCell) {
+      return Number(leftCell[1]) - Number(rightCell[1]);
+    }
+    if (leftCell) return -1;
+    if (rightCell) return 1;
 
     return left.label.localeCompare(right.label);
   });

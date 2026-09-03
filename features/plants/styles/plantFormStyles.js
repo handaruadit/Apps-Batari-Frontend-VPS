@@ -9,20 +9,19 @@ const plantFormStyles = StyleSheet.create({
     flex: 1,
     backgroundColor: appColors.screen,
   },
-  container: {
-    flex: 1,
-    backgroundColor: appColors.screen,
-    paddingHorizontal: 16,
-  },
-  contentContainer: {
-    paddingTop: 10,
-    paddingBottom: 36,
+  headerContainer: {
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
+    zIndex: 10,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 18,
   },
   backButton: {
     width: 44,
@@ -42,6 +41,18 @@ const plantFormStyles = StyleSheet.create({
   },
   headerSpacer: {
     width: 44,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: appColors.screen,
+  },
+  contentContainer: {
+    width: "100%",
+    maxWidth: 640,
+    alignSelf: "center",
+    paddingHorizontal: 20,
+    paddingTop: 4,
+    paddingBottom: 36,
   },
   sectionCard: {
     backgroundColor: appColors.bubble,

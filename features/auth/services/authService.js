@@ -70,3 +70,42 @@ export function verifyPasswordResetCode(verification) {
 export function resetPassword(resetRequest) {
   return postJsonText(AUTH_ENDPOINTS.resetPassword, resetRequest);
 }
+
+//===== (googleLogin) ======
+export async function googleLogin({ idToken, user: googleUser }) {
+  const endpoint = `${BASE_URL}/api/auth/google-login`;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({
+        idToken,
+        email: googleUser?.email,
+        name: googleUser?.name,
+        photo: googleUser?.photo,
+        user: googleUser,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok && (data.token || data.tokens?.accessToken)) {
+      return {
+        success: true,
+        token: data.tokens?.accessToken || data.token,
+        user: data.user,
+      };
+    }
+
+    return {
+      success: false,
+      message: data.message || "Gagal melakukan Google login pada server.",
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error.message || "Gagal terhubung ke server backend.",
+    };
+  }
+}

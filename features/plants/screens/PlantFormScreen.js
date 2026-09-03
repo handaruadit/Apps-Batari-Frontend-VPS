@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   PlantSelectField,
@@ -62,12 +61,9 @@ export default function AddDeviceScreen() {
   } = usePlantForm(t);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.screen }]}>
-      <ScrollView
-        style={[styles.container, { backgroundColor: colors.screen }]}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-      >
+    <View style={[styles.safeArea, { backgroundColor: colors.screen }]}>
+      {/* Fixed Sticky Header */}
+      <View style={[styles.headerContainer, { backgroundColor: colors.screen }]}>
         <View style={styles.header}>
           <TouchableOpacity
             style={[
@@ -89,6 +85,14 @@ export default function AddDeviceScreen() {
 
           <View style={styles.headerSpacer} />
         </View>
+      </View>
+
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.screen }]}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
 
         <View
           style={[
@@ -285,6 +289,6 @@ export default function AddDeviceScreen() {
         colors={colors}
         showsVerticalScrollIndicator={false}
       />
-    </SafeAreaView>
+    </View>
   );
 }

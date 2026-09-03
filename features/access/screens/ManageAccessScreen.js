@@ -19,11 +19,12 @@ import {
   updatePlantAccessUser,
 } from "@/services/plantService";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -43,6 +44,32 @@ export default function ManageAccessScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSearching, setIsSearching] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  //===== (handleBack) ======
+  const handleBack = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(home)/plant");
+    }
+  }, []);
+
+  //===== (Hardware Back Handler) ======
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        handleBack();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [handleBack]),
+  );
 
   //===== (loadAccess) ======
   const loadAccess = useCallback(async () => {
@@ -262,7 +289,7 @@ export default function ManageAccessScreen() {
         <View style={styles.header}>
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => router.replace("/plant")}
+            onPress={handleBack}
             style={[
               styles.backButton,
               {

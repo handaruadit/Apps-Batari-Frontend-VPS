@@ -2,6 +2,8 @@
 import {
   FlatList,
   Modal,
+  Pressable,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -28,6 +30,12 @@ export default function PlantSelectModal({
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
+        {/* Backdrop tap to dismiss */}
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+        />
+
         <View
           style={[
             styles.modalContent,

@@ -3,6 +3,11 @@ import AuthField from "@/features/auth/components/AuthField";
 import AuthFormLayout from "@/features/auth/components/AuthFormLayout";
 import AuthPrimaryButton from "@/features/auth/components/AuthPrimaryButton";
 import {
+  AUTH_ACCENT_ORANGE,
+  AUTH_FONT,
+  AUTH_TEXT_MUTED,
+} from "@/features/auth/constants/styles";
+import {
   AUTH_BASE_URL,
   AUTH_ENDPOINTS,
   verifyPasswordResetCode,
@@ -10,7 +15,8 @@ import {
 import { isValidResetCode } from "@/features/auth/utils/validators";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Alert, StyleSheet } from "react-native";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { showAlert } from "@/utils/showAlert";
 
 //===== (VerifyCodeScreen) ======
 export default function VerifyCodeScreen() {
@@ -28,7 +34,7 @@ export default function VerifyCodeScreen() {
     const normalizedCode = code.trim();
 
     if (!isValidResetCode(normalizedCode)) {
-      Alert.alert("Gagal", "Masukkan kode 6 digit.");
+      showAlert("Gagal", "Masukkan kode verifikasi 6 digit.");
       return;
     }
 
@@ -51,7 +57,7 @@ export default function VerifyCodeScreen() {
           status: response.status,
           body: responseText,
         });
-        Alert.alert("Gagal", json.message || "Kode salah atau kedaluwarsa.");
+        showAlert("Gagal", json.message || "Kode salah atau kedaluwarsa.");
       }
     } catch (error) {
       console.error("[verify-code] network/error", {
@@ -59,7 +65,7 @@ export default function VerifyCodeScreen() {
         baseUrl: AUTH_BASE_URL,
         endpoint: AUTH_ENDPOINTS.verifyResetCode,
       });
-      Alert.alert("Gagal", "Terjadi kesalahan jaringan.");
+      showAlert("Gagal", "Terjadi kesalahan jaringan.");
     } finally {
       setLoading(false);
     }
@@ -69,11 +75,11 @@ export default function VerifyCodeScreen() {
   return (
     <AuthFormLayout
       title="Verify Code"
-      subtitle={`Masukkan kode 6 digit yang dikirim ke ${contactLabel}.`}
-      subtitleLineHeight={21}
+      subtitle={`Masukkan kode 6 digit yang telah dikirimkan ke ${contactLabel}`}
     >
       <AuthField
-        label="Passcode"
+        label="Verification Passcode"
+        iconName="key-outline"
         inputStyle={styles.codeInput}
         placeholder="123456"
         value={code}
@@ -84,9 +90,19 @@ export default function VerifyCodeScreen() {
 
       <AuthPrimaryButton
         loading={loading}
-        label="Verify Code"
+        label="Verify & Continue"
         onPress={handleVerify}
       />
+
+      <View style={styles.bottomRow}>
+        <Text style={styles.bottomRegularText}>Belum menerima kode? </Text>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.resendLinkText}>Kirim Ulang</Text>
+        </TouchableOpacity>
+      </View>
     </AuthFormLayout>
   );
 }
@@ -94,8 +110,26 @@ export default function VerifyCodeScreen() {
 //===== (Styles) ======
 const styles = StyleSheet.create({
   codeInput: {
-    fontSize: 18,
-    letterSpacing: 4,
+    fontSize: 20,
+    fontWeight: "700",
+    letterSpacing: 6,
     textAlign: "center",
+  },
+  bottomRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 20,
+  },
+  bottomRegularText: {
+    color: AUTH_TEXT_MUTED,
+    fontFamily: AUTH_FONT,
+    fontSize: 14,
+  },
+  resendLinkText: {
+    color: AUTH_ACCENT_ORANGE,
+    fontFamily: AUTH_FONT,
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

@@ -3,14 +3,27 @@ const net = require("net");
 const path = require("path");
 const { spawn } = require("child_process");
 
+// Load .env file manually
+const envPath = path.join(__dirname, "..", ".env");
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, "utf8");
+  for (const line of envContent.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const val = trimmed.slice(eqIdx + 1).trim();
+    if (!process.env[key]) process.env[key] = val;
+  }
+}
+
 const API_HOST = "127.0.0.1";
 const API_PORT = Number(process.env.EXPO_PUBLIC_API_PORT || 3001);
 const DEFAULT_API_PATH = path.resolve(
   process.cwd(),
   "..",
-  "..",
-  "belajar-api",
-  "belajar-api",
+  "Apps-Batari-backend-VPS",
 );
 const API_PATH = path.resolve(
   process.env.BELAJAR_API_PATH || DEFAULT_API_PATH,
@@ -44,6 +57,12 @@ async function waitForApi() {
 }
 
 async function main() {
+  const apiEnv = process.env.EXPO_PUBLIC_API_ENV || "";
+  if (apiEnv.toLowerCase() === "vps") {
+    console.log(`[startup] API_ENV=vps — menggunakan remote VPS (${process.env.EXPO_PUBLIC_API_BASE_URL || "default"}).`);
+    return;
+  }
+
   if (await isPortOpen()) {
     console.log(`[startup] Backend API sudah aktif pada port ${API_PORT}.`);
     return;

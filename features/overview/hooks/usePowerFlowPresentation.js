@@ -156,9 +156,11 @@ export function usePowerFlowPresentation({ plantData, windowWidth }) {
     return () => pointerLoop.stop();
   }, [loadPointerProgress]);
 
-  const fallbackHouseOverlayWidth = Math.max(0, windowWidth - 32);
-  const houseOverlayWidth =
-    houseOverlayLayout?.width || fallbackHouseOverlayWidth;
+  const fallbackHouseOverlayWidth = Math.min(420, Math.max(0, windowWidth - 32));
+  const houseOverlayWidth = Math.min(
+    420,
+    houseOverlayLayout?.width || fallbackHouseOverlayWidth,
+  );
   const houseOverlayHeight = getPowerFlowOverlayHeight(houseOverlayWidth);
   const bubbleScale = getPowerFlowOverlayScale(
     houseOverlayWidth,

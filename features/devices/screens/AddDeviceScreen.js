@@ -1,10 +1,10 @@
-//===== (Imports) ======
 import { Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,6 +30,32 @@ export default function AddDataloggerScreen() {
   const plantId = getParamValue(params.id);
   const [deviceId, setDeviceId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  //===== (handleBack) ======
+  const handleBack = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(home)/plant");
+    }
+  }, []);
+
+  //===== (Hardware Back Handler) ======
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        handleBack();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [handleBack]),
+  );
 
   //===== (handleScanQr) ======
   const handleScanQr = () => {
@@ -111,7 +137,7 @@ export default function AddDataloggerScreen() {
               },
             ]}
             activeOpacity={0.8}
-            onPress={() => router.back()}
+            onPress={handleBack}
           >
             <Ionicons name="chevron-back" size={22} color={colors.accent} />
           </TouchableOpacity>

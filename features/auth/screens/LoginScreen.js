@@ -1,5 +1,5 @@
 //===== (Imports) ======
-import { login as loginUser } from "@/features/auth/services/authService";
+import { login as loginUser, googleLogin } from "@/features/auth/services/authService";
 import styles from "@/features/auth/styles/loginScreen.styles";
 import {
   getUserFromToken,
@@ -14,38 +14,40 @@ import {
 } from "@/auth/rememberedAccounts";
 import { AuthContext } from "@/context/AuthContext";
 import { checkAppUpdate } from "@/services/updateService";
-import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
+import { GOOGLE_WEB_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID } from "@/config/api";
+import { showAlert } from "@/utils/showAlert";
+import { AntDesign, Ionicons } from "@expo/vector-icons";
 import { router, Stack } from "expo-router";
 import { useContext, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   Image,
   ImageBackground,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  ScrollView,
   StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as AuthSession from "expo-auth-session";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 
-//===== (clamp) ======
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
+WebBrowser.maybeCompleteAuthSession();
+
+//===== (Feature Flags) ======
+const SHOW_GOOGLE_SIGN_IN = false;
 
 //===== (LoginScreen) ======
 const LoginScreen = () => {
-  const { width, height } = useWindowDimensions();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -58,19 +60,30 @@ const LoginScreen = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const introAnim = useRef(new Animated.Value(0)).current;
 
-  const isCompactHeight = height < 720;
-  const isNarrow = width < 360;
+  //===== (Detect Expo Go vs Standalone) ======
+  const isExpoGo =
+    Constants.appOwnership === "expo" ||
+    Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
-  const logoSize = clamp(width * 0.24, isCompactHeight ? 72 : 84, 100);
-  const heroHeight = clamp(height * 0.23, isCompactHeight ? 132 : 164, 188);
-  const formTopPadding = isCompactHeight ? 22 : 45;
-  const horizontalPadding = isNarrow ? 18 : 22;
-  const buttonHeight = isCompactHeight ? 52 : 58;
-  const inputHeight = isCompactHeight ? 46 : 48;
-  const footerHeight = isCompactHeight ? 28 : 52;
+  //===== (Google Auth) ======
+  const [request, response, promptAsync] = Google.useAuthRequest({
+    clientId: GOOGLE_WEB_CLIENT_ID || "batari-client-id",
+    webClientId: GOOGLE_WEB_CLIENT_ID || "batari-web-client-id",
+    androidClientId: isExpoGo ? undefined : (GOOGLE_ANDROID_CLIENT_ID || "batari-android-client-id"),
+    iosClientId: isExpoGo ? undefined : (GOOGLE_WEB_CLIENT_ID || "batari-ios-client-id"),
+    responseType: "token",
+    scopes: ["profile", "email"],
+    redirectUri: isExpoGo
+      ? "https://auth.expo.io/@idewbayus-team/Apps"
+      : AuthSession.makeRedirectUri({
+          native: "com.batarienergi.app:/oauthredirect",
+          scheme: "bysense",
+        }),
+  });
 
   //===== (Update Check Effect) ======
   useEffect(() => {
@@ -81,7 +94,7 @@ const LoginScreen = () => {
   useEffect(() => {
     Animated.timing(introAnim, {
       toValue: 1,
-      duration: 650,
+      duration: 500,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
@@ -89,7 +102,6 @@ const LoginScreen = () => {
 
   //===== (Remembered Accounts Effect) ======
   useEffect(() => {
-    //===== (loadSavedEmails) ======
     const loadSavedEmails = async () => {
       const accounts = await getRememberedAccounts();
       setSavedEmails(accounts);
@@ -98,10 +110,94 @@ const LoginScreen = () => {
     loadSavedEmails();
   }, []);
 
+  //===== (Google Auth Response Effect) ======
+  useEffect(() => {
+    if (response?.type === "success") {
+      handleGoogleSignIn(response.authentication || response.params);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [response]);
+
+  //===== (handleGoogleSignIn) ======
+  const handleGoogleSignIn = async (authResult) => {
+    const accessToken = authResult?.accessToken || authResult?.access_token;
+    const idToken = authResult?.idToken || authResult?.id_token;
+
+    if (!accessToken && !idToken) return;
+
+    setGoogleLoading(true);
+
+    try {
+      let googleUser = null;
+      if (accessToken) {
+        const userInfoResponse = await fetch(
+          "https://www.googleapis.com/userinfo/v2/me",
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+        googleUser = await userInfoResponse.json();
+      }
+
+      if (!googleUser?.email) {
+        showAlert("Login gagal", "Tidak bisa mendapatkan info akun Google.");
+        return;
+      }
+
+      const result = await googleLogin({
+        idToken: idToken || accessToken,
+        user: googleUser,
+      });
+
+      if (result.success) {
+        if (result.token) {
+          await saveToken(result.token);
+          await setRememberMe(true);
+        }
+
+        const userInfo = result.user || {
+          email: googleUser.email,
+          name: googleUser.name,
+        };
+
+        await saveUserInfo(userInfo);
+        setUser(userInfo);
+
+        router.replace("/(home)/plant");
+      } else {
+        showAlert("Login gagal", "Google Sign-In tidak berhasil.");
+      }
+    } catch (error) {
+      console.error("Google Sign-In error:", error);
+      showAlert("Login gagal", "Terjadi kesalahan saat login dengan Google.");
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  //===== (handleGooglePress) ======
+  const handleGooglePress = async () => {
+    if (!request) return;
+    try {
+      if (isExpoGo) {
+        const authUrl = await request.makeAuthUrlAsync(Google.discovery);
+        const returnUrl = AuthSession.getDefaultReturnUrl();
+        const startUrl = `https://auth.expo.io/@idewbayus-team/Apps/start?authUrl=${encodeURIComponent(authUrl)}&returnUrl=${encodeURIComponent(returnUrl)}`;
+        const res = await promptAsync({ url: startUrl });
+        if (res?.type === "success") {
+          handleGoogleSignIn(res.authentication || res.params);
+        }
+      } else {
+        promptAsync();
+      }
+    } catch (err) {
+      console.error("Google sign in prompt error:", err);
+      showAlert("Login gagal", "Gagal membuka login Google.");
+    }
+  };
+
   //===== (handleLogin) ======
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert("Login gagal", "Email dan password harus diisi.");
+      showAlert("Login gagal", "Email dan password harus diisi.");
       return;
     }
 
@@ -111,44 +207,43 @@ const LoginScreen = () => {
     let redirectPath = "/(home)/plant";
 
     try {
-      const { response, data: jsonResponse } = await loginUser({
-        email,
+      const { response: res, data: jsonResponse } = await loginUser({
+        email: email.trim(),
         password,
       });
 
       if (
-        response.ok &&
-        jsonResponse.status === "success" &&
-        jsonResponse.token
+        res.ok &&
+        (jsonResponse.status === "success" || jsonResponse.success) &&
+        (jsonResponse.token || jsonResponse.tokens?.accessToken)
       ) {
-        const userToken = jsonResponse.token;
+        const userToken = jsonResponse.token || jsonResponse.tokens.accessToken;
 
         await saveToken(userToken);
         await setRememberMe(remember);
 
         if (remember) {
-          await saveRememberedAccount(email, password);
+          await saveRememberedAccount(email.trim(), password);
         }
 
-        const userInfo = jsonResponse.user ??
-          getUserFromToken(userToken) ?? { email };
+        const userInfo =
+          jsonResponse.user ??
+          getUserFromToken(userToken) ?? { email: email.trim() };
 
         await saveUserInfo(userInfo);
-
         setUser(userInfo);
 
         redirectPath = "/(home)/plant";
         loginSuccess = true;
       } else {
-        Alert.alert(
+        showAlert(
           "Login gagal",
           jsonResponse.message || "Email atau password salah.",
         );
       }
     } catch (error) {
       console.error(error);
-
-      Alert.alert(
+      showAlert(
         "Login gagal",
         "Terjadi kesalahan jaringan. Silakan coba lagi.",
       );
@@ -161,340 +256,279 @@ const LoginScreen = () => {
     }
   };
 
-  //===== (Animation Styles) ======
-  const heroAnimatedStyle = {
-    opacity: introAnim,
-    transform: [
-      {
-        translateY: introAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [-12, 0],
-        }),
-      },
-    ],
-  };
-
-  const formAnimatedStyle = {
-    opacity: introAnim,
-    transform: [
-      {
-        translateY: introAnim.interpolate({
-          inputRange: [0, 1],
-          outputRange: [18, 0],
-        }),
-      },
-    ],
-  };
-
   //===== (Saved Email Options) ======
   const visibleSavedEmails = savedEmails.filter((item) =>
     item.toLowerCase().includes(email.trim().toLowerCase()),
   );
-
   const isEmailDropdownOpen = showEmailOptions && visibleSavedEmails.length > 0;
 
-  //===== (handleSelectSavedEmail) ======
   const handleSelectSavedEmail = async (selectedEmail) => {
     setEmail(selectedEmail);
-
     const savedPassword = await getRememberedPassword(selectedEmail);
-
     if (savedPassword) {
       setPassword(savedPassword);
     }
-
     setShowEmailOptions(false);
+  };
+
+  //===== (Animation Style) ======
+  const animatedFormStyle = {
+    opacity: introAnim,
+    transform: [
+      {
+        translateY: introAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [14, 0],
+        }),
+      },
+    ],
   };
 
   //===== (Render) ======
   return (
     <>
       <Stack.Screen options={{ headerShown: false, title: "" }} />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      <StatusBar barStyle="light-content" backgroundColor="#0C1222" />
-
-      <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          style={styles.container}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+      <View style={styles.outerContainer}>
+        <ImageBackground
+          source={require("@/assets/images/solar-bg.jpg")}
+          style={styles.backgroundImage}
+          imageStyle={styles.backgroundImageStyle}
         >
-          <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={[
-              styles.scrollContent,
-              { minHeight: height },
-            ]}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <Pressable
-              style={styles.screen}
-              onPress={() => {
-                setShowEmailOptions(false);
-              }}
+          <View style={styles.fullOverlay} />
+          <SafeAreaView style={styles.safeArea}>
+            <KeyboardAvoidingView
+              style={styles.container}
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
             >
-              <ImageBackground
-                source={require("@/assets/images/solar-bg.jpg")}
-                style={[styles.hero, { height: heroHeight }]}
-                imageStyle={styles.backgroundPhoto}
+              <Pressable
+                style={styles.screen}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setShowEmailOptions(false);
+                }}
               >
-                <View style={styles.heroOverlay} />
-
-                <Animated.View
-                  style={[
-                    styles.brandBlock,
-                    { paddingTop: isCompactHeight ? 8 : 14 },
-                    heroAnimatedStyle,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.logoFrame,
-                      {
-                        width: logoSize,
-                        height: logoSize,
-                        borderRadius: logoSize / 2,
-                      },
-                    ]}
-                  >
-                    <Image
-                      source={require("@/assets/images/batari-logo.jpeg")}
-                      style={[
-                        styles.logo,
-                        {
-                          width: logoSize,
-                          height: logoSize,
-                          borderRadius: logoSize / 2,
-                        },
-                      ]}
-                    />
-                  </View>
-
-                  <Text
-                    style={[
-                      styles.welcome,
-                      {
-                        fontSize: isCompactHeight ? 26 : 31,
-                        marginTop: isCompactHeight ? 4 : 8,
-                      },
-                    ]}
-                  >
-                    Welcome
+                {/* Brand Block with transparent box */}
+                <View style={styles.brandBlock}>
+                  <Image
+                    source={require("@/assets/images/batari-energy-logo.webp")}
+                    style={styles.logoImage}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.welcome}>Welcome Back</Text>
+                  <Text style={styles.subtitle}>
+                    Sign in to your Batari Energy account
                   </Text>
-                </Animated.View>
-              </ImageBackground>
+                </View>
 
-              <Animated.View
-                style={[
-                  styles.formSection,
-                  {
-                    paddingHorizontal: horizontalPadding,
-                    paddingTop: formTopPadding,
-                  },
-                  formAnimatedStyle,
-                ]}
-              >
-                <View style={styles.formSurface}>
-                  <Text style={styles.label}>Email</Text>
+                {/* Form Section with Rounded Card */}
+                <Animated.View style={[styles.formSection, animatedFormStyle]}>
+                  <View style={styles.formCard}>
+                    {/* Email Address */}
+                    <Text style={styles.label}>Email Address</Text>
+                    <Pressable onPress={(e) => e.stopPropagation()}>
+                      <View
+                        style={[
+                          styles.inputWrapper,
+                          focusedField === "email" && styles.inputWrapperFocused,
+                        ]}
+                      >
+                        <Ionicons
+                          name="mail-outline"
+                          size={20}
+                          color={focusedField === "email" ? "#18AEE6" : "#64748B"}
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          style={styles.input}
+                          placeholder="batari@gmail.com"
+                          placeholderTextColor="#94A3B8"
+                          value={email}
+                          onChangeText={(text) => {
+                            setEmail(text);
+                            setPassword("");
+                            setShowEmailOptions(true);
+                          }}
+                          keyboardType="email-address"
+                          autoCapitalize="none"
+                          selectionColor="#18AEE6"
+                          cursorColor="#18AEE6"
+                          onFocus={() => {
+                            setFocusedField("email");
+                            setShowEmailOptions(true);
+                          }}
+                          onBlur={() => setFocusedField(null)}
+                        />
+                      </View>
 
-                  <Pressable onPress={(event) => event.stopPropagation()}>
+                      {isEmailDropdownOpen ? (
+                        <View style={styles.emailOptionsBox}>
+                          {visibleSavedEmails.map((item) => (
+                            <Pressable
+                              key={item}
+                              style={styles.emailOption}
+                              onPress={() => handleSelectSavedEmail(item)}
+                            >
+                              <Ionicons
+                                name="person-circle-outline"
+                                size={20}
+                                color="#64748B"
+                              />
+                              <Text style={styles.emailOptionText}>{item}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      ) : null}
+                    </Pressable>
+
+                    {/* Password */}
+                    <Text style={styles.label}>Password</Text>
                     <View
                       style={[
                         styles.inputWrapper,
-                        { minHeight: inputHeight },
-                        focusedField === "email" && styles.inputWrapperFocused,
-                        isEmailDropdownOpen && styles.emailInputOpen,
+                        focusedField === "password" && styles.inputWrapperFocused,
                       ]}
                     >
+                      <Ionicons
+                        name="lock-closed-outline"
+                        size={20}
+                        color={focusedField === "password" ? "#18AEE6" : "#64748B"}
+                        style={styles.inputIcon}
+                      />
                       <TextInput
                         style={styles.input}
-                        placeholder="batari@gmail.com"
-                        placeholderTextColor="#6E7480"
-                        value={email}
-                        onChangeText={(text) => {
-                          setEmail(text);
-                          setPassword("");
-                          setShowEmailOptions(true);
-                        }}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        autoFocus={false}
+                        placeholder="Enter your password"
+                        placeholderTextColor="#94A3B8"
+                        secureTextEntry={!showPassword}
+                        value={password}
+                        onChangeText={setPassword}
                         selectionColor="#18AEE6"
                         cursorColor="#18AEE6"
                         onFocus={() => {
-                          setFocusedField("email");
-                          setShowEmailOptions(true);
+                          setFocusedField("password");
+                          setShowEmailOptions(false);
                         }}
                         onBlur={() => setFocusedField(null)}
                       />
-
-                      <Ionicons
-                        name="mail-outline"
-                        size={20}
-                        color={focusedField === "email" ? "#18AEE6" : "#64748B"}
-                      />
+                      <Pressable
+                        onPress={() => setShowPassword((v) => !v)}
+                        hitSlop={10}
+                        style={styles.passwordToggle}
+                      >
+                        <Ionicons
+                          name={showPassword ? "eye-outline" : "eye-off-outline"}
+                          size={20}
+                          color={focusedField === "password" ? "#18AEE6" : "#64748B"}
+                        />
+                      </Pressable>
                     </View>
 
-                    {isEmailDropdownOpen ? (
-                      <View style={styles.emailOptionsBox}>
-                        {visibleSavedEmails.map((item) => (
-                          <Pressable
-                            key={item}
-                            style={styles.emailOption}
-                            onPress={() => handleSelectSavedEmail(item)}
-                          >
-                            <Ionicons
-                              name="person-circle-outline"
-                              size={20}
-                              color="#64748B"
-                            />
+                    {/* Remember Me & Forgot Password */}
+                    <View style={styles.rememberAndForgotRow}>
+                      <Pressable
+                        style={styles.rememberPressable}
+                        onPress={() => setRemember(!remember)}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: remember }}
+                      >
+                        <View
+                          style={[
+                            styles.checkbox,
+                            remember && styles.checkboxActive,
+                          ]}
+                        >
+                          {remember ? (
+                            <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                          ) : null}
+                        </View>
+                        <Text style={styles.rememberText}>Remember me</Text>
+                      </Pressable>
 
-                            <Text style={styles.emailOptionText}>{item}</Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    ) : null}
-                  </Pressable>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => router.push("/(auth)/forgot-password")}
+                      >
+                        <Text style={styles.forgotPasswordLink}>Forgot password?</Text>
+                      </TouchableOpacity>
+                    </View>
 
-                  <Text style={styles.label}>Password</Text>
-
-                  <View
-                    style={[
-                      styles.inputWrapper,
-                      { minHeight: inputHeight },
-                      focusedField === "password" && styles.inputWrapperFocused,
-                    ]}
-                  >
-                    <TextInput
-                      style={styles.input}
-                      placeholder="password"
-                      placeholderTextColor="#6E7480"
-                      secureTextEntry={!showPassword}
-                      value={password}
-                      onChangeText={setPassword}
-                      selectionColor="#18AEE6"
-                      cursorColor="#18AEE6"
-                      onFocus={() => {
-                        setFocusedField("password");
-                        setShowEmailOptions(false);
-                      }}
-                      onBlur={() => setFocusedField(null)}
-                    />
-
-                    <Pressable
-                      onPress={() => setShowPassword((value) => !value)}
-                      hitSlop={10}
-                    >
-                      <Ionicons
-                        name={showPassword ? "eye-off-outline" : "eye-outline"}
-                        size={21}
-                        color={
-                          focusedField === "password" ? "#18AEE6" : "#64748B"
-                        }
-                      />
-                    </Pressable>
-                  </View>
-
-                  <Pressable
-                    style={styles.rememberRow}
-                    onPress={() => setRemember(!remember)}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: remember }}
-                  >
-                    <View
+                    {/* Log In Button */}
+                    <TouchableOpacity
                       style={[
-                        styles.checkbox,
-                        remember && styles.checkboxActive,
+                        styles.loginButton,
+                        loading && styles.loginButtonBusy,
                       ]}
+                      onPress={handleLogin}
+                      disabled={loading}
+                      activeOpacity={0.85}
                     >
-                      {remember ? (
-                        <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                      ) : null}
-                    </View>
+                      {loading ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                      ) : (
+                        <Text style={styles.loginText}>Log In</Text>
+                      )}
+                    </TouchableOpacity>
 
-                    <Text style={styles.rememberText}>Remember me</Text>
-                  </Pressable>
+                    {/* Google Sign In Option (Hidden for now) */}
+                    {SHOW_GOOGLE_SIGN_IN && (
+                      <>
+                        {/* Divider: OR */}
+                        <View style={styles.dividerRow}>
+                          <View style={styles.dividerLine} />
+                          <Text style={styles.dividerText}>OR</Text>
+                          <View style={styles.dividerLine} />
+                        </View>
 
-                  <TouchableOpacity
-                    style={[
-                      styles.loginButton,
-                      { minHeight: buttonHeight },
-                      loading && styles.loginButtonBusy,
-                    ]}
-                    onPress={handleLogin}
-                    disabled={loading}
-                    activeOpacity={0.8}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.loginText}>Log In</Text>
+                        {/* Google Sign In Button */}
+                        <TouchableOpacity
+                          style={[
+                            styles.googleButton,
+                            googleLoading && styles.loginButtonBusy,
+                          ]}
+                          activeOpacity={0.8}
+                          onPress={handleGooglePress}
+                          disabled={!request || googleLoading}
+                        >
+                          {googleLoading ? (
+                            <ActivityIndicator color="#0F172A" size="small" />
+                          ) : (
+                            <>
+                              <AntDesign
+                                name="google"
+                                size={20}
+                                color="#4285F4"
+                                style={styles.googleIconContainer}
+                              />
+                              <Text style={styles.googleText}>Continue with Google</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </>
                     )}
-                  </TouchableOpacity>
 
-                  <View style={styles.linkRow}>
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => router.push("/(auth)/forgot-password")}
-                    >
-                      <Text style={styles.link}>Forgot password</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => router.push("/(auth)/register")}
-                    >
-                      <Text style={styles.link}>Create new account</Text>
-                    </TouchableOpacity>
+                    {/* Bottom Link: Don't have an account? Sign Up */}
+                    <View style={styles.bottomLinkRow}>
+                      <Text style={styles.bottomRegularText}>{"Don't have an account? "}</Text>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => router.push("/(auth)/register")}
+                      >
+                        <Text style={styles.signUpLinkText}>Sign Up</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
+                </Animated.View>
 
-                  <Text style={styles.orText}>OR</Text>
-
-                  <TouchableOpacity
-                    style={[styles.googleButton, { minHeight: buttonHeight }]}
-                    activeOpacity={0.8}
-                  >
-                    <AntDesign
-                      name="google"
-                      size={22}
-                      color="#111827"
-                      style={styles.socialIcon}
-                    />
-
-                    <Text style={styles.googleText}>Continue with Google</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.facebookButton, { minHeight: buttonHeight }]}
-                    activeOpacity={0.8}
-                  >
-                    <FontAwesome
-                      name="facebook"
-                      size={24}
-                      color="#FFFFFF"
-                      style={styles.socialIcon}
-                    />
-
-                    <Text style={styles.facebookText}>
-                      Continue with Facebook
-                    </Text>
-                  </TouchableOpacity>
-
-                  <Text style={styles.tagline}>
-                    Powering your home with battery.
-                  </Text>
-                </View>
-              </Animated.View>
-
-              <ImageBackground
-                source={require("@/assets/images/solar-bg.jpg")}
-                style={[styles.footerPhotoBlock, { height: footerHeight }]}
-                imageStyle={styles.footerPhoto}
-              />
-            </Pressable>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
+                {/* Footer Tagline */}
+                <Text style={styles.footerTagline}>
+                  Igniting Innovation, Empowering The Nation
+                </Text>
+              </Pressable>
+            </KeyboardAvoidingView>
+          </SafeAreaView>
+        </ImageBackground>
+      </View>
     </>
   );
 };

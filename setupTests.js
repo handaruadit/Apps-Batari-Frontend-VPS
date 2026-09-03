@@ -11,6 +11,30 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn(async () => undefined),
 }));
 
+//===== (AuthSession Mock) ======
+jest.mock('expo-auth-session', () => ({
+  makeRedirectUri: jest.fn(() => 'mock-redirect-uri'),
+}));
+jest.mock('expo-auth-session/providers/google', () => ({
+  useAuthRequest: jest.fn(() => [null, null, jest.fn()]),
+}));
+jest.mock('expo-web-browser', () => ({
+  maybeCompleteAuthSession: jest.fn(),
+  openAuthSessionAsync: jest.fn(),
+}));
+
+
+//===== (Notifications Mock) ======
+jest.mock('expo-notifications', () => ({
+  setNotificationHandler: jest.fn(),
+  setNotificationChannelAsync: jest.fn(async () => ({})),
+  getPermissionsAsync: jest.fn(async () => ({ status: 'granted' })),
+  requestPermissionsAsync: jest.fn(async () => ({ status: 'granted' })),
+  scheduleNotificationAsync: jest.fn(async () => 'notif-123'),
+  AndroidImportance: { MAX: 5, HIGH: 4, DEFAULT: 3 },
+  AndroidNotificationPriority: { MAX: 'max', HIGH: 'high' },
+}));
+
 //===== (Vector Icons Mock) ======
 jest.mock('@expo/vector-icons', () => {
   const React = require('react');

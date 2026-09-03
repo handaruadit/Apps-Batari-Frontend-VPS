@@ -8,7 +8,7 @@ import {
 import { styles } from "@/components/device-card/styles";
 import { useAppSettings } from "@/context/AppSettingsContext";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   ImageBackground,
@@ -21,6 +21,9 @@ import {
 export default function DeviceCard({
   device,
   onPress,
+  menuVisible: controlledMenuVisible,
+  onMenuOpen,
+  onCloseMenu,
   onPinToggle,
   onAddDatalogger,
   onEdit,
@@ -33,10 +36,34 @@ export default function DeviceCard({
   canManageAccess = false,
 }) {
   const { colors, t, themeMode } = useAppSettings();
-  const [menuVisible, setMenuVisible] = useState(false);
+  const [localMenuVisible, setLocalMenuVisible] = useState(false);
+
+  const isMenuOpen =
+    controlledMenuVisible !== undefined
+      ? controlledMenuVisible
+      : localMenuVisible;
+
   const pulseAnim = useRef(new Animated.Value(0.45)).current;
   const connectionStatus = getPlantConnectionStatus(device);
   const cityProvinceText = formatCityProvince(device);
+
+  //===== (handleToggleMenu) ======
+  const handleToggleMenu = () => {
+    if (onMenuOpen) {
+      onMenuOpen();
+    } else {
+      setLocalMenuVisible((prev) => !prev);
+    }
+  };
+
+  //===== (handleClose) ======
+  const handleClose = () => {
+    if (onCloseMenu) {
+      onCloseMenu();
+    } else {
+      setLocalMenuVisible(false);
+    }
+  };
 
   //===== (Status Pulse Effect) ======
   useEffect(() => {
@@ -62,117 +89,149 @@ export default function DeviceCard({
 
   //===== (handleEdit) ======
   const handleEdit = () => {
-    setMenuVisible(false);
+    handleClose();
     onEdit?.(device);
   };
 
   //===== (handlePinToggle) ======
   const handlePinToggle = () => {
-    setMenuVisible(false);
+    handleClose();
     onPinToggle?.(device);
   };
 
   //===== (handleAddDatalogger) ======
   const handleAddDatalogger = () => {
-    setMenuVisible(false);
+    handleClose();
     onAddDatalogger?.(device);
   };
 
   //===== (handleManageAccess) ======
   const handleManageAccess = () => {
-    setMenuVisible(false);
+    handleClose();
     onManageAccess?.(device);
   };
 
   //===== (handleDelete) ======
   const handleDelete = () => {
-    setMenuVisible(false);
+    handleClose();
     onDelete?.(device);
   };
 
-  //===== (Render) ======
+  const isLight = themeMode === "light";
+
   return (
-    <>
+    <View
+      style={[
+        styles.card,
+        isLight && {
+          backgroundColor: colors.bubble,
+          borderColor: colors.bubbleBorder,
+        },
+      ]}
+    >
+      <View style={styles.imageWrapper}>
+        <ImageBackground
+          source={require("@/assets/images/solar-bg.jpg")}
+          style={styles.bg}
+          imageStyle={styles.imageStyle}
+          resizeMode="cover"
+        >
+          <TouchableOpacity
+            style={styles.imageOverlay}
+            activeOpacity={0.9}
+            onPress={() => {
+              if (isMenuOpen) {
+                handleClose();
+              } else {
+                onPress?.();
+              }
+            }}
+          >
+            <View style={styles.topRight}>
+              <TouchableOpacity
+                onPress={handleToggleMenu}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                style={[
+                  styles.cardHeaderIconBtn,
+                  {
+                    backgroundColor: isMenuOpen
+                      ? isLight
+                        ? "rgba(0, 0, 0, 0.08)"
+                        : "rgba(255, 255, 255, 0.18)"
+                      : "rgba(0, 0, 0, 0.35)",
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={isMenuOpen ? "close" : "ellipsis-vertical"}
+                  size={18}
+                  color={
+                    isMenuOpen
+                      ? isLight
+                        ? colors.text || "#0F172A"
+                        : "#FFFFFF"
+                      : "#FFFFFF"
+                  }
+                />
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </ImageBackground>
+
+        {/* In-Image Menu Overlay */}
+        <DeviceCardMenu
+          visible={isMenuOpen}
+          colors={colors}
+          themeMode={themeMode}
+          isPinned={isPinned}
+          canEdit={canEdit}
+          canAddDatalogger={canAddDatalogger}
+          canManageAccess={canManageAccess}
+          canDelete={canDelete}
+          t={t}
+          onClose={handleClose}
+          onPinToggle={handlePinToggle}
+          onEdit={handleEdit}
+          onAddDatalogger={handleAddDatalogger}
+          onManageAccess={handleManageAccess}
+          onDelete={handleDelete}
+        />
+      </View>
+
       <TouchableOpacity
         style={[
-          styles.card,
-          themeMode === "light" && {
-            backgroundColor: colors.bubble,
-            borderColor: colors.bubbleBorder,
-          },
+          styles.textSection,
+          isLight && { backgroundColor: colors.bubble },
         ]}
-        onPress={onPress}
-        activeOpacity={0.9}
+        activeOpacity={0.8}
+        onPress={() => {
+          if (isMenuOpen) {
+            handleClose();
+          } else {
+            onPress?.();
+          }
+        }}
       >
-        <View style={styles.imageWrapper}>
-          <ImageBackground
-            source={require("@/assets/images/solar-bg.jpg")}
-            style={styles.bg}
-            imageStyle={styles.imageStyle}
-            resizeMode="cover"
-          >
-            <View style={styles.imageOverlay}>
-              <View style={styles.topRight}>
-                <TouchableOpacity
-                  onPress={() => setMenuVisible(true)}
-                  hitSlop={10}
-                >
-                  <Ionicons
-                    name="ellipsis-vertical"
-                    size={20}
-                    color="#FFFFFF"
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </ImageBackground>
-        </View>
-
-        <View
+        <Text
           style={[
-            styles.textSection,
-            themeMode === "light" && { backgroundColor: colors.bubble },
+            styles.title,
+            isLight && { color: colors.text },
           ]}
+          numberOfLines={1}
         >
-          <Text
-            style={[
-              styles.title,
-              themeMode === "light" && { color: colors.text },
-            ]}
-            numberOfLines={1}
-          >
-            {device.name}
-          </Text>
-          <Text
-            style={[
-              styles.subtitle,
-              themeMode === "light" && { color: colors.textMuted },
-            ]}
-            numberOfLines={1}
-          >
-            {cityProvinceText}
-          </Text>
-          <ConnectionStatus status={connectionStatus} pulseAnim={pulseAnim} />
-        </View>
+          {device.name}
+        </Text>
+        <Text
+          style={[
+            styles.subtitle,
+            isLight && { color: colors.textMuted },
+          ]}
+          numberOfLines={1}
+        >
+          {cityProvinceText}
+        </Text>
+        <ConnectionStatus status={connectionStatus} pulseAnim={pulseAnim} />
       </TouchableOpacity>
-
-      <DeviceCardMenu
-        visible={menuVisible}
-        colors={colors}
-        themeMode={themeMode}
-        isPinned={isPinned}
-        canEdit={canEdit}
-        canAddDatalogger={canAddDatalogger}
-        canManageAccess={canManageAccess}
-        canDelete={canDelete}
-        t={t}
-        onClose={() => setMenuVisible(false)}
-        onPinToggle={handlePinToggle}
-        onEdit={handleEdit}
-        onAddDatalogger={handleAddDatalogger}
-        onManageAccess={handleManageAccess}
-        onDelete={handleDelete}
-      />
-    </>
+    </View>
   );
 }

@@ -2,10 +2,10 @@
 
 // Atur layout PowerFlowDiagram dari sini.
 export const POWER_FLOW_LAYOUT = {
-  containerPaddingTop: 0,
-  containerPaddingBottom: 0,
+  containerPaddingTop: 8,
+  containerPaddingBottom: 16,
   containerPaddingHorizontal: 8,
-  containerMinHeight: 240,
+  containerMinHeight: 370,
   sideColumnWidth: 76,
   sideColumnGap: 24,
   metricBlockWidth: 76,
@@ -18,9 +18,9 @@ export const POWER_FLOW_LAYOUT = {
   centerSectionWidth: 225,
   ringSize: 238,
   centerContentTop: 76,
-  gridBlockWidth: 108,
-  gridBlockHeight: 78,
-  gridBlockMarginTop: 12,
+  gridBlockWidth: 112,
+  gridBlockHeight: 110,
+  gridBlockMarginTop: 10,
   gridIconMarginBottom: 4,
 };
 
