@@ -169,30 +169,20 @@ export default function ManageAccessScreen() {
       return;
     }
 
-    Alert.alert("Tambah Access", "Apakah anda yakin menambahkan user ini?", [
+    const identifier = user.email || user.phone || "user ini";
+    Alert.alert("Pilih Permission", `Tentukan hak akses untuk ${identifier}:`, [
       {
-        text: "Ya",
-        onPress: () => {
-          Alert.alert("Pilih Permission", "Tentukan akses untuk user ini", [
-            {
-              text: "View Only",
-              onPress: () =>
-                executeAddUser(user, PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY),
-            },
-            {
-              text: "Admin",
-              onPress: () =>
-                executeAddUser(user, PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS),
-            },
-            {
-              text: "Batal",
-              style: "cancel",
-            },
-          ]);
-        },
+        text: "View Only",
+        onPress: () =>
+          executeAddUser(user, PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY),
       },
       {
-        text: "Tidak",
+        text: "Admin",
+        onPress: () =>
+          executeAddUser(user, PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS),
+      },
+      {
+        text: "Batal",
         style: "cancel",
       },
     ]);
