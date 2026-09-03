@@ -128,7 +128,7 @@ export default function ManageAccessScreen() {
     if (!normalizedRole) {
       Alert.alert(
         "Tambah Access",
-        "Role tidak valid. Silakan pilih View Only atau Admin.",
+        "Role tidak valid. Silakan pilih View Only atau Owner.",
       );
       return;
     }
@@ -177,7 +177,7 @@ export default function ManageAccessScreen() {
           executeAddUser(user, PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY),
       },
       {
-        text: "Admin",
+        text: "Owner",
         onPress: () =>
           executeAddUser(user, PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS),
       },
@@ -202,7 +202,7 @@ export default function ManageAccessScreen() {
           handleUpdateRole(user, PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY),
       },
       {
-        text: "Admin",
+        text: "Owner",
         onPress: () =>
           handleUpdateRole(user, PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS),
       },
@@ -228,7 +228,7 @@ export default function ManageAccessScreen() {
     if (!normalizedRole) {
       Alert.alert(
         "Update Access",
-        "Role tidak valid. Silakan pilih View Only atau Admin.",
+        "Role tidak valid. Silakan pilih View Only atau Owner.",
       );
       return;
     }

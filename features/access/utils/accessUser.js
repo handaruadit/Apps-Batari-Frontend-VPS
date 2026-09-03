@@ -16,7 +16,7 @@ export function formatAccessRole(role) {
   const normalizedRole = normalizePlantAccessRole(role);
 
   if (normalizedRole === PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS) {
-    return "Admin";
+    return "Owner";
   }
 
   if (normalizedRole === PLANT_ACCESS_ROLE_VALUES.VIEW_ONLY) {
