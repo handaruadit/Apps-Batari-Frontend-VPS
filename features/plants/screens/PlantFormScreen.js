@@ -3,6 +3,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -87,12 +89,17 @@ export default function AddDeviceScreen() {
         </View>
       </View>
 
-      <ScrollView
-        style={[styles.container, { backgroundColor: colors.screen }]}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
+        <ScrollView
+          style={[styles.container, { backgroundColor: colors.screen }]}
+          contentContainerStyle={[styles.contentContainer, { paddingBottom: 160 }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
 
         <View
           style={[
@@ -259,6 +266,7 @@ export default function AddDeviceScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
+    </KeyboardAvoidingView>
 
       <PlantSelectModal
         visible={timezoneModalVisible}

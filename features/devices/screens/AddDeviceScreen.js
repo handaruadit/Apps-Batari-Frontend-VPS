@@ -5,6 +5,8 @@ import {
   ActivityIndicator,
   Alert,
   BackHandler,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -122,11 +124,17 @@ export default function AddDataloggerScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.screen }]}>
-      <ScrollView
-        style={[styles.container, { backgroundColor: colors.screen }]}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
+        <ScrollView
+          style={[styles.container, { backgroundColor: colors.screen }]}
+          contentContainerStyle={[styles.contentContainer, { paddingBottom: 160 }]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         <View style={styles.header}>
           <TouchableOpacity
             style={[
@@ -178,16 +186,7 @@ export default function AddDataloggerScreen() {
             autoCorrect={false}
           />
 
-          <TouchableOpacity
-            style={[styles.secondaryButton, { borderColor: colors.inputBorder }]}
-            activeOpacity={0.85}
-            onPress={handleScanQr}
-          >
-            <Ionicons name="qr-code-outline" size={20} color={colors.accent} />
-            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
-              Scan QR
-            </Text>
-          </TouchableOpacity>
+          {/* Scan QR button temporarily hidden as feature is not available yet */}
 
           <TouchableOpacity
             style={[
@@ -207,7 +206,8 @@ export default function AddDataloggerScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </KeyboardAvoidingView>
+  </SafeAreaView>
   );
 }
 
