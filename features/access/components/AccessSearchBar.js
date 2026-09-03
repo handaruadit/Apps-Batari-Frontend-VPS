@@ -16,12 +16,14 @@ export default function AccessSearchBar({
   isUpdating,
   onChangeQuery,
   onSearch,
+  onFocus,
 }) {
   return (
     <View style={styles.searchRow}>
       <TextInput
         value={query}
         onChangeText={onChangeQuery}
+        onFocus={onFocus}
         placeholder="Email atau nomor telepon"
         placeholderTextColor={colors.textMuted}
         returnKeyType="search"

@@ -20,11 +20,13 @@ import {
 } from "@/services/plantService";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   BackHandler,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -38,6 +40,7 @@ export default function ManageAccessScreen() {
   const plantId = getParamValue(params.id);
   const plantName = getParamValue(params.name) || "Plant";
   const { colors } = useAppSettings();
+  const scrollViewRef = useRef(null);
   const [users, setUsers] = useState([]);
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -275,11 +278,18 @@ export default function ManageAccessScreen() {
   //===== (Render) ======
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.screen }]}>
-      <ScrollView
-        style={[styles.container, { backgroundColor: colors.screen }]}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
+        <ScrollView
+          ref={scrollViewRef}
+          style={[styles.container, { backgroundColor: colors.screen }]}
+          contentContainerStyle={[styles.content, { paddingBottom: 160 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
         <View style={styles.header}>
           <TouchableOpacity
             activeOpacity={0.8}
@@ -332,6 +342,11 @@ export default function ManageAccessScreen() {
               if (!text.trim()) setHasSearched(false);
             }}
             onSearch={handleSearch}
+            onFocus={() => {
+              setTimeout(() => {
+                scrollViewRef.current?.scrollToEnd({ animated: true });
+              }, 150);
+            }}
           />
 
           {searchResults.map((user) => (
@@ -355,6 +370,7 @@ export default function ManageAccessScreen() {
           ) : null}
         </AccessCard>
       </ScrollView>
-    </SafeAreaView>
-  );
+    </KeyboardAvoidingView>
+  </SafeAreaView>
+);
 }
