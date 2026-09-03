@@ -57,6 +57,14 @@ describe('DeviceCard', () => {
 
     expect(screen.getByText('-')).toBeTruthy();
   });
+
+  it('renders pinned badge when isPinned is true', () => {
+    const screen = render(
+      <DeviceCard device={createDevice()} isPinned={true} />,
+    );
+
+    expect(screen.getByText('Pinned')).toBeTruthy();
+  });
 });
 
 //===== (DeviceCard Helper Tests) ======
