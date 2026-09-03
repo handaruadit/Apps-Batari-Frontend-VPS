@@ -30,17 +30,25 @@ export default function AddDataloggerScreen() {
   const params = useLocalSearchParams();
   const { colors, t } = useAppSettings();
   const plantId = getParamValue(params.id);
+  const fromScreen = getParamValue(params.from);
   const [deviceId, setDeviceId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   //===== (handleBack) ======
   const handleBack = useCallback(() => {
-    if (router.canGoBack()) {
+    if (fromScreen === "plantList") {
+      router.replace("/(home)/plant");
+    } else if (plantId) {
+      router.replace({
+        pathname: "/plant/[id]/overview",
+        params: { id: plantId },
+      });
+    } else if (router.canGoBack()) {
       router.back();
     } else {
       router.replace("/(home)/plant");
     }
-  }, []);
+  }, [fromScreen, plantId]);
 
   //===== (Hardware Back Handler) ======
   useFocusEffect(

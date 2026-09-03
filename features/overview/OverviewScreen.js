@@ -332,7 +332,7 @@ export default function OverviewScreen() {
 
     router.push({
       pathname: "/plant/[id]/Add-device",
-      params: { id: resolvedPlantId },
+      params: { id: resolvedPlantId, from: "overview" },
     });
   };
 
