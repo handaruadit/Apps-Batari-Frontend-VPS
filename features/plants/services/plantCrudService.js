@@ -57,3 +57,4 @@ export async function deletePlant(plantId) {
 
   return body;
 }
+

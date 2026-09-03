@@ -75,3 +75,9 @@ export const API_ENVIRONMENT = expoHostBaseUrl
     : selectedEnvName;
 export const GOOGLE_MAPS_API_KEY =
   process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+export const GOOGLE_WEB_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+  "225850077259-0am8baaasl9tgfs0iil40mea67e2s5g5.apps.googleusercontent.com";
+export const GOOGLE_ANDROID_CLIENT_ID =
+  process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ||
+  "225850077259-tsjd0a67491p2b8ch34f2j8th63tlj78.apps.googleusercontent.com";

@@ -1,12 +1,36 @@
-//===== (Imports) ======
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback } from "react";
+import { BackHandler, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { appColors, appFont } from "@/config/theme";
 
 //===== (Qr Scanner Screen) ======
 export default function QrScannerScreen() {
+  const handleBack = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(home)/plant");
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        handleBack();
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        onBackPress,
+      );
+
+      return () => subscription.remove();
+    }, [handleBack]),
+  );
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -14,7 +38,7 @@ export default function QrScannerScreen() {
           <TouchableOpacity
             style={styles.backButton}
             activeOpacity={0.8}
-            onPress={() => router.back()}
+            onPress={handleBack}
           >
             <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
           </TouchableOpacity>

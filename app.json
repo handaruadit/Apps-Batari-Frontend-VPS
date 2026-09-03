@@ -17,17 +17,17 @@
       }
     },
     "android": {
-      "package": "com.nitro.belajarapp",
+      "package": "com.batarienergi.app",
       "versionCode": 2,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/adaptive-foreground-1024.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -41,6 +41,13 @@
           "backgroundColor": "#0C1222"
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "sounds": [],
+          "color": "#18AEE6"
+        }
+      ],
       "expo-web-browser",
       "expo-secure-store"
     ],
@@ -51,8 +58,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "4b829a30-35f6-447c-a914-4e5632c37537"
+        "projectId": "e255ea32-389f-4654-91bb-5817e7cef095"
       }
-    }
+    },
+    "owner": "idewbayus-team"
   }
 }

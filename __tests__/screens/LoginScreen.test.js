@@ -67,10 +67,10 @@ describe('LoginScreen', () => {
   it('renders the current login controls', async () => {
     const screen = renderLogin();
 
-    expect(screen.getByText('Email')).toBeTruthy();
+    expect(screen.getByText(/email/i)).toBeTruthy();
     expect(screen.getByText('Password')).toBeTruthy();
-    expect(screen.getByPlaceholderText('batari@gmail.com')).toBeTruthy();
-    expect(screen.getByPlaceholderText('password')).toBeTruthy();
+    expect(screen.getByPlaceholderText(/name@company.com|batari@gmail.com/i)).toBeTruthy();
+    expect(screen.getByPlaceholderText(/password/i)).toBeTruthy();
     expect(screen.getByText('Log In')).toBeTruthy();
     await waitFor(() => expect(checkAppUpdate).toHaveBeenCalledTimes(1));
   });
@@ -87,6 +87,8 @@ describe('LoginScreen', () => {
     expect(global.Alert.alert).toHaveBeenCalledWith(
       'Login gagal',
       'Email dan password harus diisi.',
+      undefined,
+      undefined,
     );
     expect(loginUser).not.toHaveBeenCalled();
   });
@@ -103,10 +105,10 @@ describe('LoginScreen', () => {
     const screen = renderLogin();
 
     fireEvent.changeText(
-      screen.getByPlaceholderText('batari@gmail.com'),
+      screen.getByPlaceholderText(/name@company.com|batari@gmail.com/i),
       'user@example.com',
     );
-    fireEvent.changeText(screen.getByPlaceholderText('password'), 'secret');
+    fireEvent.changeText(screen.getByPlaceholderText(/password/i), 'secret');
     fireEvent.press(screen.getByText('Log In'));
 
     await waitFor(() => expect(loginUser).toHaveBeenCalledTimes(1));

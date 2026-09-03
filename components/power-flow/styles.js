@@ -12,6 +12,9 @@ import {
 
 const styles = StyleSheet.create({
   container: {
+    width: "100%",
+    maxWidth: 440,
+    alignSelf: "center",
     paddingTop: POWER_FLOW_LAYOUT.containerPaddingTop,
     paddingBottom: POWER_FLOW_LAYOUT.containerPaddingBottom,
     paddingHorizontal: POWER_FLOW_LAYOUT.containerPaddingHorizontal,

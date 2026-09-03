@@ -12,36 +12,32 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_ENV": "vps",
+        "EXPO_PUBLIC_API_USE_EXPO_HOST": "false",
+        "EXPO_PUBLIC_API_PORT": "3001",
+        "EXPO_PUBLIC_API_BASE_URL": "http://89.116.33.75:3001",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "225850077259-0am8baaasl9tgfs0iil40mea67e2s5g5.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "225850077259-tsjd0a67491p2b8ch34f2j8th63tlj78.apps.googleusercontent.com"
       }
     },
     "production": {
+      "autoIncrement": true,
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_ENV": "vps",
+        "EXPO_PUBLIC_API_USE_EXPO_HOST": "false",
+        "EXPO_PUBLIC_API_PORT": "3001",
+        "EXPO_PUBLIC_API_BASE_URL": "http://89.116.33.75:3001",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "225850077259-0am8baaasl9tgfs0iil40mea67e2s5g5.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "225850077259-tsjd0a67491p2b8ch34f2j8th63tlj78.apps.googleusercontent.com"
       }
     }
+  },
+  "submit": {
+    "production": {}
   }
 }
-
-// {
-//   "cli": {
-//     "version": ">= 16.0.0",
-//     "appVersionSource": "local"
-//   },
-//   "build": {
-//     "development": {
-//       "developmentClient": true,
-//       "distribution": "internal"
-//     },
-//     "preview": {
-//       "distribution": "internal",
-//       "android": {
-//         "buildType": "apk"
-//       }
-//     },
-//     "production": {
-//       "android": {
-//         "buildType": "apk"
-//       }
-//     }
-//   }
-// }

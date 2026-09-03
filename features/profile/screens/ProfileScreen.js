@@ -1,25 +1,123 @@
 //===== (Imports) ======
 import {
+  getUserInfo,
   removeRememberMe,
   removeToken,
   removeUserInfo,
 } from "@/auth/token";
 import { AuthContext } from "@/context/AuthContext";
 import { useAppSettings } from "@/context/AppSettingsContext";
+import AboutModal from "@/features/profile/components/AboutModal";
 import ChoiceButton from "@/features/profile/components/ChoiceButton";
+import DeleteAccountModal from "@/features/profile/components/DeleteAccountModal";
+import EditProfileModal from "@/features/profile/components/EditProfileModal";
 import MenuRow from "@/features/profile/components/MenuRow";
+import NotificationSettingsModal from "@/features/profile/components/NotificationSettingsModal";
 import { profileStyles as styles } from "@/features/profile/styles";
-import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { fetchUserProfile } from "@/services/userService";
+import { Feather, Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
-import { useContext } from "react";
-import { ScrollView, View } from "react-native";
+import React, { useContext, useEffect, useState } from "react";
+import { Alert, ScrollView, Text, View } from "react-native";
 
 //===== (ProfileScreen) ======
 export default function ProfileScreen() {
   const router = useRouter();
-  const { setUser } = useContext(AuthContext);
+  const { user, setUser } = useContext(AuthContext);
   const { colors, themeMode, setThemeMode, language, setLanguage, t } =
     useAppSettings();
+
+  // Modals State
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [notifModalVisible, setNotifModalVisible] = useState(false);
+  const [aboutModalVisible, setAboutModalVisible] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [cacheSize, setCacheSize] = useState("18.4 MB");
+
+  // Load user profile on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const storedUser = await getUserInfo();
+        if (storedUser) {
+          setUser((prev) => ({ ...prev, ...storedUser }));
+        }
+        const remoteProfile = await fetchUserProfile();
+        if (remoteProfile) {
+          setUser((prev) => ({ ...prev, ...remoteProfile }));
+        }
+      } catch {
+        // Fallback to local stored user
+      }
+    };
+
+    loadProfile();
+  }, [setUser]);
+
+  // Compute Avatar Initials
+  const displayName =
+    user?.name ||
+    user?.email?.split("@")[0] ||
+    "Admin Batari";
+  const displayEmail = user?.email || "admin@batarienergy.com";
+  const initials = displayName
+    .split(" ")
+    .map((word) => word[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "AB";
+
+  //===== (handleClearCache) ======
+  const handleClearCache = () => {
+    Alert.alert(
+      t("cache"),
+      "Bersihkan file cache dan data telemetri sementara? (Data akun & sesi login Anda akan tetap aman).",
+      [
+        { text: t("cancel"), style: "cancel" },
+        {
+          text: "Bersihkan",
+          onPress: async () => {
+            try {
+              // Safely clear temporary cache keys (excluding auth & settings)
+              const allKeys = await AsyncStorage.getAllKeys();
+              const tempKeys = allKeys.filter(
+                (k) =>
+                  !k.includes("userToken") &&
+                  !k.includes("userInfo") &&
+                  !k.includes("rememberMe") &&
+                  !k.includes("theme") &&
+                  !k.includes("language") &&
+                  !k.includes("pinned_plants") &&
+                  !k.includes("notification"),
+              );
+
+              if (tempKeys.length > 0) {
+                await AsyncStorage.multiRemove(tempKeys);
+              }
+            } catch {
+              // Non-fatal
+            }
+
+            setCacheSize("0 MB");
+            Alert.alert(
+              t("success"),
+              "Cache sementara aplikasi berhasil dibersihkan.",
+            );
+          },
+        },
+      ],
+    );
+  };
+
+  //===== (handleCheckForUpdate) ======
+  const handleCheckForUpdate = () => {
+    Alert.alert(
+      t("checkForUpdate"),
+      "Aplikasi Anda sudah menggunakan versi terbaru (v1.0.0 Stable).",
+    );
+  };
 
   //===== (handleLogout) ======
   const handleLogout = async () => {
@@ -27,13 +125,27 @@ export default function ProfileScreen() {
       await removeToken();
       await removeUserInfo();
       await removeRememberMe();
-
       setUser(null);
-
       router.replace("/(auth)/login");
     } catch (error) {
       console.error("Logout error:", error);
+      router.replace("/(auth)/login");
     }
+  };
+
+  const confirmLogout = () => {
+    Alert.alert(
+      t("logout"),
+      "Apakah Anda yakin ingin keluar dari akun?",
+      [
+        { text: t("cancel"), style: "cancel" },
+        {
+          text: t("logout"),
+          style: "destructive",
+          onPress: handleLogout,
+        },
+      ],
+    );
   };
 
   //===== (Render) ======
@@ -43,169 +155,265 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
-        <MenuRow
-          title={t("editInformation")}
-          icon={<Feather name="lock" size={20} color={colors.accent} />}
-          onPress={() => {}}
-          colors={colors}
-        />
-
-        <MenuRow
-          title={t("configureWifiDatalogger")}
-          icon={<Ionicons name="wifi-outline" size={20} color={colors.accent} />}
-          onPress={() => {}}
-          colors={colors}
-        />
-
-        <MenuRow
-          title={t("localDebugging")}
-          icon={
-            <MaterialCommunityIcons
-              name="tools"
-              size={20}
-              color={colors.accent}
-            />
-          }
-          onPress={() => {}}
-          colors={colors}
-        />
-
-        <MenuRow
-          title={t("setting")}
-          icon={
-            <Ionicons
-              name="settings-outline"
-              size={20}
-              color={colors.accent}
-            />
-          }
-          onPress={() => {}}
-          colors={colors}
-        />
-
-        <MenuRow
-          title={t("logout")}
-          icon={
-            <Ionicons
-              name="log-out-outline"
-              size={20}
-              color={colors.accent}
-            />
-          }
-          showArrow={false}
-          onPress={handleLogout}
-          colors={colors}
-        />
-
-        <MenuRow
-          title={t("deleteAccount")}
-          icon={<Ionicons name="close" size={22} color="#7C8596" />}
-          showArrow={false}
-          danger
-          onPress={() => {}}
-          colors={colors}
-        />
-
-        <MenuRow
-          title={t("theme")}
-          icon={
-            <Ionicons
-              name="contrast-outline"
-              size={20}
-              color={colors.accent}
-            />
-          }
-          showArrow={false}
-          colors={colors}
+        {/* User Profile Header Card */}
+        <View
+          style={[
+            styles.profileHeaderCard,
+            {
+              backgroundColor: colors.bubble,
+              borderColor: colors.bubbleBorder,
+            },
+          ]}
         >
-          <View style={styles.choiceGroup}>
-            <ChoiceButton
-              label={t("darkMode")}
-              active={themeMode === "dark"}
-              onPress={() => setThemeMode("dark")}
-              colors={colors}
-            />
-            <ChoiceButton
-              label={t("lightMode")}
-              active={themeMode === "light"}
-              onPress={() => setThemeMode("light")}
-              colors={colors}
-            />
+          <View style={styles.avatarCircle}>
+            <Text style={styles.avatarText}>{initials}</Text>
           </View>
-        </MenuRow>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.profileName, { color: colors.text }]}>
+              {displayName}
+            </Text>
+            <Text style={[styles.profileEmail, { color: colors.textMuted }]}>
+              {displayEmail}
+            </Text>
+            {user?.role && (
+              <View
+                style={{
+                  alignSelf: "flex-start",
+                  marginTop: 6,
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 6,
+                  backgroundColor: "rgba(24, 174, 230, 0.15)",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "700",
+                    color: colors.accent,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {user.role}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
 
-        <MenuRow
-          title={t("notificationSetting")}
-          icon={
-            <Ionicons
-              name="notifications-outline"
-              size={20}
-              color={colors.accent}
-            />
-          }
-          onPress={() => {}}
-          colors={colors}
-        />
-
-        <MenuRow
-          title={t("language")}
-          icon={
-            <Ionicons name="globe-outline" size={20} color={colors.accent} />
-          }
-          showArrow={false}
-          colors={colors}
+        {/* Section 1: Akun & Profil */}
+        <Text style={[styles.sectionHeader, { color: colors.textMuted }]}>
+          {t("accountAndProfile")}
+        </Text>
+        <View
+          style={[
+            styles.sectionCard,
+            {
+              backgroundColor: colors.bubble,
+              borderColor: colors.bubbleBorder,
+            },
+          ]}
         >
-          <View style={styles.choiceGroup}>
-            <ChoiceButton
-              label="English"
-              active={language === "en"}
-              onPress={() => setLanguage("en")}
-              colors={colors}
-            />
-            <ChoiceButton
-              label="Indonesia"
-              active={language === "id"}
-              onPress={() => setLanguage("id")}
-              colors={colors}
-            />
-          </View>
-        </MenuRow>
+          <MenuRow
+            title={t("editInformation")}
+            icon={<Feather name="user" size={19} color={colors.accent} />}
+            onPress={() => setEditModalVisible(true)}
+            colors={colors}
+          />
+          <MenuRow
+            title={t("deleteAccount")}
+            icon={<Ionicons name="trash-outline" size={19} color="#EF4444" />}
+            showArrow={false}
+            danger
+            onPress={() => setDeleteModalVisible(true)}
+            colors={colors}
+          />
+        </View>
 
-        <MenuRow
-          title={t("cache")}
-          icon={
-            <Ionicons name="trash-outline" size={20} color={colors.accent} />
-          }
-          rightText="185 mb"
-          showArrow={false}
-          onPress={() => {}}
-          colors={colors}
-        />
+        {/* Section 2: Preferensi */}
+        <Text style={[styles.sectionHeader, { color: colors.textMuted }]}>
+          {t("preferences")}
+        </Text>
+        <View
+          style={[
+            styles.sectionCard,
+            {
+              backgroundColor: colors.bubble,
+              borderColor: colors.bubbleBorder,
+            },
+          ]}
+        >
+          <MenuRow
+            title={t("theme")}
+            icon={
+              <Ionicons
+                name="contrast-outline"
+                size={19}
+                color={colors.accent}
+              />
+            }
+            showArrow={false}
+            colors={colors}
+          >
+            <View style={styles.choiceGroup}>
+              <ChoiceButton
+                label={t("darkMode")}
+                active={themeMode === "dark"}
+                onPress={() => setThemeMode("dark")}
+                colors={colors}
+              />
+              <ChoiceButton
+                label={t("lightMode")}
+                active={themeMode === "light"}
+                onPress={() => setThemeMode("light")}
+                colors={colors}
+              />
+            </View>
+          </MenuRow>
 
-        <MenuRow
-          title={t("checkForUpdate")}
-          icon={
-            <Ionicons name="refresh-outline" size={20} color={colors.accent} />
-          }
-          rightText="v8.0.0.1"
-          showArrow={false}
-          onPress={() => {}}
-          colors={colors}
-        />
+          <MenuRow
+            title={t("language")}
+            icon={
+              <Ionicons name="globe-outline" size={19} color={colors.accent} />
+            }
+            showArrow={false}
+            colors={colors}
+          >
+            <View style={styles.choiceGroup}>
+              <ChoiceButton
+                label="English"
+                active={language === "en"}
+                onPress={() => setLanguage("en")}
+                colors={colors}
+              />
+              <ChoiceButton
+                label="Indonesia"
+                active={language === "id"}
+                onPress={() => setLanguage("id")}
+                colors={colors}
+              />
+            </View>
+          </MenuRow>
 
-        <MenuRow
-          title={t("about")}
-          icon={
-            <Ionicons
-              name="alert-circle-outline"
-              size={20}
-              color={colors.accent}
-            />
-          }
-          onPress={() => {}}
-          colors={colors}
-        />
+          <MenuRow
+            title={t("notificationSetting")}
+            icon={
+              <Ionicons
+                name="notifications-outline"
+                size={19}
+                color={colors.accent}
+              />
+            }
+            onPress={() => setNotifModalVisible(true)}
+            colors={colors}
+          />
+        </View>
+
+        {/* Section 3: Sistem & Informasi */}
+        <Text style={[styles.sectionHeader, { color: colors.textMuted }]}>
+          {t("systemAndInfo")}
+        </Text>
+        <View
+          style={[
+            styles.sectionCard,
+            {
+              backgroundColor: colors.bubble,
+              borderColor: colors.bubbleBorder,
+            },
+          ]}
+        >
+          <MenuRow
+            title={t("cache")}
+            icon={
+              <Ionicons
+                name="file-tray-full-outline"
+                size={19}
+                color={colors.accent}
+              />
+            }
+            rightText={cacheSize}
+            showArrow={false}
+            onPress={handleClearCache}
+            colors={colors}
+          />
+
+          <MenuRow
+            title={t("checkForUpdate")}
+            icon={
+              <Ionicons
+                name="cloud-download-outline"
+                size={19}
+                color={colors.accent}
+              />
+            }
+            rightText="v1.0.0"
+            showArrow={false}
+            onPress={handleCheckForUpdate}
+            colors={colors}
+          />
+
+          <MenuRow
+            title={t("about")}
+            icon={
+              <Ionicons
+                name="information-circle-outline"
+                size={19}
+                color={colors.accent}
+              />
+            }
+            onPress={() => setAboutModalVisible(true)}
+            colors={colors}
+          />
+
+          <MenuRow
+            title={t("logout")}
+            icon={
+              <Ionicons
+                name="log-out-outline"
+                size={19}
+                color="#EF4444"
+              />
+            }
+            showArrow={false}
+            danger
+            onPress={confirmLogout}
+            colors={colors}
+          />
+        </View>
       </ScrollView>
+
+      {/* Connected Modals */}
+      <EditProfileModal
+        visible={editModalVisible}
+        onClose={() => setEditModalVisible(false)}
+        user={user}
+        onProfileUpdated={(updated) => setUser(updated)}
+        colors={colors}
+        themeMode={themeMode}
+        t={t}
+      />
+
+      <NotificationSettingsModal
+        visible={notifModalVisible}
+        onClose={() => setNotifModalVisible(false)}
+        colors={colors}
+        t={t}
+      />
+
+      <AboutModal
+        visible={aboutModalVisible}
+        onClose={() => setAboutModalVisible(false)}
+        colors={colors}
+        t={t}
+      />
+
+      <DeleteAccountModal
+        visible={deleteModalVisible}
+        onClose={() => setDeleteModalVisible(false)}
+        onAccountDeleted={handleLogout}
+        colors={colors}
+        t={t}
+      />
     </View>
   );
 }

@@ -83,6 +83,21 @@ export async function attachLatestDeviceTimestamps(plants) {
         };
       }
 
+      const existingTimestamp =
+        parseStatusTimestamp(plant.latest_data_at) ??
+        parseStatusTimestamp(plant.latestDataStatusTimestamp) ??
+        parseStatusTimestamp(plant.latestDataAt) ??
+        parseStatusTimestamp(plant.last_synced_at) ??
+        parseStatusTimestamp(plant.last_seen);
+
+      if (existingTimestamp !== null && existingTimestamp !== undefined) {
+        return {
+          ...plant,
+          hasDeviceId: plant.has_devices ?? plant.hasDeviceId ?? true,
+          latestDataStatusTimestamp: existingTimestamp || null,
+        };
+      }
+
       try {
         const result = await fetchPlantDevices(plant.id);
         const devices = Array.isArray(result?.devices) ? result.devices : [];

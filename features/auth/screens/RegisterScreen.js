@@ -3,8 +3,9 @@ import AuthField from "@/features/auth/components/AuthField";
 import AuthFormLayout from "@/features/auth/components/AuthFormLayout";
 import AuthPrimaryButton from "@/features/auth/components/AuthPrimaryButton";
 import {
-  AUTH_ACCENT_COLOR,
+  AUTH_ACCENT_ORANGE,
   AUTH_FONT,
+  AUTH_TEXT_MUTED,
 } from "@/features/auth/constants/styles";
 import { register as registerAccount } from "@/features/auth/services/authService";
 import {
@@ -13,7 +14,8 @@ import {
 } from "@/features/auth/utils/validators";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity } from "react-native";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { showAlert } from "@/utils/showAlert";
 
 //===== (RegisterScreen) ======
 export default function RegisterScreen() {
@@ -29,34 +31,34 @@ export default function RegisterScreen() {
     const normalizedPhone = phone.trim();
 
     if (!normalizedEmail) {
-      Alert.alert("Register gagal", "Email harus diisi.");
+      showAlert("Register gagal", "Email harus diisi.");
       return;
     }
     if (!isValidEmail(normalizedEmail)) {
-      Alert.alert("Register gagal", "Format email tidak valid.");
+      showAlert("Register gagal", "Format email tidak valid.");
       return;
     }
     if (!normalizedPhone) {
-      Alert.alert("Register gagal", "Nomor HP harus diisi.");
+      showAlert("Register gagal", "Nomor HP harus diisi.");
       return;
     }
     if (!isValidPhone(normalizedPhone)) {
-      Alert.alert(
+      showAlert(
         "Register gagal",
         "Nomor HP hanya boleh berisi angka, spasi, tanda -, atau awalan +.",
       );
       return;
     }
     if (!password || !confirmPassword) {
-      Alert.alert("Register gagal", "Password dan konfirmasi harus diisi.");
+      showAlert("Register gagal", "Password dan konfirmasi harus diisi.");
       return;
     }
     if (password.length < 6) {
-      Alert.alert("Register gagal", "Password minimal 6 karakter.");
+      showAlert("Register gagal", "Password minimal 6 karakter.");
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert("Register gagal", "Password dan konfirmasi tidak sama.");
+      showAlert("Register gagal", "Password dan konfirmasi tidak sama.");
       return;
     }
 
@@ -69,16 +71,16 @@ export default function RegisterScreen() {
       });
 
       if (response.ok && (json.success || json.status === "success")) {
-        Alert.alert(
-          "Account created",
-          json.message || "Account created successfully, please login.",
-          [{ text: "OK", onPress: () => router.replace("/(auth)/login") }],
+        showAlert(
+          "Akun Berhasil Dibuat",
+          json.message || "Akun berhasil dibuat, silakan login.",
+          [{ text: "Login Sekarang", onPress: () => router.replace("/(auth)/login") }],
         );
       } else {
-        Alert.alert("Register gagal", json.message || "Email sudah digunakan.");
+        showAlert("Register gagal", json.message || "Email sudah digunakan.");
       }
     } catch {
-      Alert.alert("Register gagal", "Terjadi kesalahan jaringan.");
+      showAlert("Register gagal", "Terjadi kesalahan jaringan.");
     } finally {
       setLoading(false);
     }
@@ -87,12 +89,14 @@ export default function RegisterScreen() {
   //===== (Render) ======
   return (
     <AuthFormLayout
-      title="Create New Account"
-      subtitle="Register akun Batari baru."
+      title="Create Account"
+      subtitle="Sign up to start monitoring your solar energy"
+      scrollable
     >
       <AuthField
-        label="Email"
-        placeholder="hallo@batari.com"
+        label="Email Address"
+        iconName="mail-outline"
+        placeholder="batari@gmail.com"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -100,7 +104,8 @@ export default function RegisterScreen() {
       />
 
       <AuthField
-        label="Phone / Nomor HP"
+        label="Phone Number"
+        iconName="call-outline"
         placeholder="081234567890"
         value={phone}
         onChangeText={setPhone}
@@ -109,18 +114,20 @@ export default function RegisterScreen() {
 
       <AuthField
         label="Password"
+        iconName="lock-closed-outline"
+        isPassword
         placeholder="Minimal 6 karakter"
         value={password}
         onChangeText={setPassword}
-        secureTextEntry
       />
 
       <AuthField
         label="Confirm Password"
+        iconName="shield-checkmark-outline"
+        isPassword
         placeholder="Ulangi password"
         value={confirmPassword}
         onChangeText={setConfirmPassword}
-        secureTextEntry
       />
 
       <AuthPrimaryButton
@@ -129,23 +136,36 @@ export default function RegisterScreen() {
         onPress={handleRegister}
       />
 
-      <TouchableOpacity
-        style={styles.secondaryLink}
-        onPress={() => router.replace("/(auth)/login")}
-      >
-        <Text style={styles.linkText}>Back to Login</Text>
-      </TouchableOpacity>
+      <View style={styles.bottomRow}>
+        <Text style={styles.bottomRegularText}>Already have an account? </Text>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => router.replace("/(auth)/login")}
+        >
+          <Text style={styles.loginLinkText}>Log In</Text>
+        </TouchableOpacity>
+      </View>
     </AuthFormLayout>
   );
 }
 
 //===== (Styles) ======
 const styles = StyleSheet.create({
-  secondaryLink: { alignItems: "center", marginTop: 22 },
-  linkText: {
-    color: AUTH_ACCENT_COLOR,
+  bottomRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 20,
+  },
+  bottomRegularText: {
+    color: AUTH_TEXT_MUTED,
     fontFamily: AUTH_FONT,
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 14,
+  },
+  loginLinkText: {
+    color: AUTH_ACCENT_ORANGE,
+    fontFamily: AUTH_FONT,
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

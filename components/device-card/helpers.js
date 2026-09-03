@@ -48,6 +48,9 @@ export function getPlantConnectionStatus(device) {
 
 //===== (formatCityProvince) ======
 export function formatCityProvince(device) {
+  if (device?.location && String(device.location).trim()) {
+    return String(device.location).trim();
+  }
   const city = String(device?.city || "").trim();
   const province = String(device?.province || "").trim();
   const locationParts = [city, province].filter(Boolean);

@@ -191,7 +191,9 @@ export function getGridPointerCoordinates(containerLayout, gridBubbleLayout, sca
     gridBubbleLayout.height / 2 +
     bubbleOffset.y * scale +
     (config.lineOffsetY + config.lineStartOffsetY) * scale;
-  const leadX = startX + (config.startLeadLength || 0) * scale;
+  const leadX = config.leadAnchorPctX != null
+    ? containerLayout.width * config.leadAnchorPctX
+    : startX + (config.startLeadLength || 0) * scale;
   const leadY = startY;
   const bendX = leadX + (config.lineBendOffsetX || 0) * scale;
   const verticalLength =
@@ -275,8 +277,9 @@ export function getBatteryPointerCoordinates(
     batteryBubbleLayout.height / 2 +
     bubbleOffset.y * scale +
     (config.lineOffsetY + config.lineStartOffsetY) * scale;
-  const bendX =
-    config.horizontalLineLength == null
+  const bendX = config.bendAnchorPctX != null
+    ? containerLayout.width * config.bendAnchorPctX
+    : config.horizontalLineLength == null
       ? endX + (config.lineBendOffsetX || 0) * scale
       : startX + config.horizontalLineLength * scale;
   const bendY =

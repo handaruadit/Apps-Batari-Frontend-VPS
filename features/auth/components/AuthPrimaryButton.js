@@ -1,7 +1,7 @@
 //===== (Imports) ======
 import {
-  AUTH_ACCENT_COLOR,
   AUTH_FONT,
+  AUTH_PRIMARY_NAVY,
 } from "@/features/auth/constants/styles";
 import {
   ActivityIndicator,
@@ -11,18 +11,18 @@ import {
 } from "react-native";
 
 //===== (AuthPrimaryButton) ======
-export default function AuthPrimaryButton({ loading, label, onPress }) {
+export default function AuthPrimaryButton({ loading, label, onPress, style, textStyle }) {
   return (
     <TouchableOpacity
-      style={[styles.primaryButton, loading && styles.buttonBusy]}
+      style={[styles.primaryButton, style, loading && styles.buttonBusy]}
       onPress={onPress}
       disabled={loading}
-      activeOpacity={0.82}
+      activeOpacity={0.85}
     >
       {loading ? (
-        <ActivityIndicator color="#FFFFFF" />
+        <ActivityIndicator color="#FFFFFF" size="small" />
       ) : (
-        <Text style={styles.primaryButtonText}>{label}</Text>
+        <Text style={[styles.primaryButtonText, textStyle]}>{label}</Text>
       )}
     </TouchableOpacity>
   );
@@ -31,18 +31,24 @@ export default function AuthPrimaryButton({ loading, label, onPress }) {
 //===== (Styles) ======
 const styles = StyleSheet.create({
   primaryButton: {
-    minHeight: 56,
-    borderRadius: 28,
-    backgroundColor: AUTH_ACCENT_COLOR,
+    minHeight: 52,
+    borderRadius: 14,
+    backgroundColor: AUTH_PRIMARY_NAVY,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 8,
+    marginTop: 4,
+    shadowColor: AUTH_PRIMARY_NAVY,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  buttonBusy: { opacity: 0.76 },
+  buttonBusy: { opacity: 0.78 },
   primaryButtonText: {
     color: "#FFFFFF",
     fontFamily: AUTH_FONT,
-    fontSize: 17,
-    fontWeight: "600",
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
 });

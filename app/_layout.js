@@ -1,3 +1,14 @@
+//===== (Suppress Expo Go push notification warning) ======
+import { LogBox } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+
+WebBrowser.maybeCompleteAuthSession();
+
+LogBox.ignoreLogs([
+  'expo-notifications',
+  '`expo-notifications` functionality is not fully supported in Expo Go',
+]);
+
 //===== (Imports) ======
 import {
   getUserFromToken,
@@ -20,6 +31,8 @@ import {
   AppSettingsProvider,
   useAppSettings,
 } from '../context/AppSettingsContext';
+import { AlertProvider } from '../context/AlertContext';
+import '@/utils/showAlert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 //===== (Constants) ======
@@ -49,9 +62,11 @@ function RootLayoutContent() {
   const logoSize = clamp(width * 0.24, isCompactHeight ? 72 : 84, 100);
 
   return (
-    <AuthProvider>
-      <SessionGate colors={colors} logoSize={logoSize} />
-    </AuthProvider>
+    <AlertProvider>
+      <AuthProvider>
+        <SessionGate colors={colors} logoSize={logoSize} />
+      </AuthProvider>
+    </AlertProvider>
   );
 }
 
