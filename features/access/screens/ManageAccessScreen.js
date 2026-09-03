@@ -45,6 +45,8 @@ export default function ManageAccessScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
 
+  const [hasSearched, setHasSearched] = useState(false);
+
   //===== (handleBack) ======
   const handleBack = useCallback(() => {
     if (router.canGoBack()) {
@@ -97,10 +99,12 @@ export default function ManageAccessScreen() {
 
     if (!text) {
       setSearchResults([]);
+      setHasSearched(false);
       return;
     }
 
     setIsSearching(true);
+    setHasSearched(true);
     try {
       const result = await searchPlantAccessUsers(plantId, text);
       setSearchResults(result);
@@ -333,7 +337,10 @@ export default function ManageAccessScreen() {
             colors={colors}
             isSearching={isSearching}
             isUpdating={isUpdating}
-            onChangeQuery={setQuery}
+            onChangeQuery={(text) => {
+              setQuery(text);
+              if (!text.trim()) setHasSearched(false);
+            }}
             onSearch={handleSearch}
           />
 
@@ -348,6 +355,14 @@ export default function ManageAccessScreen() {
               disabled={isUpdating}
             />
           ))}
+
+          {hasSearched && searchResults.length === 0 && !isSearching && query.trim() ? (
+            <View style={styles.emptySearchContainer}>
+              <Text style={[styles.emptySearchText, { color: colors.textMuted }]}>
+                User tidak ditemukan atau sudah memiliki akses ke stasiun ini.
+              </Text>
+            </View>
+          ) : null}
         </AccessCard>
       </ScrollView>
     </SafeAreaView>
