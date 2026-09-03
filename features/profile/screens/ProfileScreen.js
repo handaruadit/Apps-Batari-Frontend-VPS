@@ -14,6 +14,7 @@ import EditProfileModal from "@/features/profile/components/EditProfileModal";
 import MenuRow from "@/features/profile/components/MenuRow";
 import NotificationSettingsModal from "@/features/profile/components/NotificationSettingsModal";
 import { profileStyles as styles } from "@/features/profile/styles";
+import { clearAppCache, getAppCacheSize } from "@/features/profile/utils/cacheUtils";
 import { fetchUserProfile } from "@/services/userService";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -33,10 +34,11 @@ export default function ProfileScreen() {
   const [notifModalVisible, setNotifModalVisible] = useState(false);
   const [aboutModalVisible, setAboutModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
-  const [cacheSize, setCacheSize] = useState("18.4 MB");
+  const [cacheSize, setCacheSize] = useState("0 KB");
 
-  // Load user profile on mount
+  // Load user profile & real cache size on mount
   useEffect(() => {
+    getAppCacheSize().then(setCacheSize).catch(() => {});
     const loadProfile = async () => {
       try {
         const storedUser = await getUserInfo();
@@ -80,27 +82,12 @@ export default function ProfileScreen() {
           text: "Bersihkan",
           onPress: async () => {
             try {
-              // Safely clear temporary cache keys (excluding auth & settings)
-              const allKeys = await AsyncStorage.getAllKeys();
-              const tempKeys = allKeys.filter(
-                (k) =>
-                  !k.includes("userToken") &&
-                  !k.includes("userInfo") &&
-                  !k.includes("rememberMe") &&
-                  !k.includes("theme") &&
-                  !k.includes("language") &&
-                  !k.includes("pinned_plants") &&
-                  !k.includes("notification"),
-              );
-
-              if (tempKeys.length > 0) {
-                await AsyncStorage.multiRemove(tempKeys);
-              }
+              const newSize = await clearAppCache();
+              setCacheSize(newSize);
             } catch {
-              // Non-fatal
+              setCacheSize("0 KB");
             }
 
-            setCacheSize("0 MB");
             Alert.alert(
               t("success"),
               "Cache sementara aplikasi berhasil dibersihkan.",
