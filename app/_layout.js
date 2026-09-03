@@ -1,6 +1,30 @@
-//===== (Suppress Expo Go push notification warning) ======
-import { LogBox } from 'react-native';
+import { useContext, useEffect, useState } from 'react';
+import {
+  Image,
+  LogBox,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Stack, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+
+import {
+  getUserFromToken,
+  getUserInfo,
+  getValidRememberedToken,
+} from '@/auth/token';
+import { AlertProvider } from '../context/AlertContext';
+import {
+  AppSettingsProvider,
+  useAppSettings,
+} from '../context/AppSettingsContext';
+import {
+  AuthContext,
+  AuthProvider,
+} from '../context/AuthContext';
+import '@/utils/showAlert';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -8,32 +32,6 @@ LogBox.ignoreLogs([
   'expo-notifications',
   '`expo-notifications` functionality is not fully supported in Expo Go',
 ]);
-
-//===== (Imports) ======
-import {
-  getUserFromToken,
-  getUserInfo,
-  getValidRememberedToken,
-} from '@/auth/token';
-import { Stack, useRouter } from 'expo-router';
-import { useContext, useEffect, useState } from 'react';
-import {
-  Image,
-  Pressable,
-  StyleSheet,
-  useWindowDimensions,
-} from 'react-native';
-import {
-  AuthContext,
-  AuthProvider,
-} from '../context/AuthContext';
-import {
-  AppSettingsProvider,
-  useAppSettings,
-} from '../context/AppSettingsContext';
-import { AlertProvider } from '../context/AlertContext';
-import '@/utils/showAlert';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 //===== (Constants) ======
 const BATARI_LOGO = require('../assets/images/batari-logo.jpeg');
