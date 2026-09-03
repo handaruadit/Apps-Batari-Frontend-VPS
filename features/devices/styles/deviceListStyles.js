@@ -85,6 +85,26 @@ const deviceListStyles = StyleSheet.create({
     fontFamily: appFont,
     lineHeight: 20,
   },
+  deviceIdRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  copyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  copyButtonText: {
+    fontFamily: appFont,
+    fontSize: 12,
+    fontWeight: "600",
+  },
   parameterSection: {
     marginTop: 16,
     borderTopWidth: 1,

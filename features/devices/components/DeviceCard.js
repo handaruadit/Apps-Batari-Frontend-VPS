@@ -1,6 +1,7 @@
-//===== (Imports) ======
-import { MaterialIcons } from "@expo/vector-icons";
-import { Text, TouchableOpacity, View } from "react-native";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
+import React, { useState } from "react";
+import { Platform, Text, ToastAndroid, TouchableOpacity, View } from "react-native";
 
 import BatteryParameterList from "@/features/devices/components/BatteryParameterList";
 import styles from "@/features/devices/styles/deviceListStyles";
@@ -31,6 +32,27 @@ export default function DeviceCard({
   colors,
   themeMode,
 }) {
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopyDeviceId = async () => {
+    if (!item.device_id) return;
+
+    try {
+      await Clipboard.setStringAsync(String(item.device_id));
+      setIsCopied(true);
+
+      if (Platform.OS === "android") {
+        ToastAndroid.show("Device ID berhasil disalin", ToastAndroid.SHORT);
+      }
+
+      setTimeout(() => {
+        setIsCopied(false);
+      }, 2000);
+    } catch (err) {
+      console.warn("Gagal menyalin:", err);
+    }
+  };
+
   const isStationTelemetry = String(item.device_id || "").startsWith(
     "DEYE_STATION_",
   );
@@ -80,9 +102,43 @@ export default function DeviceCard({
         <Text style={[styles.metricLabel, { color: colors.textMuted }]}>
           {t("deviceId")}
         </Text>
-        <Text style={[styles.infoValue, { color: colors.text }]}>
-          {item.device_id || "-"}
-        </Text>
+        <View style={styles.deviceIdRow}>
+          <Text style={[styles.infoValue, { color: colors.text, flexShrink: 1 }]}>
+            {item.device_id || "-"}
+          </Text>
+          {item.device_id ? (
+            <TouchableOpacity
+              onPress={handleCopyDeviceId}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[
+                styles.copyButton,
+                {
+                  backgroundColor: isCopied
+                    ? "rgba(16, 185, 129, 0.12)"
+                    : colors.input || "rgba(24, 174, 230, 0.08)",
+                  borderColor: isCopied
+                    ? "rgba(16, 185, 129, 0.35)"
+                    : colors.inputBorder || "rgba(24, 174, 230, 0.2)",
+                },
+              ]}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={isCopied ? "checkmark" : "copy-outline"}
+                size={13}
+                color={isCopied ? "#10B981" : colors.accent || "#18AEE6"}
+              />
+              <Text
+                style={[
+                  styles.copyButtonText,
+                  { color: isCopied ? "#10B981" : colors.accent || "#18AEE6" },
+                ]}
+              >
+                {isCopied ? "Tersalin" : "Salin"}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
 
       {connectionLabel && (
