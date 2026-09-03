@@ -127,6 +127,12 @@ export default function DeviceCard({
           backgroundColor: colors.bubble,
           borderColor: colors.bubbleBorder,
         },
+        isPinned && {
+          borderColor: isLight
+            ? "rgba(24, 174, 230, 0.6)"
+            : "rgba(24, 174, 230, 0.45)",
+          borderWidth: 1.2,
+        },
       ]}
     >
       <View style={styles.imageWrapper}>
@@ -147,7 +153,15 @@ export default function DeviceCard({
               }
             }}
           >
-            <View style={styles.topRight}>
+            <View style={styles.cardTopRow}>
+              {isPinned ? (
+                <View style={styles.pinnedBadge}>
+                  <Ionicons name="pin" size={11} color="#18AEE6" />
+                  <Text style={styles.pinnedText}>Pinned</Text>
+                </View>
+              ) : (
+                <View />
+              )}
               <TouchableOpacity
                 onPress={handleToggleMenu}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
