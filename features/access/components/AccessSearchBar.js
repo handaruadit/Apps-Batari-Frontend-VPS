@@ -24,6 +24,10 @@ export default function AccessSearchBar({
         onChangeText={onChangeQuery}
         placeholder="Email atau nomor telepon"
         placeholderTextColor={colors.textMuted}
+        returnKeyType="search"
+        onSubmitEditing={onSearch}
+        autoCapitalize="none"
+        autoCorrect={false}
         style={[
           styles.input,
           {

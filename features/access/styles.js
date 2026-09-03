@@ -105,4 +105,16 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  emptySearchContainer: {
+    paddingVertical: 14,
+    paddingHorizontal: 6,
+    alignItems: "center",
+  },
+  emptySearchText: {
+    fontFamily: appFont,
+    fontSize: 13,
+    fontWeight: "500",
+    textAlign: "center",
+    lineHeight: 18,
+  },
 });
