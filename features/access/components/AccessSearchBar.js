@@ -12,6 +12,7 @@ import {
 export default function AccessSearchBar({
   query,
   colors,
+  t,
   isSearching,
   isUpdating,
   onChangeQuery,
@@ -24,7 +25,7 @@ export default function AccessSearchBar({
         value={query}
         onChangeText={onChangeQuery}
         onFocus={onFocus}
-        placeholder="Email atau nomor telepon"
+        placeholder={t ? t("emailOrPhonePlaceholder") : "Email or phone number"}
         placeholderTextColor={colors.textMuted}
         returnKeyType="search"
         onSubmitEditing={onSearch}

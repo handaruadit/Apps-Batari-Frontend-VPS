@@ -1,5 +1,6 @@
 //===== (Imports) ======
 import { getPlantConnectionStatus } from "@/components/device-card/helpers";
+import { useAppSettings } from "@/context/AppSettingsContext";
 import {
   getNotificationSettings,
   requestNotificationPermissions,
@@ -9,6 +10,8 @@ import { useEffect, useRef } from "react";
 
 //===== (usePlantStatusWatcher) ======
 export function usePlantStatusWatcher(plantList = []) {
+  const { language } = useAppSettings();
+  const isEn = language === "en";
   const previousStatusMap = useRef(new Map());
   const previousBatteryAlertMap = useRef(new Map());
   const isInitialRun = useRef(true);
@@ -47,7 +50,9 @@ export function usePlantStatusWatcher(plantList = []) {
           if (settings.stationOffline) {
             triggerLocalNotification({
               title: `Station Offline: ${plantName}`,
-              body: `Station '${plantName}' telah terputus dari jaringan (Offline).`,
+              body: isEn
+                ? `Station '${plantName}' has been disconnected from the network (Offline).`
+                : `Station '${plantName}' telah terputus dari jaringan (Offline).`,
               type: "danger",
             });
           }
@@ -58,7 +63,9 @@ export function usePlantStatusWatcher(plantList = []) {
           if (settings.stationOnline) {
             triggerLocalNotification({
               title: `Station Online: ${plantName}`,
-              body: `Station '${plantName}' kembali terhubung dan aktif menghasilkan daya.`,
+              body: isEn
+                ? `Station '${plantName}' is back online and actively generating power.`
+                : `Station '${plantName}' kembali terhubung dan aktif menghasilkan daya.`,
               type: "success",
             });
           }
@@ -71,8 +78,10 @@ export function usePlantStatusWatcher(plantList = []) {
           if (!alreadyAlerted) {
             previousBatteryAlertMap.current.set(plantId, true);
             triggerLocalNotification({
-              title: `Alarm Baterai: ${plantName}`,
-              body: `Kapasitas baterai di station '${plantName}' berada pada level rendah (${Math.round(soc)}%).`,
+              title: isEn ? `Battery Alarm: ${plantName}` : `Alarm Baterai: ${plantName}`,
+              body: isEn
+                ? `Battery capacity at station '${plantName}' is at low level (${Math.round(soc)}%).`
+                : `Kapasitas baterai di station '${plantName}' berada pada level rendah (${Math.round(soc)}%).`,
               type: "warning",
             });
           }
@@ -90,5 +99,5 @@ export function usePlantStatusWatcher(plantList = []) {
     };
 
     checkStatusTransitions();
-  }, [plantList]);
+  }, [plantList, isEn]);
 }

@@ -17,6 +17,7 @@ import { profileStyles as styles } from "@/features/profile/styles";
 import { clearAppCache, getAppCacheSize } from "@/features/profile/utils/cacheUtils";
 import { fetchUserProfile } from "@/services/userService";
 import { Feather, Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useContext, useEffect, useState } from "react";
@@ -75,11 +76,11 @@ export default function ProfileScreen() {
   const handleClearCache = () => {
     Alert.alert(
       t("cache"),
-      "Bersihkan file cache dan data telemetri sementara? (Data akun & sesi login Anda akan tetap aman).",
+      t("clearCacheConfirm"),
       [
         { text: t("cancel"), style: "cancel" },
         {
-          text: "Bersihkan",
+          text: t("clear"),
           onPress: async () => {
             try {
               const newSize = await clearAppCache();
@@ -90,7 +91,7 @@ export default function ProfileScreen() {
 
             Alert.alert(
               t("success"),
-              "Cache sementara aplikasi berhasil dibersihkan.",
+              t("cacheCleared"),
             );
           },
         },
@@ -102,7 +103,7 @@ export default function ProfileScreen() {
   const handleCheckForUpdate = () => {
     Alert.alert(
       t("checkForUpdate"),
-      "Aplikasi Anda sudah menggunakan versi terbaru (v1.0.0 Stable).",
+      t("latestVersionAlert"),
     );
   };
 
@@ -123,7 +124,7 @@ export default function ProfileScreen() {
   const confirmLogout = () => {
     Alert.alert(
       t("logout"),
-      "Apakah Anda yakin ingin keluar dari akun?",
+      t("logoutConfirm"),
       [
         { text: t("cancel"), style: "cancel" },
         {
@@ -333,7 +334,7 @@ export default function ProfileScreen() {
                 color={colors.accent}
               />
             }
-            rightText="v1.0.0"
+            rightText={`v${Constants.expoConfig?.version || "1.0.2"}`}
             showArrow={false}
             onPress={handleCheckForUpdate}
             colors={colors}

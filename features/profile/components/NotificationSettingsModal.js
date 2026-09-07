@@ -53,11 +53,11 @@ export default function NotificationSettingsModal({
       await saveNotificationSettings(settings);
       Alert.alert(
         t("success"),
-        "Pengaturan notifikasi berhasil disimpan.",
+        t("notifSettingsSaved"),
         [{ text: "OK", onPress: onClose }],
       );
     } catch {
-      Alert.alert("Error", "Gagal menyimpan pengaturan.");
+      Alert.alert(t("failed"), t("notifSettingsFailed"));
     } finally {
       setIsSaving(false);
     }
@@ -112,10 +112,10 @@ export default function NotificationSettingsModal({
                   />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.switchTitle, { color: colors.text }]}>
-                      Notifikasi Station Offline
+                      {t("notifStationOfflineTitle")}
                     </Text>
                     <Text style={[styles.switchSubtitle, { color: colors.textMuted }]}>
-                      Peringatan instan saat station terputus dari jaringan.
+                      {t("notifStationOfflineSubtitle")}
                     </Text>
                   </View>
                 </View>
@@ -138,10 +138,10 @@ export default function NotificationSettingsModal({
                   />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.switchTitle, { color: colors.text }]}>
-                      Notifikasi Station Online
+                      {t("notifStationOnlineTitle")}
                     </Text>
                     <Text style={[styles.switchSubtitle, { color: colors.textMuted }]}>
-                      Pemberitahuan saat station yang offline kembali normal.
+                      {t("notifStationOnlineSubtitle")}
                     </Text>
                   </View>
                 </View>
@@ -164,10 +164,10 @@ export default function NotificationSettingsModal({
                   />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.switchTitle, { color: colors.text }]}>
-                      Alarm Baterai
+                      {t("notifBatteryAlarmTitle")}
                     </Text>
                     <Text style={[styles.switchSubtitle, { color: colors.textMuted }]}>
-                      Peringatan saat SoC terlalu rendah atau ada anomali voltase.
+                      {t("notifBatteryAlarmSubtitle")}
                     </Text>
                   </View>
                 </View>
@@ -190,10 +190,10 @@ export default function NotificationSettingsModal({
                   />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.switchTitle, { color: colors.text }]}>
-                      Ringkasan Harian Daya
+                      {t("notifDailySummaryTitle")}
                     </Text>
                     <Text style={[styles.switchSubtitle, { color: colors.textMuted }]}>
-                      Laporan ringkasan total produksi harian setiap sore.
+                      {t("notifDailySummarySubtitle")}
                     </Text>
                   </View>
                 </View>

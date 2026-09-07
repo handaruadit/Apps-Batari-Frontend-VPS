@@ -1,6 +1,6 @@
 //===== (Imports) ======
-import { useFocusEffect } from "@react-navigation/native";
 import {
+  useFocusEffect,
   useGlobalSearchParams,
   useLocalSearchParams,
   useRouter,
@@ -130,14 +130,14 @@ export default function PerangkatScreen() {
   const handleDeleteDevice = (deviceId) => {
     if (!canUnlinkDevice) {
       Alert.alert(
-        "Tidak diizinkan",
-        "Akun view only tidak dapat melepas device dari plant.",
+        t("notAllowed"),
+        t("notAllowedViewOnly"),
       );
       return;
     }
 
     if (!resolvedPlantId) {
-      setErrorMessage("ID plant tidak ditemukan.");
+      setErrorMessage(t("plantNotFound"));
       setCanUnlinkDevice(false);
       setIsLoading(false);
       setIsRefreshing(false);
@@ -145,20 +145,20 @@ export default function PerangkatScreen() {
     }
 
     if (!deviceId) {
-      Alert.alert("Gagal", "Device ID tidak ditemukan.");
+      Alert.alert(t("failed"), t("deviceIdNotFound"));
       return;
     }
 
     Alert.alert(
-      "Hapus Device",
-      "Apakah Anda yakin ingin melepas device ini dari plant?",
+      t("deleteDevice"),
+      t("deleteDeviceConfirm"),
       [
         {
-          text: "Batal",
+          text: t("cancel"),
           style: "cancel",
         },
         {
-          text: "Hapus",
+          text: t("delete"),
           style: "destructive",
           onPress: async () => {
             try {
@@ -170,15 +170,15 @@ export default function PerangkatScreen() {
               if (error.code === "AUTH_EXPIRED") {
                 Alert.alert(
                   "Error",
-                  "Sesi Anda telah habis atau token tidak valid. Silakan login kembali.",
+                  t("sessionExpiredAlert"),
                 );
                 router.replace("/(auth)/login");
                 return;
               }
 
               Alert.alert(
-                "Gagal",
-                error.message || "Gagal melepas device dari plant.",
+                t("failed"),
+                error.message || t("unlinkDeviceFailed"),
               );
             }
           },
@@ -191,17 +191,10 @@ export default function PerangkatScreen() {
   const loadDevices = useCallback(
     async ({ refreshing = false } = {}) => {
       const requestPlantId = resolvedPlantId;
-      console.log("PERANGKAT_ROUTE_IDS:", {
-        localId,
-        localPlantId,
-        globalId,
-        globalPlantId,
-        selectedDeviceId: selectedDevice?.id,
-      });
-      console.log("PERANGKAT_RESOLVED_PLANT_ID:", resolvedPlantId);
+
 
       if (!resolvedPlantId) {
-        setErrorMessage("ID plant tidak ditemukan.");
+        setErrorMessage(t("plantNotFound"));
         setIsLoading(false);
         setIsRefreshing(false);
         return;
@@ -219,7 +212,7 @@ export default function PerangkatScreen() {
         if (String(activePlantIdRef.current) !== String(requestPlantId)) {
           return;
         }
-        console.log("DEVICE_RESPONSE", result);
+
 
         const nextPlant = result?.plant || null;
         const nextDevices = Array.isArray(result?.devices)
@@ -232,18 +225,18 @@ export default function PerangkatScreen() {
           canCurrentUserUnlinkDevice(nextPlant, selectedDevice),
         );
       } catch (error) {
-        console.log("PERANGKAT_ERROR:", error?.message || error);
+
         if (error.code === "AUTH_EXPIRED") {
           Alert.alert(
             "Error",
-            "Sesi Anda telah habis atau token tidak valid. Silakan login kembali.",
+            t("sessionExpiredAlert"),
           );
           router.replace("/(auth)/login");
           return;
         }
 
-        setErrorMessage(error.message || "Gagal mengambil data device.");
-        Alert.alert("Gagal", error.message || "Gagal mengambil data device.");
+        setErrorMessage(error.message || t("unlinkDeviceFailed"));
+        Alert.alert(t("failed"), error.message || t("unlinkDeviceFailed"));
       } finally {
         if (String(activePlantIdRef.current) === String(requestPlantId)) {
           setIsLoading(false);

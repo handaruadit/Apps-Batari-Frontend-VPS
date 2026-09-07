@@ -143,7 +143,7 @@ export default function usePlantForm(t) {
       if (error.code === "AUTH_EXPIRED") {
         Alert.alert(
           "Error",
-          "Sesi Anda telah habis atau token tidak valid. Silakan login kembali.",
+          t("sessionExpiredAlert"),
         );
         router.replace("/(auth)/login");
         return;
@@ -153,8 +153,8 @@ export default function usePlantForm(t) {
         t("failed"),
         error.message ||
           (isEditMode
-            ? "Gagal menyimpan perubahan plant."
-            : "Gagal menyimpan plant."),
+            ? t("plantSaveFailed")
+            : t("plantCreateFailed")),
       );
       console.error(error);
     } finally {

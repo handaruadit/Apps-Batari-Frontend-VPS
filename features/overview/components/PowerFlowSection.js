@@ -1,7 +1,19 @@
 //===== (Imports) ======
 import PowerFlowDiagram from '@/components/PowerFlowDiagram';
 import { Ionicons } from '@expo/vector-icons';
-import { Animated, Image, Text, TouchableOpacity, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import {
+  Animated,
+  Dimensions,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import {
   BATTERY_BUBBLE_CONFIG,
@@ -35,6 +47,41 @@ export default function PowerFlowSection({
   t,
   windowWidth,
 }) {
+  const dropdownButtonRef = useRef(null);
+  const [dropdownCoords, setDropdownCoords] = useState(null);
+
+  const measureDropdownButton = (callback) => {
+    if (dropdownButtonRef.current?.measureInWindow) {
+      dropdownButtonRef.current.measureInWindow((x, y, width, height) => {
+        if (typeof y === "number" && typeof height === "number" && height > 0) {
+          const effectiveWidth = windowWidth || Dimensions.get("window").width;
+          const coords = {
+            top: y + height + 3,
+            right: Math.max(12, effectiveWidth - (x + width)),
+            width: Math.max(width, 144),
+          };
+          setDropdownCoords(coords);
+          callback?.(coords);
+          return;
+        }
+        callback?.(null);
+      });
+    } else {
+      callback?.(null);
+    }
+  };
+
+  const handleToggleDropdown = () => {
+    if (dataSourceMenuVisible) {
+      setDataSourceMenuVisible(false);
+      return;
+    }
+
+    measureDropdownButton(() => {
+      setDataSourceMenuVisible(true);
+    });
+  };
+
   const presentation = usePowerFlowPresentation({ plantData, windowWidth });
   const {
     batteryPointerCoordinates,
@@ -545,6 +592,8 @@ export default function PowerFlowSection({
       <View style={styles.dataSourceDropdownRow}>
         <View style={styles.dataSourceDropdownWrap}>
           <TouchableOpacity
+            ref={dropdownButtonRef}
+            collapsable={false}
             activeOpacity={0.82}
             style={[
               styles.dataSourceDropdownButton,
@@ -554,9 +603,10 @@ export default function PowerFlowSection({
                 borderColor: colors.bubbleBorder,
               },
             ]}
-            onPress={() =>
-              setDataSourceMenuVisible((current) => !current)
-            }
+            onPress={handleToggleDropdown}
+            onLayout={() => {
+              measureDropdownButton();
+            }}
           >
             <Text
               style={[
@@ -575,25 +625,63 @@ export default function PowerFlowSection({
               color={colors.accent}
             />
           </TouchableOpacity>
+        </View>
+      </View>
 
-          {dataSourceMenuVisible && (
-            <View
-              style={[
-                styles.dataSourceDropdownMenu,
-                isLightMode && {
-                  backgroundColor: colors.bubble,
-                  borderColor: colors.bubbleBorder,
-                },
-              ]}
+      {/* Dropdown Menu Modal for smooth scrolling without parent ScrollView interference */}
+      <Modal
+        visible={dataSourceMenuVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDataSourceMenuVisible(false)}
+      >
+        <View style={StyleSheet.absoluteFill}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setDataSourceMenuVisible(false)}
+          />
+
+          <View
+            style={[
+              styles.dataSourceDropdownMenu,
+              {
+                position: "absolute",
+                top: dropdownCoords?.top ?? 320,
+                right: dropdownCoords?.right ?? 16,
+                width: dropdownCoords?.width ?? 144,
+                maxHeight: 194,
+              },
+              isLightMode && {
+                backgroundColor: colors.bubble,
+                borderColor: colors.bubbleBorder,
+              },
+            ]}
+          >
+            <ScrollView
+              style={{ maxHeight: 190 }}
+              contentContainerStyle={{ paddingVertical: 2 }}
+              nestedScrollEnabled={true}
+              showsVerticalScrollIndicator={true}
+              persistentScrollbar={true}
+              keyboardShouldPersistTaps="handled"
+              bounces={true}
             >
-              {dataSourceOptions.map((item) => {
+              {dataSourceOptions.map((item, index) => {
                 const isSelected = item.key === selectedDataSource;
 
                 return (
                   <TouchableOpacity
                     key={item.key}
-                    activeOpacity={0.78}
-                    style={styles.dataSourceDropdownItem}
+                    activeOpacity={0.72}
+                    style={[
+                      styles.dataSourceDropdownItem,
+                      index < dataSourceOptions.length - 1 && {
+                        borderBottomWidth: StyleSheet.hairlineWidth,
+                        borderBottomColor: isLightMode
+                          ? "rgba(0,0,0,0.06)"
+                          : "rgba(255,255,255,0.06)",
+                      },
+                    ]}
                     onPress={() => {
                       setSelectedDataSource(item.key);
                       setDataSourceMenuVisible(false);
@@ -606,19 +694,28 @@ export default function PowerFlowSection({
                           color: isSelected
                             ? colors.accent
                             : colors.text,
+                          fontWeight: isSelected ? "800" : "600",
                         },
                       ]}
                       numberOfLines={1}
                     >
                       {item.label}
                     </Text>
+                    {isSelected && (
+                      <Ionicons
+                        name="checkmark"
+                        size={14}
+                        color={colors.accent}
+                        style={{ marginLeft: 6 }}
+                      />
+                    )}
                   </TouchableOpacity>
                 );
               })}
-            </View>
-          )}
+            </ScrollView>
+          </View>
         </View>
-      </View>
+      </Modal>
       <View
         style={[
           styles.powerFlowWrapper,

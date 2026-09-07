@@ -39,7 +39,7 @@ export default function ManageAccessScreen() {
   const params = useLocalSearchParams();
   const plantId = getParamValue(params.id);
   const plantName = getParamValue(params.name) || "Plant";
-  const { colors } = useAppSettings();
+  const { colors, t } = useAppSettings();
   const scrollViewRef = useRef(null);
   const [users, setUsers] = useState([]);
   const [query, setQuery] = useState("");
@@ -85,11 +85,11 @@ export default function ManageAccessScreen() {
       const result = await fetchPlantAccess(plantId);
       setUsers(result);
     } catch (error) {
-      Alert.alert("Manage Access", error.message || "Gagal mengambil akses.");
+      Alert.alert(t("manageAccess"), error.message || t("failedToGetAccess"));
     } finally {
       setIsLoading(false);
     }
-  }, [plantId]);
+  }, [plantId, t]);
 
   //===== (Load Access Effect) ======
   useEffect(() => {
@@ -112,7 +112,7 @@ export default function ManageAccessScreen() {
       const result = await searchPlantAccessUsers(plantId, text);
       setSearchResults(result);
     } catch (error) {
-      Alert.alert("Cari User", error.message || "Gagal mencari user.");
+      Alert.alert(t("searchUser"), error.message || t("failedToSearchUser"));
     } finally {
       setIsSearching(false);
     }
@@ -124,14 +124,14 @@ export default function ManageAccessScreen() {
     const normalizedRole = normalizePlantAccessRole(role);
 
     if (!userId) {
-      Alert.alert("Tambah Access", "User tidak ditemukan.");
+      Alert.alert(t("addAccess"), t("userNotFound"));
       return;
     }
 
     if (!normalizedRole) {
       Alert.alert(
-        "Tambah Access",
-        "Role tidak valid. Silakan pilih View Only atau Owner.",
+        t("addAccess"),
+        t("invalidRole"),
       );
       return;
     }
@@ -142,12 +142,12 @@ export default function ManageAccessScreen() {
       await loadAccess();
       setQuery("");
       setSearchResults([]);
-      Alert.alert("Tambah Access", "User berhasil ditambahkan ke plant.");
+      Alert.alert(t("addAccess"), t("userAddedSuccess"));
     } catch (error) {
       Alert.alert(
-        "Tambah Access",
+        t("addAccess"),
         error.message ||
-          "Gagal menambahkan user. Pastikan email dan role sudah benar.",
+          t("failedToAddUser"),
       );
     } finally {
       setIsUpdating(false);
@@ -159,7 +159,7 @@ export default function ManageAccessScreen() {
     const userId = getAccessUserId(user);
 
     if (!userId) {
-      Alert.alert("Tambah Access", "User tidak ditemukan.");
+      Alert.alert(t("addAccess"), t("userNotFound"));
       return;
     }
 
@@ -168,12 +168,12 @@ export default function ManageAccessScreen() {
     );
 
     if (alreadyHasAccess) {
-      Alert.alert("Tambah Access", "User sudah memiliki akses ke plant ini.");
+      Alert.alert(t("addAccess"), t("userAlreadyHasAccess"));
       return;
     }
 
-    const identifier = user.email || user.phone || "user ini";
-    Alert.alert("Pilih Permission", `Tentukan hak akses untuk ${identifier}:`, [
+    const identifier = user.email || user.phone || "user";
+    Alert.alert(t("selectPermission"), `${t("determineAccessFor")} ${identifier}:`, [
       {
         text: "View Only",
         onPress: () =>
@@ -185,7 +185,7 @@ export default function ManageAccessScreen() {
           executeAddUser(user, PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS),
       },
       {
-        text: "Batal",
+        text: t("cancel"),
         style: "cancel",
       },
     ]);
@@ -194,11 +194,11 @@ export default function ManageAccessScreen() {
   //===== (handleUserAction) ======
   const handleUserAction = (user) => {
     if (user.role === "owner") {
-      Alert.alert("Owner", "Owner tidak bisa diubah atau dihapus.");
+      Alert.alert("Owner", t("ownerCannotBeModified"));
       return;
     }
 
-    Alert.alert(user.email || "User", "Pilih permission", [
+    Alert.alert(user.email || "User", t("selectPermission"), [
       {
         text: "View Only",
         onPress: () =>
@@ -210,11 +210,11 @@ export default function ManageAccessScreen() {
           handleUpdateRole(user, PLANT_ACCESS_ROLE_VALUES.MANAGE_ACCESS),
       },
       {
-        text: "remove access",
+        text: t("removeAccess"),
         style: "destructive",
         onPress: () => handleRemoveUser(user),
       },
-      { text: "Batal", style: "cancel" },
+      { text: t("cancel"), style: "cancel" },
     ]);
   };
 
@@ -224,14 +224,14 @@ export default function ManageAccessScreen() {
     const normalizedRole = normalizePlantAccessRole(role);
 
     if (!userId) {
-      Alert.alert("Update Access", "User tidak ditemukan.");
+      Alert.alert(t("updateAccess"), t("userNotFound"));
       return;
     }
 
     if (!normalizedRole) {
       Alert.alert(
-        "Update Access",
-        "Role tidak valid. Silakan pilih View Only atau Owner.",
+        t("updateAccess"),
+        t("invalidRole"),
       );
       return;
     }
@@ -246,9 +246,9 @@ export default function ManageAccessScreen() {
       setUsers(result);
     } catch (error) {
       Alert.alert(
-        "Update Access",
+        t("updateAccess"),
         error.message ||
-          "Gagal mengubah akses user. Pastikan role sudah benar.",
+          t("accessUpdateFailed"),
       );
     } finally {
       setIsUpdating(false);
@@ -260,7 +260,7 @@ export default function ManageAccessScreen() {
     const userId = getAccessUserId(user);
 
     if (!userId) {
-      Alert.alert("Remove Access", "User tidak ditemukan.");
+      Alert.alert(t("removeAccess"), t("userNotFound"));
       return;
     }
 
@@ -269,7 +269,7 @@ export default function ManageAccessScreen() {
       const result = await removePlantAccessUser(plantId, userId);
       setUsers(result);
     } catch (error) {
-      Alert.alert("Remove Access", error.message || "Gagal menghapus akses.");
+      Alert.alert(t("removeAccess"), error.message || t("accessRemoveFailed"));
     } finally {
       setIsUpdating(false);
     }
@@ -306,7 +306,7 @@ export default function ManageAccessScreen() {
           </TouchableOpacity>
           <View style={styles.titleBlock}>
             <Text style={[styles.title, { color: colors.text }]}>
-              Manage Access
+              {t("manageAccess")}
             </Text>
             <Text style={[styles.subtitle, { color: colors.textMuted }]}>
               {plantName}
@@ -314,7 +314,7 @@ export default function ManageAccessScreen() {
           </View>
         </View>
 
-        <AccessCard title="Authorized Users" colors={colors}>
+        <AccessCard title={t("authorizedUsers")} colors={colors}>
           {isLoading ? (
             <ActivityIndicator color={colors.accent} />
           ) : (
@@ -331,10 +331,11 @@ export default function ManageAccessScreen() {
           )}
         </AccessCard>
 
-        <AccessCard title="+ Add" colors={colors}>
+        <AccessCard title={`+ ${t("add")}`} colors={colors}>
           <AccessSearchBar
             query={query}
             colors={colors}
+            t={t}
             isSearching={isSearching}
             isUpdating={isUpdating}
             onChangeQuery={(text) => {
@@ -354,7 +355,7 @@ export default function ManageAccessScreen() {
               key={getAccessUserId(user)}
               user={user}
               colors={colors}
-              actionLabel="Add"
+              actionLabel={t("add")}
               activeOpacity={0.78}
               onPress={() => handleAddUser(user)}
               disabled={isUpdating}
@@ -364,7 +365,7 @@ export default function ManageAccessScreen() {
           {hasSearched && searchResults.length === 0 && !isSearching && query.trim() ? (
             <View style={styles.emptySearchContainer}>
               <Text style={[styles.emptySearchText, { color: colors.textMuted }]}>
-                User tidak ditemukan atau sudah memiliki akses ke stasiun ini.
+                {t("userNotFoundOrHasAccess")}
               </Text>
             </View>
           ) : null}

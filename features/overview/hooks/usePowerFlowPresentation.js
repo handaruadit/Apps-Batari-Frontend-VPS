@@ -36,8 +36,22 @@ export function usePowerFlowPresentation({ plantData, windowWidth }) {
   const pvPointerEndRef = useRef(null);
   const loadPointerEndRef = useRef(null);
 
+  const shouldAnimateGridPointer =
+    Boolean(plantData.isDeviceOnline && hasActivePowerFlowValue(plantData.grid));
+  const shouldAnimateBatteryPointer =
+    Boolean(plantData.isDeviceOnline && hasActivePowerFlowValue(plantData.battery));
+  const shouldAnimatePvPointer =
+    Boolean(plantData.isDeviceOnline && hasActivePowerFlowValue(plantData.production));
+  const shouldAnimateLoadPointer =
+    Boolean(plantData.isDeviceOnline && hasActivePowerFlowValue(plantData.load));
+
   //===== (animateGridPointer) ======
   useEffect(() => {
+    if (!shouldAnimateGridPointer) {
+      gridPointerProgress.setValue(0);
+      return;
+    }
+
     const loopDelay = Math.max(
       0,
       GRID_POINTER_CONFIG.animationLoopInterval -
@@ -64,10 +78,15 @@ export function usePowerFlowPresentation({ plantData, windowWidth }) {
     pointerLoop.start();
 
     return () => pointerLoop.stop();
-  }, [gridPointerProgress]);
+  }, [gridPointerProgress, shouldAnimateGridPointer]);
 
   //===== (animateBatteryPointer) ======
   useEffect(() => {
+    if (!shouldAnimateBatteryPointer) {
+      batteryPointerProgress.setValue(0);
+      return;
+    }
+
     const loopDelay = Math.max(
       0,
       BATTERY_POINTER_CONFIG.animationLoopInterval -
@@ -94,10 +113,15 @@ export function usePowerFlowPresentation({ plantData, windowWidth }) {
     pointerLoop.start();
 
     return () => pointerLoop.stop();
-  }, [batteryPointerProgress]);
+  }, [batteryPointerProgress, shouldAnimateBatteryPointer]);
 
   //===== (animatePvPointer) ======
   useEffect(() => {
+    if (!shouldAnimatePvPointer) {
+      pvPointerProgress.setValue(0);
+      return;
+    }
+
     const loopDelay = Math.max(
       0,
       PV_POINTER_CONFIG.animationLoopInterval -
@@ -124,10 +148,15 @@ export function usePowerFlowPresentation({ plantData, windowWidth }) {
     pointerLoop.start();
 
     return () => pointerLoop.stop();
-  }, [pvPointerProgress]);
+  }, [pvPointerProgress, shouldAnimatePvPointer]);
 
   //===== (animateLoadPointer) ======
   useEffect(() => {
+    if (!shouldAnimateLoadPointer) {
+      loadPointerProgress.setValue(0);
+      return;
+    }
+
     const loopDelay = Math.max(
       0,
       LOAD_POINTER_CONFIG.animationLoopInterval -
@@ -154,7 +183,7 @@ export function usePowerFlowPresentation({ plantData, windowWidth }) {
     pointerLoop.start();
 
     return () => pointerLoop.stop();
-  }, [loadPointerProgress]);
+  }, [loadPointerProgress, shouldAnimateLoadPointer]);
 
   const fallbackHouseOverlayWidth = Math.min(420, Math.max(0, windowWidth - 32));
   const houseOverlayWidth = Math.min(
@@ -212,14 +241,6 @@ export function usePowerFlowPresentation({ plantData, windowWidth }) {
     ),
     loadPointerEndRef,
   );
-  const shouldAnimateGridPointer =
-    plantData.isDeviceOnline && hasActivePowerFlowValue(plantData.grid);
-  const shouldAnimateBatteryPointer =
-    plantData.isDeviceOnline && hasActivePowerFlowValue(plantData.battery);
-  const shouldAnimatePvPointer =
-    plantData.isDeviceOnline && hasActivePowerFlowValue(plantData.production);
-  const shouldAnimateLoadPointer =
-    plantData.isDeviceOnline && hasActivePowerFlowValue(plantData.load);
   const isBatteryPointerReverse = Number(plantData.battery) < 0;
   const gridPointerDotSize = GRID_POINTER_CONFIG.dotSize * bubbleScale;
   const gridPointerGlowSize = GRID_POINTER_CONFIG.dotSize * 2.8 * bubbleScale;

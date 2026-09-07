@@ -157,7 +157,7 @@ export default function DeviceCard({
               {isPinned ? (
                 <View style={styles.pinnedBadge}>
                   <Ionicons name="pin" size={11} color="#18AEE6" />
-                  <Text style={styles.pinnedText}>Pinned</Text>
+                  <Text style={styles.pinnedText}>{t ? t("pinned") : "Pinned"}</Text>
                 </View>
               ) : (
                 <View />

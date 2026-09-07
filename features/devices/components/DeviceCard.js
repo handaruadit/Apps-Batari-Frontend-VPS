@@ -42,7 +42,7 @@ export default function DeviceCard({
       setIsCopied(true);
 
       if (Platform.OS === "android") {
-        ToastAndroid.show("Device ID berhasil disalin", ToastAndroid.SHORT);
+        ToastAndroid.show(t ? t("deviceIdCopied") : "Device ID copied", ToastAndroid.SHORT);
       }
 
       setTimeout(() => {
@@ -134,7 +134,7 @@ export default function DeviceCard({
                   { color: isCopied ? "#10B981" : colors.accent || "#18AEE6" },
                 ]}
               >
-                {isCopied ? "Tersalin" : "Salin"}
+                {isCopied ? (t ? t("copied") : "Copied") : (t ? t("copy") : "Copy")}
               </Text>
             </TouchableOpacity>
           ) : null}

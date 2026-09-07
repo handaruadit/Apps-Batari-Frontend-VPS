@@ -17,13 +17,13 @@ import {
 } from "@/services/plantService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  RefreshControl,
   Text,
   TextInput,
   TouchableOpacity,
@@ -42,6 +42,7 @@ export default function PlantScreen() {
   const [pinnedPlantIds, setPinnedPlantIds] = useState([]);
   const [activeMenuPlantId, setActiveMenuPlantId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isNavigatingOverview, setIsNavigatingOverview] = useState(false);
 
   // Watch for station online/offline status changes and trigger notifications
@@ -100,8 +101,8 @@ export default function PlantScreen() {
   const handleEditDevice = (device) => {
     if (isDemoPlant(device)) {
       Alert.alert(
-        "Tidak bisa diedit",
-        `${DEMO_PLANT_NAME} tidak bisa diedit karena digunakan sebagai contoh/demo.`,
+        t("cannotEdit"),
+        `${DEMO_PLANT_NAME} ${t("demoPlantCannotEdit")}`,
       );
       return;
     }
@@ -136,16 +137,16 @@ export default function PlantScreen() {
   const handleDeleteDevice = (device) => {
     if (isDemoPlant(device)) {
       Alert.alert(
-        "Tidak bisa dihapus",
-        `${DEMO_PLANT_NAME} tidak bisa dihapus karena digunakan sebagai contoh/demo.`,
+        t("cannotDelete"),
+        `${DEMO_PLANT_NAME} ${t("demoPlantCannotDelete")}`,
       );
       return;
     }
 
-    Alert.alert("Hapus Plant", `Yakin ingin menghapus ${device.name}?`, [
-      { text: "Batal", style: "cancel" },
+    Alert.alert(t("deletePlant"), `${t("deletePlantConfirm")} (${device.name})`, [
+      { text: t("cancel"), style: "cancel" },
       {
-        text: "Delete",
+        text: t("delete"),
         style: "destructive",
         onPress: async () => {
           try {
@@ -159,18 +160,18 @@ export default function PlantScreen() {
               ),
             );
             await savePinnedPlantIds(nextPinnedIds);
-            Alert.alert("Berhasil", "Plant berhasil dihapus.");
+            Alert.alert(t("success"), t("plantDeletedSuccess"));
           } catch (error) {
             if (error.code === "AUTH_EXPIRED") {
               Alert.alert(
                 "Error",
-                "Sesi Anda telah habis atau token tidak valid. Silakan login kembali.",
+                t("sessionExpiredAlert"),
               );
               router.replace("/(auth)/login");
               return;
             }
 
-            Alert.alert("Gagal", error.message || "Gagal menghapus plant.");
+            Alert.alert(t("failed"), error.message || t("plantDeleteFailed"));
             console.error(error);
           }
         },
@@ -198,7 +199,7 @@ export default function PlantScreen() {
       if (error.code === "AUTH_EXPIRED") {
         Alert.alert(
           "Error",
-          "Sesi Anda telah habis atau token tidak valid. Silakan login kembali.",
+          t("sessionExpiredAlert"),
         );
         router.replace("/(auth)/login");
         return;
@@ -206,13 +207,13 @@ export default function PlantScreen() {
 
       Alert.alert(
         "Error",
-        error.message || "Terjadi masalah jaringan atau server mati.",
+        error.message || t("networkOrServerError"),
       );
       console.error(error);
     } finally {
       setIsLoading(false);
     }
-  }, [pinnedPlantIds, savePinnedPlantIds]);
+  }, [pinnedPlantIds, savePinnedPlantIds, t]);
 
   //===== (Plant Focus Effect) ======
   useFocusEffect(
@@ -221,6 +222,16 @@ export default function PlantScreen() {
       fetchSensorData();
     }, [fetchSensorData]),
   );
+
+  //===== (Pull to Refresh) ======
+  const handlePullToRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchSensorData(false);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [fetchSensorData]);
 
   //===== (Filtered Plants) ======
   const filteredDevices = useMemo(() => {
@@ -277,7 +288,7 @@ export default function PlantScreen() {
     }
 
     if (pinnedPlantIds.length >= MAX_PINNED_PLANTS) {
-      Alert.alert("Pin Plant", "Maksimal hanya 3 plant yang bisa dipin.");
+      Alert.alert(t("pinPlant"), t("maxPinnedPlantsAlert"));
       return;
     }
 
@@ -408,6 +419,14 @@ export default function PlantScreen() {
           ref={flatListRef}
           data={sortedDevices}
           keyExtractor={(item) => item.id.toString()}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handlePullToRefresh}
+              colors={[colors.accent || "#18AEE6"]}
+              tintColor={colors.accent || "#18AEE6"}
+            />
+          }
           onScrollBeginDrag={() => setActiveMenuPlantId(null)}
           onScrollToIndexFailed={(info) => {
             setTimeout(() => {
@@ -447,7 +466,7 @@ export default function PlantScreen() {
                 <Ionicons name="sunny-outline" size={36} color="#18AEE6" />
               </View>
               <Text style={{ fontSize: 18, fontWeight: "700", color: colors.text, marginBottom: 8, textAlign: "center" }}>
-                Belum Ada Plant Terdaftar
+                {t("noPlantsRegistered")}
               </Text>
               <Text style={{ fontSize: 13, color: colors.textMuted, textAlign: "center", marginBottom: 20, paddingHorizontal: 20 }}>
                 {t("emptyPlants")}
@@ -473,7 +492,7 @@ export default function PlantScreen() {
               >
                 <Ionicons name="add" size={20} color="#FFFFFF" style={{ marginRight: 6 }} />
                 <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 15 }}>
-                  Tambah Plant Baru
+                  {t("addNewPlant")}
                 </Text>
               </TouchableOpacity>
             </View>
