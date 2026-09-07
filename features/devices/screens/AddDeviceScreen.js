@@ -80,7 +80,7 @@ export default function AddDataloggerScreen() {
     const trimmedDeviceId = deviceId.trim();
 
     if (!trimmedDeviceId) {
-      Alert.alert("Peringatan", "Device ID tidak boleh kosong.");
+      Alert.alert(t("warning"), t("deviceIdEmptyAlert"));
       return;
     }
 
@@ -89,10 +89,10 @@ export default function AddDataloggerScreen() {
     try {
       const result = await linkDeviceToPlant(plantId, trimmedDeviceId);
       const successMessage = result?.data?.alreadyLinked
-        ? "Device sudah terhubung."
-        : "Device berhasil disimpan.";
+        ? t("deviceAlreadyConnected")
+        : t("deviceSavedSuccess");
 
-      Alert.alert("Berhasil", successMessage, [
+      Alert.alert(t("success"), successMessage, [
         {
           text: "OK",
           onPress: () =>
@@ -106,7 +106,7 @@ export default function AddDataloggerScreen() {
       if (error.code === "AUTH_EXPIRED") {
         Alert.alert(
           "Error",
-          "Sesi Anda telah habis atau token tidak valid. Silakan login kembali.",
+          t("sessionExpiredAlert"),
         );
         router.replace("/(auth)/login");
         return;
@@ -115,16 +115,16 @@ export default function AddDataloggerScreen() {
       const message = String(error.message || "");
 
       if (error.status === 404 || message.includes("tidak ditemukan")) {
-        Alert.alert("Gagal", "Device ID tidak ditemukan.");
+        Alert.alert(t("failed"), t("deviceIdNotFound"));
         return;
       }
 
       if (error.status === 409 || message.includes("sudah terhubung")) {
-        Alert.alert("Gagal", message);
+        Alert.alert(t("failed"), message);
         return;
       }
 
-      Alert.alert("Gagal", "Gagal menyimpan device. Coba lagi.");
+      Alert.alert(t("failed"), t("deviceSaveFailed"));
     } finally {
       setIsSaving(false);
     }
@@ -209,7 +209,7 @@ export default function AddDataloggerScreen() {
             {isSaving ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.saveButtonText}>Simpan Device</Text>
+              <Text style={styles.saveButtonText}>{t("saveDevice")}</Text>
             )}
           </TouchableOpacity>
         </View>

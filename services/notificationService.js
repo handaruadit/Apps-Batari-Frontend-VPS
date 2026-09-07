@@ -1,7 +1,15 @@
 //===== (Imports) ======
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+
+// Safe loader for expo-notifications to prevent crash in Expo Go on Android
+// (Remote push notifications native code was removed from Expo Go starting in SDK 53)
+let Notifications = null;
+try {
+  Notifications = require("expo-notifications");
+} catch {
+  // Gracefully fallback when expo-notifications is not supported in environment
+}
 
 //===== (Storage Key) ======
 const NOTIF_SETTINGS_KEY = "batari_notification_settings";
@@ -17,24 +25,26 @@ export const DEFAULT_NOTIF_SETTINGS = {
 //===== (Configure Foreground Notification) ======
 // Ensures notifications are shown in phone tray even when app is open
 try {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
-  });
+  if (Notifications?.setNotificationHandler) {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+  }
 } catch {
   // Non-fatal
 }
 
 //===== (setupNotificationChannel) ======
 async function setupNotificationChannel() {
-  if (Platform.OS !== "android") return;
+  if (Platform.OS !== "android" || !Notifications?.setNotificationChannelAsync) return;
   try {
     await Notifications.setNotificationChannelAsync("station-alerts", {
       name: "Station Status Alerts",
-      importance: Notifications.AndroidImportance.MAX,
+      importance: Notifications.AndroidImportance?.MAX ?? 5,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#00AEEF",
       sound: "default",
@@ -46,6 +56,7 @@ async function setupNotificationChannel() {
 
 //===== (requestNotificationPermissions) ======
 export async function requestNotificationPermissions() {
+  if (!Notifications?.getPermissionsAsync) return false;
   try {
     const { status: current } = await Notifications.getPermissionsAsync();
     if (current === "granted") {
@@ -87,6 +98,7 @@ export async function saveNotificationSettings(settings) {
 //===== (triggerLocalNotification) ======
 // Sends native system notification directly to phone notification tray
 export async function triggerLocalNotification({ title, body, data = {} }) {
+  if (!Notifications?.scheduleNotificationAsync) return false;
   try {
     await setupNotificationChannel();
     await Notifications.scheduleNotificationAsync({
@@ -95,7 +107,7 @@ export async function triggerLocalNotification({ title, body, data = {} }) {
         body,
         data,
         sound: true,
-        priority: Notifications.AndroidNotificationPriority.MAX,
+        priority: Notifications.AndroidNotificationPriority?.MAX ?? 2,
         ...(Platform.OS === "android" ? { channelId: "station-alerts" } : {}),
       },
       trigger: null, // Send immediately

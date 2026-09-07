@@ -2,8 +2,7 @@
 import { clearAuth, getToken, isTokenValid } from '@/auth/token';
 import { BASE_URL } from '@/config/api';
 import { fetchPlantDevices, isDemoPlant } from '@/services/plantService';
-import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import {

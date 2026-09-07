@@ -1,5 +1,6 @@
 //===== (Imports) ======
-import { Alert, Linking } from "react-native";
+import { Linking } from "react-native";
+import { showAlert } from "@/utils/showAlert";
 import * as Application from "expo-application";
 
 //===== (Update Constants) ======
@@ -18,7 +19,7 @@ export async function checkAppUpdate() {
       return;
     }
 
-    Alert.alert(
+    showAlert(
       data.forceUpdate ? "Update Wajib" : "Update Tersedia",
       data.message || "Versi terbaru aplikasi sudah tersedia.",
       [

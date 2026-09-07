@@ -319,14 +319,14 @@ export default function OverviewScreen() {
 
     if (!plantData.canAddDatalogger) {
       Alert.alert(
-        "Access denied",
-        "Anda tidak memiliki izin menambah datalogger.",
+        t("accessDenied"),
+        t("noAddDataloggerPermission"),
       );
       return;
     }
 
     if (!resolvedPlantId) {
-      Alert.alert("Peringatan", "Plant belum siap. Silakan coba lagi.");
+      Alert.alert(t("warning"), t("plantNotReadyAlert"));
       return;
     }
 
@@ -459,7 +459,10 @@ export default function OverviewScreen() {
       clearInterval(interval);
     };
   }, [fetchOverviewData, focusRefreshKey]);
+
   const overviewSafeTopPadding = Platform.OS === "ios" ? insets.top : 0;
+  const topBarHeight = windowWidth < 380 ? 62 : PLANT_HEADER_BOX.minHeight;
+  const modalMenuTopPadding = topBarHeight + 4;
   const isLandscapeChartRotated = windowHeight > windowWidth;
   const landscapeChartWidth = Math.max(
     320,
@@ -485,7 +488,7 @@ export default function OverviewScreen() {
       edges={["left", "right"]}
       style={[
         styles.safeArea,
-        { paddingTop: overviewSafeTopPadding, backgroundColor: colors.bubble },
+        { backgroundColor: colors.bubble },
       ]}
     >
       <StatusBar
@@ -499,7 +502,7 @@ export default function OverviewScreen() {
           styles.stickyTopBar,
           {
             paddingHorizontal: windowWidth < 380 ? 18 : 24,
-            minHeight: windowWidth < 380 ? 62 : PLANT_HEADER_BOX.minHeight,
+            minHeight: topBarHeight,
           },
           isLightMode && {
             backgroundColor: colors.bubble,
@@ -558,6 +561,7 @@ export default function OverviewScreen() {
       <ScrollView
         style={[styles.container, { backgroundColor: colors.screen }]}
         showsVerticalScrollIndicator={false}
+        nestedScrollEnabled={true}
       >
 
         <Modal
@@ -567,7 +571,13 @@ export default function OverviewScreen() {
           onRequestClose={() => setPlantMenuVisible(false)}
         >
           <Pressable
-            style={styles.menuOverlay}
+            style={[
+              styles.menuOverlay,
+              {
+                paddingTop: modalMenuTopPadding,
+                paddingRight: windowWidth < 380 ? 18 : 24,
+              },
+            ]}
             onPress={() => setPlantMenuVisible(false)}
           >
             <View

@@ -27,7 +27,7 @@ export default function DeleteAccountModal({
 
   const handleDelete = async () => {
     if (!password) {
-      Alert.alert(t("warning"), "Masukkan kata sandi Anda untuk mengonfirmasi penghapusan akun.");
+      Alert.alert(t("warning"), t("enterPasswordDeleteAlert"));
       return;
     }
 
@@ -35,8 +35,8 @@ export default function DeleteAccountModal({
     try {
       await deleteUserAccount({ password });
       Alert.alert(
-        "Akun Dihapus",
-        "Akun Anda telah berhasil dihapus dari sistem Batari.",
+        t("accountDeletedTitle"),
+        t("accountDeletedMessage"),
         [
           {
             text: "OK",
@@ -48,7 +48,7 @@ export default function DeleteAccountModal({
         ],
       );
     } catch (error) {
-      Alert.alert("Gagal", error.message || "Gagal menghapus akun.");
+      Alert.alert(t("failed"), error.message || t("deleteAccountFailed"));
     } finally {
       setIsDeleting(false);
     }
@@ -95,7 +95,7 @@ export default function DeleteAccountModal({
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              placeholder="Masukkan kata sandi untuk konfirmasi"
+              placeholder={t("enterPasswordToConfirm")}
               placeholderTextColor={colors.textMuted}
               style={[
                 styles.formInput,

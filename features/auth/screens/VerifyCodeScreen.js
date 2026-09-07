@@ -15,7 +15,7 @@ import {
 import { isValidResetCode } from "@/features/auth/utils/validators";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { showAlert } from "@/utils/showAlert";
 
 //===== (VerifyCodeScreen) ======

@@ -59,15 +59,15 @@ export default function EditProfileModal({
   const handleSave = async () => {
     if (password) {
       if (!oldPassword) {
-        Alert.alert(t("warning"), "Masukkan kata sandi saat ini untuk mengubah kata sandi.");
+        Alert.alert(t("warning"), t("enterCurrentPasswordAlert"));
         return;
       }
       if (password.length < 6) {
-        Alert.alert(t("warning"), "Kata sandi baru minimal 6 karakter.");
+        Alert.alert(t("warning"), t("passwordMin6Alert"));
         return;
       }
       if (password !== confirmPassword) {
-        Alert.alert(t("warning"), "Konfirmasi kata sandi baru tidak cocok.");
+        Alert.alert(t("warning"), t("passwordMismatchAlert"));
         return;
       }
     }
@@ -93,11 +93,11 @@ export default function EditProfileModal({
 
       Alert.alert(
         t("success"),
-        "Informasi profil berhasil diperbarui.",
+        t("profileUpdatedSuccess"),
         [{ text: "OK", onPress: onClose }],
       );
     } catch (error) {
-      Alert.alert("Gagal", error.message || "Gagal memperbarui profil.");
+      Alert.alert(t("failed"), error.message || t("profileUpdateFailed"));
     } finally {
       setIsSaving(false);
     }
@@ -163,7 +163,7 @@ export default function EditProfileModal({
               <TextInput
                 value={fullName}
                 onChangeText={setFullName}
-                placeholder="Masukkan nama lengkap"
+                placeholder={t("enterFullName")}
                 style={[
                   styles.formInput,
                   {
@@ -225,19 +225,19 @@ export default function EditProfileModal({
             {/* Password Section */}
             <View style={{ marginTop: 6, marginBottom: 12 }}>
               <Text style={{ fontSize: 13, fontWeight: "700", color: colors.accent, marginBottom: 8 }}>
-                Ganti Kata Sandi (Opsional)
+                {t("changePasswordOptional")}
               </Text>
 
               <View style={styles.formGroup}>
                 <Text style={[styles.inputLabel, { color: colors.textMuted }]}>
-                  Kata Sandi Saat Ini
+                  {t("currentPassword")}
                 </Text>
                 <TextInput
                   value={oldPassword}
                   onChangeText={setOldPassword}
                   onFocus={scrollToPassword}
                   secureTextEntry
-                  placeholder="Masukkan kata sandi lama jika ingin mengganti"
+                  placeholder={t("enterCurrentPasswordToChange")}
                   style={[
                     styles.formInput,
                     {
@@ -260,7 +260,7 @@ export default function EditProfileModal({
                   onChangeText={setPassword}
                   onFocus={scrollToPassword}
                   secureTextEntry
-                  placeholder="Minimal 6 karakter"
+                  placeholder={t("min6Characters")}
                   style={[
                     styles.formInput,
                     {
@@ -284,7 +284,7 @@ export default function EditProfileModal({
                     onChangeText={setConfirmPassword}
                     onFocus={scrollToPassword}
                     secureTextEntry
-                    placeholder="Ulangi kata sandi baru"
+                    placeholder={t("repeatNewPassword")}
                     style={[
                       styles.formInput,
                       {
