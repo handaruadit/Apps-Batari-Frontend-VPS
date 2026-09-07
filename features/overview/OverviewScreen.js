@@ -12,6 +12,7 @@ import {
   POWER_CHART_MONTH_CHIP_STEP,
   ZERO_ENERGY_VALUES,
 } from "./constants/overviewConstants";
+import { useDayComparison } from "./hooks/useDayComparison";
 import { useOverviewData } from "./hooks/useOverviewData";
 import { useVisiblePowerSeries } from "./hooks/useVisiblePowerSeries";
 import styles from "./styles/overview.styles";
@@ -82,6 +83,15 @@ export default function OverviewScreen() {
   const [plantMenuVisible, setPlantMenuVisible] = useState(false);
   const [isChartLandscapeVisible, setIsChartLandscapeVisible] = useState(false);
   const [chartCurrentTime, setChartCurrentTime] = useState(() => new Date());
+  const [isChartTooltipActive, setIsChartTooltipActive] = useState(false);
+  const [chartTooltipDismissKey, setChartTooltipDismissKey] = useState(0);
+
+  const handleDismissChartTooltip = () => {
+    if (isChartTooltipActive) {
+      setChartTooltipDismissKey((prev) => prev + 1);
+      setIsChartTooltipActive(false);
+    }
+  };
   const { togglePowerSeries, visiblePowerSeries } = useVisiblePowerSeries();
   //===== (Overview Chart Width) ======
   const overviewChartWidth = useMemo(
@@ -113,6 +123,21 @@ export default function OverviewScreen() {
     selectedMonth,
     selectedYear,
     setSelectedDataSource,
+  });
+  const selectedSourceDeviceId =
+    selectedDataSource === "plant" ? null : selectedDataSource;
+  const {
+    comparisonSeries,
+    isComparisonActive,
+    isLoadingComparison,
+    toggleComparison,
+  } = useDayComparison({
+    activeSegment,
+    resolvedPlantId,
+    selectedDay,
+    selectedMonth,
+    selectedYear,
+    selectedSourceDeviceId,
   });
   const weatherCardAnim = useRef(new Animated.Value(0)).current;
   const dayPickerScrollRef = useRef(null);
@@ -372,42 +397,7 @@ export default function OverviewScreen() {
     }
   }, [selectedMonth, selectedYear, daysInMonth, selectedDay]);
 
-  //===== (scrollDayPicker) ======
-  useEffect(() => {
-    if (activeSegment !== "day") {
-      return;
-    }
 
-    const offsetX = Math.max(0, (selectedDay - 1) * POWER_CHART_DAY_CHIP_STEP);
-    const frame = requestAnimationFrame(() => {
-      dayPickerScrollRef.current?.scrollTo({
-        x: offsetX,
-        animated: false,
-      });
-    });
-
-    return () => cancelAnimationFrame(frame);
-  }, [activeSegment, selectedDay, selectedMonth, selectedYear]);
-
-  //===== (scrollMonthPicker) ======
-  useEffect(() => {
-    if (activeSegment !== "month") {
-      return;
-    }
-
-    const offsetX = Math.max(
-      0,
-      (selectedMonth - 1) * POWER_CHART_MONTH_CHIP_STEP,
-    );
-    const frame = requestAnimationFrame(() => {
-      monthPickerScrollRef.current?.scrollTo({
-        x: offsetX,
-        animated: false,
-      });
-    });
-
-    return () => cancelAnimationFrame(frame);
-  }, [activeSegment, selectedMonth, selectedYear]);
 
   //===== (animateOverviewHeader) ======
   useEffect(() => {
@@ -511,6 +501,11 @@ export default function OverviewScreen() {
           },
           weatherCardAnimatedStyle,
         ]}
+        onTouchStart={() => {
+          if (isChartTooltipActive) {
+            handleDismissChartTooltip();
+          }
+        }}
       >
         <View style={styles.leftHeader}>
           <TouchableOpacity
@@ -537,6 +532,7 @@ export default function OverviewScreen() {
             <View style={styles.plantMetaRow}>
               <Text
                 style={[styles.plantProductionMeta, { color: colors.accent }]}
+                numberOfLines={1}
               >
                 {productionMeta}
               </Text>
@@ -562,6 +558,7 @@ export default function OverviewScreen() {
         style={[styles.container, { backgroundColor: colors.screen }]}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled={true}
+        onScrollBeginDrag={handleDismissChartTooltip}
       >
 
         <Modal
@@ -653,29 +650,39 @@ export default function OverviewScreen() {
         </Modal>
 
         <View style={styles.content}>
-          <PowerFlowSection
-            colors={colors}
-            dataSourceMenuVisible={dataSourceMenuVisible}
-            dataSourceOptions={dataSourceOptions}
-            isLightMode={isLightMode}
-            lowerPowerFlowData={lowerPowerFlowData}
-            plantData={plantData}
-            pointerLineColor={pointerLineColor}
-            selectedDataSource={selectedDataSource}
-            selectedDataSourceLabel={selectedDataSourceLabel}
-            setDataSourceMenuVisible={setDataSourceMenuVisible}
-            setSelectedDataSource={setSelectedDataSource}
-            t={t}
-            windowWidth={windowWidth}
-          />
+          <View
+            onTouchStart={() => {
+              if (isChartTooltipActive) {
+                handleDismissChartTooltip();
+              }
+            }}
+          >
+            <PowerFlowSection
+              colors={colors}
+              dataSourceMenuVisible={dataSourceMenuVisible}
+              dataSourceOptions={dataSourceOptions}
+              isLightMode={isLightMode}
+              lowerPowerFlowData={lowerPowerFlowData}
+              plantData={plantData}
+              pointerLineColor={pointerLineColor}
+              selectedDataSource={selectedDataSource}
+              selectedDataSourceLabel={selectedDataSourceLabel}
+              setDataSourceMenuVisible={setDataSourceMenuVisible}
+              setSelectedDataSource={setSelectedDataSource}
+              t={t}
+              windowWidth={windowWidth}
+            />
+          </View>
 
           <OverviewChartSection
             activeSegment={activeSegment}
+            chartCurrentTime={chartCurrentTime}
             chartError={chartError}
             chartStatus={chartStatus}
-            chartCurrentTime={chartCurrentTime}
+            chartTooltipDismissKey={chartTooltipDismissKey}
             chartYearRange={chartYearRange}
             colors={colors}
+            comparisonSeries={comparisonSeries}
             dailySeries={dailySeries}
             dayOptions={dayOptions}
             dayPickerScrollRef={dayPickerScrollRef}
@@ -683,9 +690,13 @@ export default function OverviewScreen() {
             goNextYear={goNextYear}
             goPrevMonth={goPrevMonth}
             goPrevYear={goPrevYear}
+            isComparisonActive={isComparisonActive}
+            isLoadingComparison={isLoadingComparison}
             isLightMode={isLightMode}
             monthOptions={monthOptions}
             monthPickerScrollRef={monthPickerScrollRef}
+            onToggleComparison={toggleComparison}
+            onTooltipChange={setIsChartTooltipActive}
             overviewChartWidth={overviewChartWidth}
             plantData={plantData}
             selectedDay={selectedDay}
@@ -714,8 +725,10 @@ export default function OverviewScreen() {
         chartCurrentTime={chartCurrentTime}
         chartYearRange={chartYearRange}
         colors={colors}
+        comparisonSeries={comparisonSeries}
         dailySeries={dailySeries}
         isChartLandscapeVisible={isChartLandscapeVisible}
+        isComparisonActive={isComparisonActive}
         isLandscapeChartRotated={isLandscapeChartRotated}
         isLightMode={isLightMode}
         landscapeChartHeight={landscapeChartHeight}

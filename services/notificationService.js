@@ -29,8 +29,11 @@ try {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
         shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
         shouldPlaySound: true,
-        shouldSetBadge: false,
+        shouldSetBadge: true,
+        priority: Notifications.AndroidNotificationPriority?.MAX ?? "max",
       }),
     });
   }
@@ -42,12 +45,20 @@ try {
 async function setupNotificationChannel() {
   if (Platform.OS !== "android" || !Notifications?.setNotificationChannelAsync) return;
   try {
-    await Notifications.setNotificationChannelAsync("station-alerts", {
+    const channelConfig = {
       name: "Station Status Alerts",
       importance: Notifications.AndroidImportance?.MAX ?? 5,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#00AEEF",
+      lightColor: "#18AEE6",
       sound: "default",
+      enableLights: true,
+      enableVibrate: true,
+      showBadge: true,
+    };
+    await Notifications.setNotificationChannelAsync("station-alerts", channelConfig);
+    await Notifications.setNotificationChannelAsync("expo_notifications_fallback_notification_channel", {
+      ...channelConfig,
+      name: "Default Notifications",
     });
   } catch {
     // Non-fatal
@@ -97,20 +108,43 @@ export async function saveNotificationSettings(settings) {
 
 //===== (triggerLocalNotification) ======
 // Sends native system notification directly to phone notification tray
-export async function triggerLocalNotification({ title, body, data = {} }) {
-  if (!Notifications?.scheduleNotificationAsync) return false;
+export async function triggerLocalNotification({
+  title,
+  body,
+  data = {},
+  delaySeconds = 0,
+}) {
+  if (!Notifications?.scheduleNotificationAsync) {
+    console.warn("[notification] Notifications.scheduleNotificationAsync is not available");
+    return false;
+  }
   try {
+    const hasPermission = await requestNotificationPermissions();
+    if (!hasPermission) {
+      console.warn("[notification] Notification permission not granted");
+    }
     await setupNotificationChannel();
+
+    const trigger = delaySeconds > 0
+      ? {
+          type: Notifications.SchedulableTriggerInputTypes?.TIME_INTERVAL ?? "timeInterval",
+          seconds: delaySeconds,
+          repeats: false,
+          channelId: "station-alerts",
+        }
+      : null;
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title,
         body,
         data,
         sound: true,
-        priority: Notifications.AndroidNotificationPriority?.MAX ?? 2,
+        priority: Notifications.AndroidNotificationPriority?.MAX ?? "max",
+        color: "#18AEE6",
         ...(Platform.OS === "android" ? { channelId: "station-alerts" } : {}),
       },
-      trigger: null, // Send immediately
+      trigger,
     });
     return true;
   } catch (err) {
@@ -120,16 +154,37 @@ export async function triggerLocalNotification({ title, body, data = {} }) {
 }
 
 //===== (testStationNotification) ======
-export async function testStationNotification(mode = "offline", plantName = "Solar Plant Utama") {
+export async function testStationNotification(
+  mode = "offline",
+  plantName = "Solar Plant Utama",
+  language = null,
+  delaySeconds = 0,
+) {
+  let isEn = false;
+  if (language) {
+    isEn = language === "en";
+  } else {
+    try {
+      const stored = await AsyncStorage.getItem("batari:language");
+      isEn = stored === "en";
+    } catch {
+      isEn = false;
+    }
+  }
   const isOffline = mode === "offline";
-  const name = plantName || "Solar Plant Utama";
+  const name = plantName || (isEn ? "Main Solar Station" : "Stasiun Surya Utama");
   return triggerLocalNotification({
-    title: isOffline
-      ? `Station Offline: ${name}`
-      : `Station Online: ${name}`,
-    body: isOffline
-      ? `Station '${name}' telah terputus dari jaringan.`
-      : `Station '${name}' kembali terhubung dan aktif.`,
+    title: isEn
+      ? (isOffline ? `Station Offline: ${name}` : `Station Online: ${name}`)
+      : (isOffline ? `Stasiun Offline: ${name}` : `Stasiun Online: ${name}`),
+    body: isEn
+      ? (isOffline
+          ? `Station '${name}' has been disconnected from the network (Offline).`
+          : `Station '${name}' is back online and actively generating power.`)
+      : (isOffline
+          ? `Stasiun '${name}' telah terputus dari jaringan (Offline).`
+          : `Stasiun '${name}' kembali terhubung dan aktif menghasilkan daya.`),
     data: { type: isOffline ? "station_offline" : "station_online" },
+    delaySeconds,
   });
 }

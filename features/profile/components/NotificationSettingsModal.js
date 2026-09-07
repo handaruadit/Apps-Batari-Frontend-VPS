@@ -24,6 +24,7 @@ export default function NotificationSettingsModal({
   visible,
   onClose,
   colors,
+  language,
   t,
 }) {
   const [settings, setSettings] = useState(DEFAULT_NOTIF_SETTINGS);
@@ -207,7 +208,7 @@ export default function NotificationSettingsModal({
             </ScrollView>
           )}
 
-          <View style={[styles.modalActionRow, { marginTop: 12 }]}>
+          <View style={styles.modalActionRow}>
             <TouchableOpacity
               style={[
                 styles.modalConfirmBtn,

@@ -1,5 +1,6 @@
 //===== (Imports) ======
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
 import { Modal, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import OverviewChart from './charts/OverviewChart';
@@ -13,8 +14,10 @@ export default function LandscapeChartModal({
   chartCurrentTime,
   chartYearRange,
   colors,
+  comparisonSeries,
   dailySeries,
   isChartLandscapeVisible,
+  isComparisonActive,
   isLandscapeChartRotated,
   isLightMode,
   landscapeChartHeight,
@@ -29,6 +32,16 @@ export default function LandscapeChartModal({
   togglePowerSeries,
   visiblePowerSeries,
 }) {
+  const [isTooltipActive, setIsTooltipActive] = useState(false);
+  const [tooltipDismissKey, setTooltipDismissKey] = useState(0);
+
+  const handleDismissTooltip = () => {
+    if (isTooltipActive) {
+      setTooltipDismissKey((prev) => prev + 1);
+      setIsTooltipActive(false);
+    }
+  };
+
   return (
     <Modal
       visible={isChartLandscapeVisible}
@@ -49,6 +62,11 @@ export default function LandscapeChartModal({
             styles.chartLandscapeHeader,
             isLightMode && { backgroundColor: colors.screen },
           ]}
+          onTouchStart={() => {
+            if (isTooltipActive) {
+              handleDismissTooltip();
+            }
+          }}
         >
           <TouchableOpacity
             activeOpacity={0.75}
@@ -65,6 +83,11 @@ export default function LandscapeChartModal({
             styles.chartLandscapeBody,
             isLightMode && { backgroundColor: colors.screen },
           ]}
+          onTouchStart={() => {
+            if (isTooltipActive) {
+              handleDismissTooltip();
+            }
+          }}
         >
           <View
             style={[
@@ -81,10 +104,16 @@ export default function LandscapeChartModal({
               chartStatus={chartStatus}
               chartWidth={landscapeChartWidth}
               chartHeight={landscapeChartHeight}
+              comparisonSeries={comparisonSeries}
               currentTime={chartCurrentTime}
+              isComparisonActive={isComparisonActive}
               lastTimestamp={plantData.latestDataTimestamp}
               mode="landscape"
-              onToggleSeries={togglePowerSeries}
+              onToggleSeries={(key) => {
+                handleDismissTooltip();
+                togglePowerSeries?.(key);
+              }}
+              onTooltipChange={setIsTooltipActive}
               period={activeSegment}
               selectedDay={selectedDay}
               selectedMonth={selectedMonth}
@@ -92,6 +121,7 @@ export default function LandscapeChartModal({
               series={dailySeries}
               showCurrentTime={false}
               showLegend={false}
+              tooltipDismissKey={tooltipDismissKey}
               visibleSeries={visiblePowerSeries}
               yearRange={chartYearRange}
             />

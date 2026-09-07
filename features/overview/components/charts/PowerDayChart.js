@@ -36,15 +36,19 @@ const SOC_TICKS = [0, 25, 50, 75, 100];
 export default function PowerDayChart({
   chartHeight = DEFAULT_HEIGHT,
   chartWidth,
+  comparisonSeries = null,
   currentTime,
+  isComparisonActive = false,
   mode = "portrait",
   onToggleSeries,
+  onTooltipChange,
   selectedDay,
   selectedMonth,
   selectedYear,
   series,
   showCurrentTime = true,
   showLegend = true,
+  tooltipDismissKey,
   visibleSeries,
 }) {
   const { colors, t, themeMode } = useAppSettings();
@@ -53,6 +57,21 @@ export default function PowerDayChart({
     () => normalizeDayPowerSeries(series),
     [series],
   );
+  const comparisonNormalizedData = useMemo(() => {
+    if (!isComparisonActive || !comparisonSeries) {
+      return null;
+    }
+    const firstKey = Object.keys(comparisonSeries)[0];
+    const firstItem = comparisonSeries[firstKey]?.[0];
+    if (
+      firstItem &&
+      typeof firstItem.timestamp === "number" &&
+      typeof firstItem.value === "number"
+    ) {
+      return comparisonSeries;
+    }
+    return normalizeDayPowerSeries(comparisonSeries);
+  }, [comparisonSeries, isComparisonActive]);
   const activeSeries = DAY_SERIES_CONFIG.filter(
     (item) => visibleSeries[item.key],
   );
@@ -67,11 +86,22 @@ export default function PowerDayChart({
       };
   const innerWidth = Math.max(1, chartWidth - pad.left - pad.right);
   const innerHeight = Math.max(1, chartHeight - pad.top - pad.bottom);
-  const powerValues = POWER_SERIES_CONFIG.filter(
-    (item) => visibleSeries[item.key],
-  ).flatMap((item) =>
-    (normalizedData[item.key] || []).map((point) => point.value),
-  );
+  const powerValues = useMemo(() => {
+    const todayValues = POWER_SERIES_CONFIG.filter(
+      (item) => visibleSeries[item.key],
+    ).flatMap((item) =>
+      (normalizedData[item.key] || []).map((point) => point.value),
+    );
+    if (!isComparisonActive || !comparisonNormalizedData) {
+      return todayValues;
+    }
+    const compareValues = POWER_SERIES_CONFIG.filter(
+      (item) => visibleSeries[item.key],
+    ).flatMap((item) =>
+      (comparisonNormalizedData[item.key] || []).map((point) => point.value),
+    );
+    return [...todayValues, ...compareValues];
+  }, [comparisonNormalizedData, isComparisonActive, normalizedData, visibleSeries]);
   const chartRange = useMemo(
     () => calculateYAxisRange(powerValues),
     [powerValues],
@@ -81,6 +111,10 @@ export default function PowerDayChart({
     [selectedDay, selectedMonth, selectedYear],
   );
   const [selectedTimestamp, setSelectedTimestamp] = useState(null);
+
+  useEffect(() => {
+    onTooltipChange?.(selectedTimestamp !== null);
+  }, [selectedTimestamp, onTooltipChange]);
 
   //========== CHART SCALE ==========
   const getX = (timestamp) =>
@@ -95,6 +129,23 @@ export default function PowerDayChart({
   const timeTicks = getResponsiveChartTimeTicks(innerWidth);
 
   //========== DATA PROCESSING ==========
+  const comparisonPaths =
+    isComparisonActive && comparisonNormalizedData
+      ? activeSeries.map((item) => ({
+          ...item,
+          points: (comparisonNormalizedData[item.key] || [])
+            .filter(
+              (point) =>
+                point.timestamp >= startTimestamp &&
+                point.timestamp <= endTimestamp,
+            )
+            .map((point) => ({
+              ...point,
+              x: getX(point.timestamp),
+              y: getSeriesY(item.key, point.value),
+            })),
+        }))
+      : [];
   const paths = activeSeries.map((item) => ({
     ...item,
     points: (normalizedData[item.key] || [])
@@ -115,16 +166,33 @@ export default function PowerDayChart({
           normalizedData[item.key],
           selectedTimestamp,
         );
+        const comparePoint =
+          isComparisonActive && comparisonNormalizedData
+            ? findNearestDataPoint(
+                comparisonNormalizedData[item.key],
+                selectedTimestamp,
+              )
+            : null;
+
+        let compareValue = null;
+        if (comparePoint && Number.isFinite(comparePoint?.value)) {
+          compareValue =
+            item.key === "soc"
+              ? `${comparePoint.value.toFixed(1)}%`
+              : formatPower(comparePoint.value);
+        }
 
         return {
           ...item,
           point,
+          comparePoint,
           label: t(item.labelKey) || item.label,
           value: item.key === "soc"
             ? Number.isFinite(point?.value)
               ? `${point.value.toFixed(1)}%`
               : "No data"
             : formatPower(point?.value),
+          compareValue,
         };
       });
   const selectedMarkerX = selectedTimestamp === null
@@ -178,7 +246,7 @@ export default function PowerDayChart({
 
   useEffect(() => {
     setSelectedTimestamp(null);
-  }, [selectedDay, selectedMonth, selectedYear]);
+  }, [selectedDay, selectedMonth, selectedYear, tooltipDismissKey]);
 
   //========== RENDER HELPERS ==========
   const textColor = isLightMode ? colors.text : appColors.text;
@@ -282,6 +350,21 @@ export default function PowerDayChart({
             </>
           )}
 
+          {/* Previous day (H-1) comparison lines */}
+          {comparisonPaths.map((item) => (
+            <Path
+              key={`compare-${item.key}`}
+              d={buildLinePath(item.points)}
+              fill="none"
+              stroke={item.color}
+              strokeOpacity={0.35}
+              strokeWidth={item.key === "soc" ? 1.5 : 1.8}
+              strokeDasharray={item.key === "soc" ? "4 4" : "6 4"}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
+
           {paths.map((item) => (
             <Path
               key={item.key}
@@ -343,13 +426,26 @@ export default function PowerDayChart({
       </View>
 
       {showLegend && (
-        <ChartLegend
-          colors={colors}
-          config={DAY_SERIES_CONFIG}
-          onToggleSeries={onToggleSeries}
-          t={t}
-          visibleSeries={visibleSeries}
-        />
+        <View
+          onTouchStart={() => {
+            if (selectedTimestamp !== null) {
+              setSelectedTimestamp(null);
+            }
+          }}
+        >
+          <ChartLegend
+            colors={colors}
+            config={DAY_SERIES_CONFIG}
+            onToggleSeries={(key) => {
+              if (selectedTimestamp !== null) {
+                setSelectedTimestamp(null);
+              }
+              onToggleSeries?.(key);
+            }}
+            t={t}
+            visibleSeries={visibleSeries}
+          />
+        </View>
       )}
     </View>
   );

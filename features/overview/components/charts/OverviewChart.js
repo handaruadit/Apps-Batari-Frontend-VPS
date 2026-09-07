@@ -2,7 +2,7 @@
 import { useAppSettings } from "@/context/AppSettingsContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { ActivityIndicator, Alert, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from "react-native";
 import { ENERGY_SERIES_CONFIG } from "../../constants/overviewConstants";
 import { shareDailyChartCsv } from "../../utils/csvExport";
 import {
@@ -20,9 +20,13 @@ import styles from "./chart.styles";
 //========== COMPONENT ==========
 export default function OverviewChart({
   chartStatus,
+  comparisonSeries = null,
+  isComparisonActive = false,
+  isLoadingComparison = false,
   lastTimestamp,
   mode = "portrait",
   onFullscreenPress,
+  onToggleComparison,
   period,
   selectedDay,
   selectedMonth,
@@ -71,6 +75,8 @@ export default function OverviewChart({
 
   const commonProps = {
     ...chartProps,
+    comparisonSeries,
+    isComparisonActive,
     mode,
     selectedDay,
     selectedMonth,
@@ -98,35 +104,90 @@ export default function OverviewChart({
     <View style={styles.container}>
       {mode === "portrait" && (
         <View style={styles.toolbar}>
-          {period === "day" && (
-            <TouchableOpacity
-              activeOpacity={0.75}
-              disabled={isSavingCsv}
-              onPress={handleSaveCsv}
-              style={[
-                styles.toolbarButton,
-                { borderColor: colors.bubbleBorder },
-              ]}
-            >
-              {isSavingCsv ? (
-                <ActivityIndicator size="small" color={colors.accent} />
-              ) : (
-                <Ionicons name="download-outline" size={17} color={colors.accent} />
-              )}
-            </TouchableOpacity>
-          )}
-          {onFullscreenPress && (
-            <TouchableOpacity
-              activeOpacity={0.75}
-              onPress={onFullscreenPress}
-              style={[
-                styles.toolbarButton,
-                { borderColor: colors.bubbleBorder },
-              ]}
-            >
-              <Ionicons name="expand-outline" size={17} color={colors.accent} />
-            </TouchableOpacity>
-          )}
+          <View style={{ flex: 1 }}>
+            {period === "day" && onToggleComparison && (
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={onToggleComparison}
+                style={[
+                  styles.comparePill,
+                  {
+                    borderColor: isComparisonActive
+                      ? colors.accent
+                      : colors.bubbleBorder,
+                    backgroundColor: isComparisonActive
+                      ? colors.accent
+                      : "transparent",
+                  },
+                ]}
+              >
+                {isLoadingComparison ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={isComparisonActive ? "#FFFFFF" : colors.accent}
+                  />
+                ) : (
+                  <Ionicons
+                    name="swap-horizontal"
+                    size={15}
+                    color={isComparisonActive ? "#FFFFFF" : colors.accent}
+                  />
+                )}
+                <Text
+                  style={[
+                    styles.comparePillText,
+                    {
+                      color: isComparisonActive ? "#FFFFFF" : colors.text,
+                    },
+                  ]}
+                >
+                  {isComparisonActive
+                    ? t("compareYesterdayActive")
+                    : t("compareYesterday")}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.toolbarActions}>
+            {period === "day" && (
+              <TouchableOpacity
+                activeOpacity={0.75}
+                disabled={isSavingCsv}
+                onPress={handleSaveCsv}
+                style={[
+                  styles.toolbarButton,
+                  { borderColor: colors.bubbleBorder },
+                ]}
+              >
+                {isSavingCsv ? (
+                  <ActivityIndicator size="small" color={colors.accent} />
+                ) : (
+                  <Ionicons
+                    name="download-outline"
+                    size={17}
+                    color={colors.accent}
+                  />
+                )}
+              </TouchableOpacity>
+            )}
+            {onFullscreenPress && (
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={onFullscreenPress}
+                style={[
+                  styles.toolbarButton,
+                  { borderColor: colors.bubbleBorder },
+                ]}
+              >
+                <Ionicons
+                  name="expand-outline"
+                  size={17}
+                  color={colors.accent}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       )}
       {renderChart()}

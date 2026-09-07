@@ -32,11 +32,13 @@ export default function EnergyBarChart({
   chartWidth,
   mode = "portrait",
   onToggleSeries,
+  onTooltipChange,
   segment,
   selectedMonth,
   selectedYear,
   series,
   showLegend = true,
+  tooltipDismissKey,
   visibleSeries,
   yearRange,
 }) {
@@ -96,6 +98,10 @@ export default function EnergyBarChart({
   );
   const chartRange = calculateYAxisRange(visibleValues);
   const [selectedIndex, setSelectedIndex] = useState(null);
+
+  useEffect(() => {
+    onTooltipChange?.(selectedIndex !== null);
+  }, [selectedIndex, onTooltipChange]);
 
   //========== CHART SCALE ==========
   const slotWidth = innerWidth / Math.max(items.length, 1);
@@ -178,7 +184,7 @@ export default function EnergyBarChart({
 
   useEffect(() => {
     setSelectedIndex(null);
-  }, [segment, selectedMonth, selectedYear]);
+  }, [segment, selectedMonth, selectedYear, tooltipDismissKey]);
 
   //========== RENDER HELPERS ==========
   const gridColor = "rgba(148,163,184,0.18)";
@@ -305,17 +311,37 @@ export default function EnergyBarChart({
       )}
 
       {showLegend && (
-        <ChartLegend
-          colors={colors}
-          config={ENERGY_SERIES_CONFIG}
-          onToggleSeries={onToggleSeries}
-          t={t}
-          visibleSeries={visibleSeries}
-        />
+        <View
+          onTouchStart={() => {
+            if (selectedIndex !== null) {
+              setSelectedIndex(null);
+            }
+          }}
+        >
+          <ChartLegend
+            colors={colors}
+            config={ENERGY_SERIES_CONFIG}
+            onToggleSeries={(key) => {
+              if (selectedIndex !== null) {
+                setSelectedIndex(null);
+              }
+              onToggleSeries?.(key);
+            }}
+            t={t}
+            visibleSeries={visibleSeries}
+          />
+        </View>
       )}
 
       {showLegend && summary.length > 0 && (
-        <View style={styles.summaryRow}>
+        <View
+          style={styles.summaryRow}
+          onTouchStart={() => {
+            if (selectedIndex !== null) {
+              setSelectedIndex(null);
+            }
+          }}
+        >
           {summary.map((item) => (
             <View
               key={item.key}

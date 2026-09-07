@@ -125,7 +125,7 @@ export const SOC_SERIES_CONFIG = {
   key: "soc",
   labelKey: "soc",
   label: "SoC",
-  color: "#FACC15",
+  color: "#1D4ED8",
   group: "battery",
 };
 
@@ -501,6 +501,12 @@ export const POWER_LATEST_ENDPOINT_CONFIG = [
     label: "Load",
     category: "load",
     types: ["power", "vaPower"],
+  },
+  {
+    key: "soc",
+    label: "SoC",
+    category: "battery",
+    types: ["soc"],
   },
 ];
 

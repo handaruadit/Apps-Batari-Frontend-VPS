@@ -385,6 +385,7 @@ export default function ProfileScreen() {
         visible={notifModalVisible}
         onClose={() => setNotifModalVisible(false)}
         colors={colors}
+        language={language}
         t={t}
       />
 

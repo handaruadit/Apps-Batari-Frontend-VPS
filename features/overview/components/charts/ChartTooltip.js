@@ -28,9 +28,23 @@ export default function ChartTooltip({ colors, left, rows, title, top = 30 }) {
           <Text style={[styles.tooltipLabel, { color: colors.textMuted }]}>
             {row.label}
           </Text>
-          <Text style={[styles.tooltipValue, { color: colors.text }]}>
-            {row.value}
-          </Text>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text style={[styles.tooltipValue, { color: colors.text }]}>
+              {row.value}
+            </Text>
+            {row.compareValue && (
+              <Text
+                style={{
+                  fontSize: 8.5,
+                  fontWeight: "600",
+                  color: colors.textMuted,
+                  marginTop: -1,
+                }}
+              >
+                H-1: {row.compareValue}
+              </Text>
+            )}
+          </View>
         </View>
       ))}
     </View>

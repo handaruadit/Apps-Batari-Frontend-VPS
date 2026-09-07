@@ -22,6 +22,10 @@ export const translations = {
     csvSaved: "CSV file is ready.",
     csvFailed: "Save CSV failed",
     csvUnavailable: "Share/save is not available on this device.",
+    compareYesterday: "Compare H-1",
+    compareYesterdayActive: "H-1 Active",
+    success: "Success",
+    failed: "Failed",
     selectedData: "Selected Data",
     time: "Time",
     date: "Date",
@@ -185,6 +189,8 @@ export const translations = {
     notifDailySummarySubtitle: "Daily total production summary report every afternoon.",
     notifSettingsSaved: "Notification settings saved successfully.",
     notifSettingsFailed: "Failed to save settings.",
+    sendTestNotification: "Send Test Notification",
+    testNotifSent: "Test notification sent! Check your phone notification tray.",
 
     // Delete Account
     enterPasswordToConfirm: "Enter password to confirm",
@@ -257,6 +263,21 @@ export const translations = {
     networkOrServerError: "Network issue or server unavailable.",
     plantSaveFailed: "Failed to save plant changes.",
     plantCreateFailed: "Failed to save plant.",
+
+    // Notification Settings
+    notificationSetting: "Notification Settings",
+    notifStationOfflineTitle: "Station Offline",
+    notifStationOfflineSubtitle: "Alert when a station loses network connection",
+    notifStationOnlineTitle: "Station Online",
+    notifStationOnlineSubtitle: "Alert when a station reconnects and operates",
+    notifBatteryAlarmTitle: "Battery Alarm",
+    notifBatteryAlarmSubtitle: "Alert when battery capacity drops to critical levels",
+    notifDailySummaryTitle: "Daily Summary",
+    notifDailySummarySubtitle: "Daily production summary report",
+    notifSettingsSaved: "Notification settings saved successfully.",
+    notifSettingsFailed: "Failed to save notification settings.",
+    success: "Success",
+    failed: "Failed",
   },
   id: {
     editInformation: "Edit Informasi",
@@ -280,6 +301,10 @@ export const translations = {
     csvSaved: "File CSV siap disimpan.",
     csvFailed: "Simpan CSV gagal",
     csvUnavailable: "Fitur share/save tidak tersedia di perangkat ini.",
+    compareYesterday: "Bandingkan H-1",
+    compareYesterdayActive: "H-1 Aktif",
+    success: "Berhasil",
+    failed: "Gagal",
     selectedData: "Data Terpilih",
     time: "Waktu",
     date: "Tanggal",
@@ -443,6 +468,8 @@ export const translations = {
     notifDailySummarySubtitle: "Laporan ringkasan total produksi harian setiap sore.",
     notifSettingsSaved: "Pengaturan notifikasi berhasil disimpan.",
     notifSettingsFailed: "Gagal menyimpan pengaturan.",
+    sendTestNotification: "Kirim Notifikasi Uji Coba",
+    testNotifSent: "Notifikasi uji coba terkirim! Cek bilah notifikasi ponsel Anda.",
 
     // Delete Account
     enterPasswordToConfirm: "Masukkan kata sandi untuk konfirmasi",
@@ -515,5 +542,20 @@ export const translations = {
     networkOrServerError: "Terjadi masalah jaringan atau server mati.",
     plantSaveFailed: "Gagal menyimpan perubahan plant.",
     plantCreateFailed: "Gagal menyimpan plant.",
+
+    // Pengaturan Notifikasi
+    notificationSetting: "Pengaturan Notifikasi",
+    notifStationOfflineTitle: "Stasiun Offline",
+    notifStationOfflineSubtitle: "Peringatan saat stasiun terputus dari jaringan",
+    notifStationOnlineTitle: "Stasiun Online",
+    notifStationOnlineSubtitle: "Peringatan saat stasiun kembali terhubung dan aktif",
+    notifBatteryAlarmTitle: "Alarm Baterai",
+    notifBatteryAlarmSubtitle: "Peringatan saat kapasitas baterai berada di level kritis",
+    notifDailySummaryTitle: "Ringkasan Harian",
+    notifDailySummarySubtitle: "Laporan ringkasan produksi harian",
+    notifSettingsSaved: "Pengaturan notifikasi berhasil disimpan.",
+    notifSettingsFailed: "Gagal menyimpan pengaturan notifikasi.",
+    success: "Berhasil",
+    failed: "Gagal",
   },
 };

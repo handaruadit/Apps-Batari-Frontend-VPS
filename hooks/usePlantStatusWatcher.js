@@ -49,10 +49,12 @@ export function usePlantStatusWatcher(plantList = []) {
         if (prevIsOnline === true && currentIsOnline === false) {
           if (settings.stationOffline) {
             triggerLocalNotification({
-              title: `Station Offline: ${plantName}`,
+              title: isEn
+                ? `Station Offline: ${plantName}`
+                : `Stasiun Offline: ${plantName}`,
               body: isEn
                 ? `Station '${plantName}' has been disconnected from the network (Offline).`
-                : `Station '${plantName}' telah terputus dari jaringan (Offline).`,
+                : `Stasiun '${plantName}' telah terputus dari jaringan (Offline).`,
               type: "danger",
             });
           }
@@ -62,10 +64,12 @@ export function usePlantStatusWatcher(plantList = []) {
         if (prevIsOnline === false && currentIsOnline === true) {
           if (settings.stationOnline) {
             triggerLocalNotification({
-              title: `Station Online: ${plantName}`,
+              title: isEn
+                ? `Station Online: ${plantName}`
+                : `Stasiun Online: ${plantName}`,
               body: isEn
                 ? `Station '${plantName}' is back online and actively generating power.`
-                : `Station '${plantName}' kembali terhubung dan aktif menghasilkan daya.`,
+                : `Stasiun '${plantName}' kembali terhubung dan aktif menghasilkan daya.`,
               type: "success",
             });
           }
@@ -81,7 +85,7 @@ export function usePlantStatusWatcher(plantList = []) {
               title: isEn ? `Battery Alarm: ${plantName}` : `Alarm Baterai: ${plantName}`,
               body: isEn
                 ? `Battery capacity at station '${plantName}' is at low level (${Math.round(soc)}%).`
-                : `Kapasitas baterai di station '${plantName}' berada pada level rendah (${Math.round(soc)}%).`,
+                : `Kapasitas baterai di stasiun '${plantName}' berada pada level rendah (${Math.round(soc)}%).`,
               type: "warning",
             });
           }

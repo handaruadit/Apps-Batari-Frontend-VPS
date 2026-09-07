@@ -10,10 +10,30 @@ export default StyleSheet.create({
   },
   toolbar: {
     minHeight: 32,
-    marginBottom: 4,
+    marginBottom: 6,
     flexDirection: "row",
-    justifyContent: "flex-end",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  toolbarActions: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
+  },
+  comparePill: {
+    alignSelf: "flex-start",
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  comparePillText: {
+    fontFamily: appFont,
+    fontSize: 11,
+    fontWeight: "700",
   },
   toolbarButton: {
     width: 32,
