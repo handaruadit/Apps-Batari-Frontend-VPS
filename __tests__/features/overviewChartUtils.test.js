@@ -49,11 +49,11 @@ describe("overview chart data correctness", () => {
   test("drops records without a timestamp instead of inventing a position", () => {
     const normalized = normalizeDayPowerSeries({
       production: [{ value: 2.1 }],
-      load: [{ value: 1.1, createdAt: "2026-08-12T08:00:00+07:00" }],
+      grid: [{ value: 1.1, createdAt: "2026-08-12T08:00:00+07:00" }],
     });
 
     expect(normalized.production).toEqual([]);
-    expect(normalized.load).toHaveLength(1);
+    expect(normalized.grid).toHaveLength(1);
   });
 
   test("keeps PV and PV Generate as separate historical series", () => {
@@ -149,7 +149,7 @@ describe("overview aggregate periods", () => {
     });
 
     expect(items).toHaveLength(31);
-    expect(items[0]).toMatchObject({ production: 8.5, load: 12.3 });
+    expect(items[0]).toMatchObject({ production: 8.5 });
     expect(items[1].production).toBeUndefined();
     expect(items[2].production).toBe(0);
   });
@@ -177,7 +177,6 @@ describe("overview aggregate periods", () => {
 
     expect(items[0]).toMatchObject({
       production: 8.5,
-      load: 7.2,
       grid: -1.1,
       battery: -2.4,
       pvGenerate: 9.3,
@@ -197,7 +196,7 @@ describe("overview aggregate periods", () => {
 
     expect(items).toHaveLength(12);
     expect(items[0].production).toBeUndefined();
-    expect(items[1]).toMatchObject({ production: 120, load: 90 });
+    expect(items[1]).toMatchObject({ production: 120 });
   });
 
   test("year accepts all 12 months", () => {
@@ -231,7 +230,7 @@ describe("overview aggregate periods", () => {
       },
     });
 
-    expect(items[0]).toMatchObject({ production: 900, load: 850 });
+    expect(items[0]).toMatchObject({ production: 900 });
     expect(items[1].production).toBeUndefined();
     expect(items[2].production).toBe(1100);
   });
@@ -270,8 +269,8 @@ describe("overview Day CSV", () => {
       },
     });
 
-    expect(csv).toContain("Waktu,PV,Load,Grid,Battery,PV Generate");
-    expect(csv).toContain("08:00,2.10,1.40,-0.50,-0.70,3.40");
+    expect(csv).toContain("Waktu,PV,Grid,Battery,PV Generate");
+    expect(csv).toContain("08:00,2.10,-0.50,-0.70,3.40");
   });
 });
 
@@ -291,7 +290,7 @@ describe("overview chart legend", () => {
     );
 
     expect(screen.getByText("PV")).toBeTruthy();
-    expect(screen.getByText("Load")).toBeTruthy();
+    expect(screen.queryByText("Load")).toBeNull();
     expect(screen.getByText("Grid")).toBeTruthy();
     expect(screen.getByText("Battery")).toBeTruthy();
     expect(screen.getByText("PV Generate")).toBeTruthy();

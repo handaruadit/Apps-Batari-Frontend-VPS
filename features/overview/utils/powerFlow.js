@@ -37,7 +37,7 @@ export function getSelectedInfoConfig() {
 //===== (getDefaultVisiblePowerSeries) ======
 export const getDefaultVisiblePowerSeries = () =>
   DAY_SERIES_CONFIG.reduce((items, item) => {
-    items[item.key] = item.key === "production" || item.key === "load";
+    items[item.key] = true;
     return items;
   }, {});
 
@@ -88,7 +88,7 @@ export function buildProductionPowerFlowData(plantData, useDemoData) {
   const chartSeries = plantData?.chartSeries || {};
   const pvGenerateKwh =
     getSeriesTotalValue(chartSeries.pvGenerate) ||
-    Math.abs(Number(plantData?.pv ?? plantData?.production ?? 0));
+    Math.abs(Number(plantData?.pvGenerate ?? plantData?.load ?? 0));
   const chargeKwh =
     getSeriesTotalValue(chartSeries.charge) ||
     Math.max(0, Number(plantData?.battery || 0));

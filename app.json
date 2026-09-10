@@ -16,8 +16,8 @@
       }
     },
     "android": {
-      "package": "com.batarienergi.app",
-      "versionCode": 2,
+      "package": "com.batarienergy.app",
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/adaptive-foreground-1024.png"

@@ -52,13 +52,6 @@ export const POWER_SERIES_CONFIG = [
     group: "consumption",
   },
   {
-    key: "load",
-    labelKey: "load",
-    label: "Load",
-    color: "#B96CFF",
-    group: "consumption",
-  },
-  {
     key: "grid",
     labelKey: "grid",
     label: "Grid",
@@ -88,13 +81,6 @@ export const ENERGY_SERIES_CONFIG = [
     labelKey: "pv",
     label: "PV",
     color: "#1FB7FF",
-    group: "consumption",
-  },
-  {
-    key: "load",
-    labelKey: "load",
-    label: "Load",
-    color: "#B96CFF",
     group: "consumption",
   },
   {
@@ -137,7 +123,7 @@ export const DAY_SERIES_CONFIG = [
 export const SOC_SELECTED_INFO_CONFIG = SOC_SERIES_CONFIG;
 
 //===== (SELECTED_INFO_PRIMARY_KEYS) ======
-export const SELECTED_INFO_PRIMARY_KEYS = ["production", "grid", "battery", "load"];
+export const SELECTED_INFO_PRIMARY_KEYS = ["production", "grid", "battery", "pvGenerate"];
 
 //===== (SOC_FIELD_KEYS) ======
 export const SOC_FIELD_KEYS = [

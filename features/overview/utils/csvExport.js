@@ -87,7 +87,6 @@ export function buildDailyCsv({ series }) {
   const header = [
     "Waktu",
     "PV",
-    "Load",
     "Grid",
     "Battery",
     "PV Generate",
@@ -96,7 +95,6 @@ export function buildDailyCsv({ series }) {
     [
       row.time,
       row.production,
-      row.load,
       row.grid,
       row.battery,
       row.pvGenerate,

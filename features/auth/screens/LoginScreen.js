@@ -80,7 +80,7 @@ const LoginScreen = () => {
     redirectUri: isExpoGo
       ? "https://auth.expo.io/@idewbayus-team/Apps"
       : AuthSession.makeRedirectUri({
-          native: "com.batarienergi.app:/oauthredirect",
+          native: "com.batarienergy.app:/oauthredirect",
           scheme: "bysense",
         }),
   });
