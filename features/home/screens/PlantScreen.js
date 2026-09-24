@@ -22,6 +22,8 @@ import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "r
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
   FlatList,
   RefreshControl,
   Text,
@@ -29,7 +31,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 //===== (PlantScreen) ======
 export default function PlantScreen() {
@@ -44,6 +45,17 @@ export default function PlantScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isNavigatingOverview, setIsNavigatingOverview] = useState(false);
+
+  const [headerAnim] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    Animated.timing(headerAnim, {
+      toValue: 1,
+      duration: 450,
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+      useNativeDriver: true,
+    }).start();
+  }, [headerAnim]);
 
   // Watch for station online/offline status changes and trigger notifications
   usePlantStatusWatcher(plantList);
@@ -340,72 +352,88 @@ export default function PlantScreen() {
     });
   };
 
+  const headerTranslateY = headerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-14, 0],
+  });
+  const headerOpacity = headerAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
   //===== (Render) ======
   return (
     <View style={[styles.container, { backgroundColor: colors.screen }]}>
       <View style={styles.contentWrapper}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Plant</Text>
-
-        <TouchableOpacity
-          style={[
-            styles.addButton,
-            themeMode === "light" && {
-              backgroundColor: colors.bubble,
-              borderColor: colors.bubbleBorder,
-            },
-          ]}
-          activeOpacity={0.8}
-          onPress={handleAddDevice}
+        <Animated.View
+          style={{
+            transform: [{ translateY: headerTranslateY }],
+            opacity: headerOpacity,
+          }}
         >
-          <Ionicons
-            name="add"
-            size={24}
-            color={themeMode === "light" ? colors.accent : "#FFFFFF"}
-          />
-        </TouchableOpacity>
-      </View>
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: colors.text }]}>Plant</Text>
 
-        <View
-          style={[
-            styles.searchBox,
-            {
-              backgroundColor: colors.bubble,
-              borderColor: colors.bubbleBorder,
-              flexDirection: "row",
-              alignItems: "center",
-            },
-          ]}
-        >
-          <TextInput
-            placeholder={t("searchPlantPlaceholder")}
-            placeholderTextColor={colors.textMuted}
-            value={search}
-            onFocus={() => setActiveMenuPlantId(null)}
-            onChangeText={(val) => {
-              setSearch(val);
-              setActiveMenuPlantId(null);
-            }}
-            style={[styles.searchInput, { color: colors.text, flex: 1 }]}
-          />
-          {search.length > 0 && (
             <TouchableOpacity
-              onPress={() => {
-                setSearch("");
-                setActiveMenuPlantId(null);
-              }}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={{ padding: 4 }}
-              activeOpacity={0.7}
+              style={[
+                styles.addButton,
+                themeMode === "light" && {
+                  backgroundColor: colors.bubble,
+                  borderColor: colors.bubbleBorder,
+                },
+              ]}
+              activeOpacity={0.8}
+              onPress={handleAddDevice}
             >
               <Ionicons
-                name="close-circle"
-                size={20}
-                color={colors.textMuted}
+                name="add"
+                size={24}
+                color={themeMode === "light" ? colors.accent : "#FFFFFF"}
               />
             </TouchableOpacity>
-          )}
-        </View>
+          </View>
+
+          <View
+            style={[
+              styles.searchBox,
+              {
+                backgroundColor: colors.bubble,
+                borderColor: colors.bubbleBorder,
+                flexDirection: "row",
+                alignItems: "center",
+              },
+            ]}
+          >
+            <TextInput
+              placeholder={t("searchPlantPlaceholder")}
+              placeholderTextColor={colors.textMuted}
+              value={search}
+              onFocus={() => setActiveMenuPlantId(null)}
+              onChangeText={(val) => {
+                setSearch(val);
+                setActiveMenuPlantId(null);
+              }}
+              style={[styles.searchInput, { color: colors.text, flex: 1 }]}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity
+                onPress={() => {
+                  setSearch("");
+                  setActiveMenuPlantId(null);
+                }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={{ padding: 4 }}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="close-circle"
+                  size={20}
+                  color={colors.textMuted}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
 
       {isLoading ? (
         <View style={styles.centerContainer}>
@@ -440,6 +468,7 @@ export default function PlantScreen() {
           renderItem={({ item, index }) => (
             <DeviceCard
               device={item}
+              index={index}
               menuVisible={activeMenuPlantId === item.id}
               onMenuOpen={() => handleMenuOpen(index, item.id)}
               onCloseMenu={() => setActiveMenuPlantId(null)}

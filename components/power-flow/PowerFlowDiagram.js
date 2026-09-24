@@ -64,21 +64,21 @@ export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
   const colors = isProductionVariant ? PRODUCTION_FLOW_COLORS : POWER_FLOW_COLORS;
   const energy = data.energy || {};
   const productionFlow = data.productionFlow || {};
+  const productionFlowPercent = data.productionFlowPercent || {};
   const consumptionKwh = Number(
     isProductionVariant
-      ? productionFlow.pvGenerateKwh
+      ? (productionFlow.pvGenerateKwh ?? productionFlow.totalProductionKwh ?? 0)
       : energy.consumptionKwh || 0,
   );
   const batteryKwh = Number(
-    isProductionVariant ? productionFlow.chargeKwh : energy.batteryKwh || 0,
+    isProductionVariant ? (productionFlow.chargeKwh || 0) : energy.batteryKwh || 0,
   );
   const gridKwh = Number(
-    isProductionVariant ? productionFlow.exportKwh : energy.gridKwh || 0,
+    isProductionVariant ? (productionFlow.exportKwh || 0) : energy.gridKwh || 0,
   );
   const rawTotalKwh = Number(
     isProductionVariant
-      ? productionFlow.totalProductionKwh ??
-          consumptionKwh + batteryKwh + gridKwh
+      ? (productionFlow.totalProductionKwh ?? consumptionKwh)
       : energy.totalKwh || 0,
   );
   const totalKwh =
@@ -87,11 +87,22 @@ export default function PowerFlowDiagram({ data = {}, variant = "default" }) {
       : getSafeRingValue(consumptionKwh) +
         getSafeRingValue(batteryKwh) +
         getSafeRingValue(gridKwh);
-  const pvPercent = formatPercent(getSectionPercent(consumptionKwh, totalKwh));
-  const batteryPercent = formatPercent(getSectionPercent(batteryKwh, totalKwh));
-  const gridPercent = formatPercent(getSectionPercent(gridKwh, totalKwh));
+
+  const pvPercent = isProductionVariant && productionFlowPercent.pvGeneratePercent !== undefined
+    ? formatPercent(productionFlowPercent.pvGeneratePercent)
+    : formatPercent(getSectionPercent(consumptionKwh, totalKwh));
+  const batteryPercent = isProductionVariant && productionFlowPercent.chargePercent !== undefined
+    ? formatPercent(productionFlowPercent.chargePercent)
+    : formatPercent(getSectionPercent(batteryKwh, totalKwh));
+  const gridPercent = isProductionVariant && productionFlowPercent.exportPercent !== undefined
+    ? formatPercent(productionFlowPercent.exportPercent)
+    : formatPercent(getSectionPercent(gridKwh, totalKwh));
+
+  const directPvKwh = isProductionVariant
+    ? Math.max(0, totalKwh - batteryKwh - gridKwh)
+    : consumptionKwh;
   const ringSegmentRatios = getRingSegmentRatios({
-    pv: consumptionKwh,
+    pv: isProductionVariant ? (directPvKwh > 0 ? directPvKwh : (totalKwh > 0 ? totalKwh : 0)) : consumptionKwh,
     battery: batteryKwh,
     grid: gridKwh,
   });

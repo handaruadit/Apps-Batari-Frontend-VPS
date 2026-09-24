@@ -18,7 +18,7 @@ import { GOOGLE_WEB_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID } from "@/config/api";
 import { showAlert } from "@/utils/showAlert";
 import { AntDesign, Ionicons } from "@expo/vector-icons";
 import { router, Stack } from "expo-router";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -62,7 +62,9 @@ const LoginScreen = () => {
   const [focusedField, setFocusedField] = useState(null);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  const introAnim = useRef(new Animated.Value(0)).current;
+  const [introAnim] = useState(() => new Animated.Value(0));
+  const [btnScale] = useState(() => new Animated.Value(1));
+  const [exitAnim] = useState(() => new Animated.Value(0));
 
   //===== (Detect Expo Go vs Standalone) ======
   const isExpoGo =
@@ -110,16 +112,8 @@ const LoginScreen = () => {
     loadSavedEmails();
   }, []);
 
-  //===== (Google Auth Response Effect) ======
-  useEffect(() => {
-    if (response?.type === "success") {
-      handleGoogleSignIn(response.authentication || response.params);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [response]);
-
   //===== (handleGoogleSignIn) ======
-  const handleGoogleSignIn = async (authResult) => {
+  const handleGoogleSignIn = useCallback(async (authResult) => {
     const accessToken = authResult?.accessToken || authResult?.access_token;
     const idToken = authResult?.idToken || authResult?.id_token;
 
@@ -171,7 +165,7 @@ const LoginScreen = () => {
     } finally {
       setGoogleLoading(false);
     }
-  };
+  }, [setUser]);
 
   //===== (handleGooglePress) ======
   const handleGooglePress = async () => {
@@ -193,6 +187,16 @@ const LoginScreen = () => {
       showAlert("Login gagal", "Gagal membuka login Google.");
     }
   };
+
+  //===== (Google Auth Response Effect) ======
+  useEffect(() => {
+    if (response?.type === "success") {
+      const auth = response.authentication || response.params;
+      setTimeout(() => {
+        handleGoogleSignIn(auth);
+      }, 0);
+    }
+  }, [response, handleGoogleSignIn]);
 
   //===== (handleLogin) ======
   const handleLogin = async () => {
@@ -251,7 +255,14 @@ const LoginScreen = () => {
       setLoading(false);
 
       if (loginSuccess) {
-        router.replace(redirectPath);
+        Animated.timing(exitAnim, {
+          toValue: 1,
+          duration: 280,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start(() => {
+          router.replace(redirectPath);
+        });
       }
     }
   };
@@ -284,6 +295,15 @@ const LoginScreen = () => {
     ],
   };
 
+  const exitTranslateY = exitAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -18],
+  });
+  const exitOpacity = exitAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
+
   //===== (Render) ======
   return (
     <>
@@ -309,8 +329,16 @@ const LoginScreen = () => {
                   setShowEmailOptions(false);
                 }}
               >
-                {/* Brand Block with transparent box */}
-                <View style={styles.brandBlock}>
+                <Animated.View
+                  style={{
+                    width: "100%",
+                    alignItems: "center",
+                    transform: [{ translateY: exitTranslateY }],
+                    opacity: exitOpacity,
+                  }}
+                >
+                  {/* Brand Block with transparent box */}
+                  <View style={styles.brandBlock}>
                   <Image
                     source={require("@/assets/images/batari-energy-logo.webp")}
                     style={styles.logoImage}
@@ -453,22 +481,40 @@ const LoginScreen = () => {
                       </TouchableOpacity>
                     </View>
 
-                    {/* Log In Button */}
-                    <TouchableOpacity
-                      style={[
-                        styles.loginButton,
-                        loading && styles.loginButtonBusy,
-                      ]}
-                      onPress={handleLogin}
-                      disabled={loading}
-                      activeOpacity={0.85}
-                    >
-                      {loading ? (
-                        <ActivityIndicator color="#FFFFFF" size="small" />
-                      ) : (
-                        <Text style={styles.loginText}>Log In</Text>
-                      )}
-                    </TouchableOpacity>
+                    {/* Log In Button with Tactile Spring */}
+                    <Animated.View style={{ transform: [{ scale: btnScale }] }}>
+                      <TouchableOpacity
+                        style={[
+                          styles.loginButton,
+                          loading && styles.loginButtonBusy,
+                        ]}
+                        onPressIn={() => {
+                          Animated.spring(btnScale, {
+                            toValue: 0.96,
+                            speed: 24,
+                            bounciness: 4,
+                            useNativeDriver: true,
+                          }).start();
+                        }}
+                        onPressOut={() => {
+                          Animated.spring(btnScale, {
+                            toValue: 1.0,
+                            speed: 18,
+                            bounciness: 6,
+                            useNativeDriver: true,
+                          }).start();
+                        }}
+                        onPress={handleLogin}
+                        disabled={loading}
+                        activeOpacity={0.92}
+                      >
+                        {loading ? (
+                          <ActivityIndicator color="#FFFFFF" size="small" />
+                        ) : (
+                          <Text style={styles.loginText}>Log In</Text>
+                        )}
+                      </TouchableOpacity>
+                    </Animated.View>
 
                     {/* Google Sign In Option (Hidden for now) */}
                     {SHOW_GOOGLE_SIGN_IN && (
@@ -524,6 +570,7 @@ const LoginScreen = () => {
                 <Text style={styles.footerTagline}>
                   Igniting Innovation, Empowering The Nation
                 </Text>
+                </Animated.View>
               </Pressable>
             </KeyboardAvoidingView>
           </SafeAreaView>

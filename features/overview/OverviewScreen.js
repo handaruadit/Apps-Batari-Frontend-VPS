@@ -1,4 +1,5 @@
 //===== (Imports) ======
+import CountUpNumber from "@/components/CountUpNumber";
 import LandscapeChartModal from "./components/LandscapeChartModal";
 import OverviewChartSection from "./components/OverviewChartSection";
 import PowerFlowSection from "./components/PowerFlowSection";
@@ -8,8 +9,6 @@ import {
   LANDSCAPE_CHART_LAYOUT,
   PLANT_HEADER_BOX,
   PLANT_HEADER_BUTTON,
-  POWER_CHART_DAY_CHIP_STEP,
-  POWER_CHART_MONTH_CHIP_STEP,
   ZERO_ENERGY_VALUES,
 } from "./constants/overviewConstants";
 import { useDayComparison } from "./hooks/useDayComparison";
@@ -22,7 +21,6 @@ import {
   getResponsiveChartWidth,
 } from "./utils/chartData";
 import {
-  formatCompactNumber,
   getJakartaDateParts,
   getYearRange,
   resolvePlantId,
@@ -139,7 +137,7 @@ export default function OverviewScreen() {
     selectedYear,
     selectedSourceDeviceId,
   });
-  const weatherCardAnim = useRef(new Animated.Value(0)).current;
+  const [weatherCardAnim] = useState(() => new Animated.Value(0));
   const dayPickerScrollRef = useRef(null);
   const monthPickerScrollRef = useRef(null);
   const todayParts = getJakartaDateParts();
@@ -162,6 +160,10 @@ export default function OverviewScreen() {
   //===== (Plant Presentation Data) ======
   const plantData = useMemo(() => {
     const isDeviceOnline = fetchedData?.isDeviceOnline === true;
+    const isStationGateway =
+      !selectedDataSource ||
+      selectedDataSource === "plant" ||
+      String(selectedDataSource).startsWith("DEYE_STATION_");
 
     return {
       plantName: pickValue(
@@ -169,12 +171,16 @@ export default function OverviewScreen() {
         selectedDevice?.name,
         "No Device Selected",
       ),
-      productionToday: pickNumber(
-        isDeviceOnline ? fetchedData?.productionToday : 0,
-        isDeviceOnline ? fetchedData?.production : 0,
-        isDeviceOnline ? selectedDevice?.productionToday : 0,
-        isDeviceOnline ? selectedDevice?.production : 0,
-      ),
+      productionToday: isStationGateway
+        ? pickNumber(
+            fetchedData?.dailyProduction,
+            fetchedData?.productionToday,
+            isDeviceOnline ? fetchedData?.production : 0,
+            selectedDevice?.dailyProduction,
+            selectedDevice?.productionToday,
+            0,
+          )
+        : 0,
       weather: pickValue(fetchedData?.weather, selectedDevice?.weather, null),
       weatherTemperature: pickFiniteNumber(
         fetchedData?.weatherTemperature,
@@ -225,23 +231,25 @@ export default function OverviewScreen() {
         selectedDevice?.updatedAt,
         null,
       ),
-      production: pickNumber(
-        isDeviceOnline ? fetchedData?.production : 0,
-        isDeviceOnline ? selectedDevice?.production : 0,
-      ),
-      pv: pickNumber(isDeviceOnline ? fetchedData?.pv : 0),
-      grid: pickNumber(isDeviceOnline ? fetchedData?.grid : 0),
-      battery: pickNumber(isDeviceOnline ? fetchedData?.battery : 0),
-      upsLoad: pickNumber(isDeviceOnline ? fetchedData?.upsLoad : 0),
-      load: pickNumber(isDeviceOnline ? fetchedData?.load : 0),
-      energy: isDeviceOnline
+      production: isStationGateway
+        ? pickNumber(
+            isDeviceOnline ? fetchedData?.production : 0,
+            isDeviceOnline ? selectedDevice?.production : 0,
+          )
+        : 0,
+      pv: isStationGateway ? pickNumber(isDeviceOnline ? fetchedData?.pv : 0) : 0,
+      grid: isStationGateway ? pickNumber(isDeviceOnline ? fetchedData?.grid : 0) : 0,
+      battery: isStationGateway ? pickNumber(isDeviceOnline ? fetchedData?.battery : 0) : 0,
+      upsLoad: isStationGateway ? pickNumber(isDeviceOnline ? fetchedData?.upsLoad : 0) : 0,
+      load: isStationGateway ? pickNumber(isDeviceOnline ? fetchedData?.load : 0) : 0,
+      energy: isStationGateway && isDeviceOnline
         ? (fetchedData?.energy ?? ZERO_ENERGY_VALUES.energy)
         : ZERO_ENERGY_VALUES.energy,
-      energyPercent: isDeviceOnline
+      energyPercent: isStationGateway && isDeviceOnline
         ? (fetchedData?.energyPercent ?? ZERO_ENERGY_VALUES.energyPercent)
         : ZERO_ENERGY_VALUES.energyPercent,
-      soc: isDeviceOnline ? pickFiniteNumber(fetchedData?.soc) : null,
-      selectedDataPercentages: isDeviceOnline
+      soc: isStationGateway && isDeviceOnline ? pickFiniteNumber(fetchedData?.soc) : null,
+      selectedDataPercentages: isStationGateway && isDeviceOnline
         ? (fetchedData?.selectedDataPercentages ?? {})
         : {},
       status: pickValue(fetchedData?.status, selectedDevice?.status, "--"),
@@ -249,15 +257,39 @@ export default function OverviewScreen() {
       latestDataTimestamp: fetchedData?.latestDataTimestamp ?? null,
       canAddDatalogger: selectedDevice?.canAddDatalogger === true,
       chartSeries: fetchedData?.chartSeries ?? createEmptyChartSeries(),
+      capacity: pickNumber(
+        fetchedData?.capacity,
+        selectedDevice?.capacity,
+        selectedDevice?.pv_capacity,
+        selectedDevice?.installed_capacity,
+        0,
+      ),
+      productionFlow: isStationGateway
+        ? (fetchedData?.productionFlow ?? null)
+        : {
+            pvGenerateKwh: 0,
+            chargeKwh: 0,
+            exportKwh: 0,
+            totalProductionKwh: 0,
+          },
+      energySummary: isStationGateway ? (fetchedData?.energySummary ?? null) : {},
+      dailyProduction: isStationGateway
+        ? pickNumber(
+            fetchedData?.dailyProduction,
+            fetchedData?.productionToday,
+            selectedDevice?.dailyProduction,
+            selectedDevice?.productionToday,
+            0,
+          )
+        : 0,
     };
-  }, [fetchedData, selectedDevice]);
+  }, [fetchedData, selectedDevice, selectedDataSource]);
   const isCurrentDemoPlant = isDemoPlant({ name: plantData.plantName });
   //===== (Lower Power Flow Data) ======
   const lowerPowerFlowData = useMemo(
     () => buildProductionPowerFlowData(plantData, isCurrentDemoPlant),
     [isCurrentDemoPlant, plantData],
   );
-  const productionMeta = `${formatCompactNumber(plantData.productionToday)}kW`;
   const weatherCardAnimatedStyle = {
     opacity: weatherCardAnim,
     transform: [
@@ -393,7 +425,9 @@ export default function OverviewScreen() {
   //===== (clampSelectedDay) ======
   useEffect(() => {
     if (selectedDay > daysInMonth) {
-      setSelectedDay(daysInMonth);
+      setTimeout(() => {
+        setSelectedDay(daysInMonth);
+      }, 0);
     }
   }, [selectedMonth, selectedYear, daysInMonth, selectedDay]);
 
@@ -530,12 +564,14 @@ export default function OverviewScreen() {
             </Text>
 
             <View style={styles.plantMetaRow}>
-              <Text
+              <CountUpNumber
+                value={plantData.capacity}
+                unit="kW"
+                decimals={1}
+                duration={900}
                 style={[styles.plantProductionMeta, { color: colors.accent }]}
                 numberOfLines={1}
-              >
-                {productionMeta}
-              </Text>
+              />
             </View>
           </View>
         </View>

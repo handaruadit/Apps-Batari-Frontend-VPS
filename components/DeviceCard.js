@@ -8,9 +8,10 @@ import {
 import { styles } from "@/components/device-card/styles";
 import { useAppSettings } from "@/context/AppSettingsContext";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Animated,
+  Easing,
   ImageBackground,
   Text,
   TouchableOpacity,
@@ -20,6 +21,7 @@ import {
 //===== (DeviceCard) ======
 export default function DeviceCard({
   device,
+  index = 0,
   onPress,
   menuVisible: controlledMenuVisible,
   onMenuOpen,
@@ -34,6 +36,7 @@ export default function DeviceCard({
   canDelete = true,
   canAddDatalogger = false,
   canManageAccess = false,
+  canDeletePlant = true,
 }) {
   const { colors, t, themeMode } = useAppSettings();
   const [localMenuVisible, setLocalMenuVisible] = useState(false);
@@ -43,7 +46,45 @@ export default function DeviceCard({
       ? controlledMenuVisible
       : localMenuVisible;
 
-  const pulseAnim = useRef(new Animated.Value(0.45)).current;
+  const [pulseAnim] = useState(() => new Animated.Value(0.45));
+  const [entranceAnim] = useState(() => new Animated.Value(0));
+  const [touchScale] = useState(() => new Animated.Value(1));
+
+  // Staggered iOS entrance animation ("muncul 1 per 1")
+  useEffect(() => {
+    const delay = Math.min(index * 75, 450);
+    const fluidEasing = Easing.bezier(0.16, 1, 0.3, 1);
+
+    const timer = setTimeout(() => {
+      Animated.timing(entranceAnim, {
+        toValue: 1,
+        duration: 520,
+        easing: fluidEasing,
+        useNativeDriver: true,
+      }).start();
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [entranceAnim, index]);
+
+  const handlePressIn = () => {
+    Animated.spring(touchScale, {
+      toValue: 0.97,
+      speed: 24,
+      bounciness: 4,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(touchScale, {
+      toValue: 1.0,
+      speed: 18,
+      bounciness: 6,
+      useNativeDriver: true,
+    }).start();
+  };
+
   const connectionStatus = getPlantConnectionStatus(device);
   const cityProvinceText = formatCityProvince(device);
 
@@ -65,18 +106,20 @@ export default function DeviceCard({
     }
   };
 
-  //===== (Status Pulse Effect) ======
+  //===== (Status Breathing Aura Effect) ======
   useEffect(() => {
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 700,
+          duration: 1200,
+          easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 0.45,
-          duration: 700,
+          duration: 1200,
+          easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
       ]),
@@ -120,22 +163,45 @@ export default function DeviceCard({
   const isLight = themeMode === "light";
 
   return (
-    <View
-      style={[
-        styles.card,
-        isLight && {
-          backgroundColor: colors.bubble,
-          borderColor: colors.bubbleBorder,
-        },
-        isPinned && {
-          borderColor: isLight
-            ? "rgba(24, 174, 230, 0.6)"
-            : "rgba(24, 174, 230, 0.45)",
-          borderWidth: 1.2,
-        },
-      ]}
+    <Animated.View
+      style={{
+        width: "100%",
+        opacity: entranceAnim,
+        transform: [
+          {
+            translateY: entranceAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [32, 0],
+            }),
+          },
+          {
+            scale: entranceAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.93, 1.0],
+            }),
+          },
+        ],
+      }}
     >
-      <View style={styles.imageWrapper}>
+      <Animated.View
+        style={[
+          styles.card,
+          isLight && {
+            backgroundColor: colors.bubble,
+            borderColor: colors.bubbleBorder,
+          },
+          isPinned && {
+            borderColor: isLight
+              ? "rgba(24, 174, 230, 0.6)"
+              : "rgba(24, 174, 230, 0.45)",
+            borderWidth: 1.2,
+          },
+          {
+            transform: [{ scale: touchScale }],
+          },
+        ]}
+      >
+        <View style={styles.imageWrapper}>
         <ImageBackground
           source={require("@/assets/images/solar-bg.jpg")}
           style={styles.bg}
@@ -145,6 +211,8 @@ export default function DeviceCard({
           <TouchableOpacity
             style={styles.imageOverlay}
             activeOpacity={0.9}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
             onPress={() => {
               if (isMenuOpen) {
                 handleClose();
@@ -218,6 +286,8 @@ export default function DeviceCard({
           isLight && { backgroundColor: colors.bubble },
         ]}
         activeOpacity={0.8}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
         onPress={() => {
           if (isMenuOpen) {
             handleClose();
@@ -246,6 +316,7 @@ export default function DeviceCard({
         </Text>
         <ConnectionStatus status={connectionStatus} pulseAnim={pulseAnim} />
       </TouchableOpacity>
-    </View>
+      </Animated.View>
+    </Animated.View>
   );
 }

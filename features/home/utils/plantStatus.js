@@ -98,6 +98,14 @@ export async function attachLatestDeviceTimestamps(plants) {
         };
       }
 
+      if (plant.has_devices === false || plant.has_devices === 0) {
+        return {
+          ...plant,
+          hasDeviceId: false,
+          latestDataStatusTimestamp: null,
+        };
+      }
+
       try {
         const result = await fetchPlantDevices(plant.id);
         const devices = Array.isArray(result?.devices) ? result.devices : [];
@@ -111,13 +119,7 @@ export async function attachLatestDeviceTimestamps(plants) {
           hasDeviceId: devices.length > 0,
           latestDataStatusTimestamp: latestDataTimestamp || null,
         };
-      } catch (error) {
-        console.warn(
-          "Failed to load latest device timestamp for plant status:",
-          plant?.id,
-          error?.message || error,
-        );
-
+      } catch {
         return {
           ...plant,
           latestDataStatusTimestamp: getLatestStatusTimestamp(plant) || null,

@@ -166,13 +166,56 @@ export function buildAggregateChartData({
 }
 
 export function buildLinePath(points) {
-  if (!points.length) {
+  if (!points || !points.length) {
     return "";
   }
 
-  return points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
-    .join(" ");
+  // Filter out any non-finite coords or duplicate adjacent X coordinates
+  const valid = points.filter((pt, idx, arr) => {
+    if (!Number.isFinite(pt.x) || !Number.isFinite(pt.y)) return false;
+    if (idx > 0 && Math.abs(pt.x - arr[idx - 1].x) < 0.0001) return false;
+    return true;
+  });
+
+  if (valid.length === 0) return "";
+  if (valid.length === 1) return `M ${valid[0].x.toFixed(1)} ${valid[0].y.toFixed(1)}`;
+  if (valid.length === 2) {
+    return `M ${valid[0].x.toFixed(1)} ${valid[0].y.toFixed(1)} L ${valid[1].x.toFixed(1)} ${valid[1].y.toFixed(1)}`;
+  }
+
+  let d = `M ${valid[0].x.toFixed(1)} ${valid[0].y.toFixed(1)}`;
+
+  for (let i = 0; i < valid.length - 1; i++) {
+    const p0 = valid[Math.max(0, i - 1)];
+    const p1 = valid[i];
+    const p2 = valid[i + 1];
+    const p3 = valid[Math.min(valid.length - 1, i + 2)];
+
+    let cp1x = p1.x + (p2.x - p0.x) / 6;
+    let cp1y = p1.y + (p2.y - p0.y) / 6;
+    let cp2x = p2.x - (p3.x - p1.x) / 6;
+    let cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    // Monotonic clamping on Y: avoids artificial wave dips below zero or above peaks
+    if (Math.abs(p1.y - p2.y) < 0.001) {
+      cp1y = p1.y;
+      cp2y = p2.y;
+    } else if (p1.y < p2.y) {
+      cp1y = Math.max(p1.y, Math.min(p2.y, cp1y));
+      cp2y = Math.max(p1.y, Math.min(p2.y, cp2y));
+    } else {
+      cp1y = Math.min(p1.y, Math.max(p2.y, cp1y));
+      cp2y = Math.min(p1.y, Math.max(p2.y, cp2y));
+    }
+
+    // Monotonic clamping on X
+    cp1x = Math.max(p1.x, Math.min(p2.x, cp1x));
+    cp2x = Math.max(p1.x, Math.min(p2.x, cp2x));
+
+    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+
+  return d;
 }
 
 export function findNearestDataPoint(

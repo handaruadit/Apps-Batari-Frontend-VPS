@@ -1,13 +1,16 @@
 //===== (Imports) ======
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import OverviewChart from './charts/OverviewChart';
 import {
   POWER_CHART_DAY_CHIP_STEP,
   POWER_CHART_MONTH_CHIP_STEP,
 } from '../constants/overviewConstants';
 import styles from '../styles/overview.styles';
+import { appColors } from '@/config/theme';
+
+const SEGMENT_KEYS = ['day', 'month', 'year', 'lifetime'];
 
 //===== (OverviewChartSection) ======
 export default function OverviewChartSection({
@@ -51,6 +54,23 @@ export default function OverviewChartSection({
   visiblePowerSeries,
   yearOptions,
 }) {
+  const initialSegmentIndex = Math.max(0, SEGMENT_KEYS.indexOf(activeSegment));
+  const [segmentAnim] = useState(() => new Animated.Value(initialSegmentIndex));
+  const [rowWidth, setRowWidth] = useState(0);
+
+  useEffect(() => {
+    const targetIndex = SEGMENT_KEYS.indexOf(activeSegment);
+    if (targetIndex >= 0) {
+      Animated.spring(segmentAnim, {
+        toValue: targetIndex,
+        damping: 18,
+        stiffness: 180,
+        mass: 0.8,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [activeSegment, segmentAnim]);
+
   const [internalTooltipActive, setInternalTooltipActive] = useState(false);
   const [internalDismissKey, setInternalDismissKey] = useState(0);
 
@@ -193,103 +213,143 @@ export default function OverviewChartSection({
               borderColor: colors.bubbleBorder,
             },
           ]}
-        >
-        <TouchableOpacity
-          style={[
-            styles.segmentButton,
-            activeSegment === "day" && styles.segmentButtonActive,
-          ]}
-          onPress={() => setActiveSegment("day")}
-        >
-          <Text
-            style={[
-              styles.segmentText,
-              activeSegment === "day" && styles.segmentTextActive,
-              isLightMode && {
-                color:
-                  activeSegment === "day"
-                    ? colors.bubble
-                    : colors.textMuted,
-              },
-            ]}
-          >
-            {t("day")}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.segmentButton,
-            activeSegment === "month" && styles.segmentButtonActive,
-          ]}
-          onPress={() => {
-            setSelectedMonth(todayMonth);
-            setSelectedYear(todayYear);
-            setActiveSegment("month");
+          onLayout={(e) => {
+            const width = e.nativeEvent.layout.width;
+            if (width > 0) {
+              setRowWidth(width);
+            }
           }}
         >
-          <Text
-            style={[
-              styles.segmentText,
-              activeSegment === "month" && styles.segmentTextActive,
-              isLightMode && {
-                color:
-                  activeSegment === "month"
-                    ? colors.bubble
-                    : colors.textMuted,
-              },
-            ]}
-          >
-            {t("month")}
-          </Text>
-        </TouchableOpacity>
+          {rowWidth > 0 && (
+            <Animated.View
+              style={{
+                position: 'absolute',
+                top: 4,
+                bottom: 4,
+                left: 4,
+                width: (rowWidth - 8) / 4,
+                backgroundColor: isLightMode
+                  ? colors.accent || appColors.accent
+                  : appColors.accent,
+                borderRadius: 10,
+                shadowColor: appColors.accent,
+                shadowOpacity: 0.35,
+                shadowRadius: 6,
+                shadowOffset: { width: 0, height: 2 },
+                elevation: 3,
+                transform: [
+                  {
+                    translateX: segmentAnim.interpolate({
+                      inputRange: [0, 1, 2, 3],
+                      outputRange: [
+                        0,
+                        (rowWidth - 8) / 4,
+                        ((rowWidth - 8) / 4) * 2,
+                        ((rowWidth - 8) / 4) * 3,
+                      ],
+                    }),
+                  },
+                ],
+              }}
+            />
+          )}
 
-        <TouchableOpacity
-          style={[
-            styles.segmentButton,
-            activeSegment === "year" && styles.segmentButtonActive,
-          ]}
-          onPress={() => setActiveSegment("year")}
-        >
-          <Text
+          <TouchableOpacity
             style={[
-              styles.segmentText,
-              activeSegment === "year" && styles.segmentTextActive,
-              isLightMode && {
-                color:
-                  activeSegment === "year"
-                    ? colors.bubble
-                    : colors.textMuted,
-              },
+              styles.segmentButton,
+              rowWidth === 0 && activeSegment === 'day' && styles.segmentButtonActive,
             ]}
+            onPress={() => setActiveSegment('day')}
           >
-            {t("year")}
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.segmentText,
+                activeSegment === 'day' && styles.segmentTextActive,
+                isLightMode && {
+                  color:
+                    activeSegment === 'day'
+                      ? colors.bubble
+                      : colors.textMuted,
+                },
+              ]}
+            >
+              {t('day')}
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.segmentButton,
-            activeSegment === "lifetime" && styles.segmentButtonActive,
-          ]}
-          onPress={() => setActiveSegment("lifetime")}
-        >
-          <Text
+          <TouchableOpacity
             style={[
-              styles.segmentText,
-              activeSegment === "lifetime" && styles.segmentTextActive,
-              isLightMode && {
-                color:
-                  activeSegment === "lifetime"
-                    ? colors.bubble
-                    : colors.textMuted,
-              },
+              styles.segmentButton,
+              rowWidth === 0 && activeSegment === 'month' && styles.segmentButtonActive,
             ]}
+            onPress={() => {
+              setSelectedMonth(todayMonth);
+              setSelectedYear(todayYear);
+              setActiveSegment('month');
+            }}
           >
-            Lifetime
-          </Text>
-        </TouchableOpacity>
-      </View>
+            <Text
+              style={[
+                styles.segmentText,
+                activeSegment === 'month' && styles.segmentTextActive,
+                isLightMode && {
+                  color:
+                    activeSegment === 'month'
+                      ? colors.bubble
+                      : colors.textMuted,
+                },
+              ]}
+            >
+              {t('month')}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.segmentButton,
+              rowWidth === 0 && activeSegment === 'year' && styles.segmentButtonActive,
+            ]}
+            onPress={() => setActiveSegment('year')}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                activeSegment === 'year' && styles.segmentTextActive,
+                isLightMode && {
+                  color:
+                    activeSegment === 'year'
+                      ? colors.bubble
+                      : colors.textMuted,
+                },
+              ]}
+            >
+              {t('year')}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.segmentButton,
+              rowWidth === 0 && activeSegment === 'lifetime' && styles.segmentButtonActive,
+            ]}
+            onPress={() => setActiveSegment('lifetime')}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                activeSegment === 'lifetime' && styles.segmentTextActive,
+                isLightMode && {
+                  color:
+                    activeSegment === 'lifetime'
+                      ? colors.bubble
+                      : colors.textMuted,
+                },
+              ]}
+            >
+              Lifetime
+            </Text>
+          </TouchableOpacity>
+        </View>
 
       {activeSegment === "day" ? (
         <>

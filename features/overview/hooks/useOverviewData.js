@@ -1,7 +1,7 @@
-//===== (Imports) ======
+﻿//===== (Imports) ======
 import { clearAuth, getToken, isTokenValid } from '@/auth/token';
 import { BASE_URL } from '@/config/api';
-import { fetchPlantDevices, isDemoPlant } from '@/services/plantService';
+import { fetchPlantDevices } from '@/services/plantService';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
@@ -161,6 +161,7 @@ export function useOverviewData({
   const fetchOverviewData = useCallback(
     async ({ showLoading = false } = {}) => {
       const requestPlantId = resolvedPlantId;
+      let stationDetail = null;
       try {
         if (showLoading) {
           setIsRefreshLoading(true);
@@ -219,26 +220,40 @@ export function useOverviewData({
             selectedSourceDeviceId,
           ),
         );
+        const targetChartPlantId =
+          selectedDevice?.deye_station_id ||
+          selectedDevice?.plantsId ||
+          resolvedPlantId;
+
+        // For plant or Deye Station gateway, query station history (deviceId = null).
+        // For individual hardware device (e.g. 2411216565), pass deviceId so backend queries that device.
+        const chartDeviceId =
+          !selectedSourceDeviceId ||
+          selectedSourceDeviceId === "plant" ||
+          String(selectedSourceDeviceId).startsWith("DEYE_STATION_")
+            ? null
+            : selectedSourceDeviceId;
+
         const chartEndpoints =
           activeSegment === "lifetime"
             ? chartYearRange.map((year) =>
                 buildChartEndpoint(
                   activeSegment,
-                  resolvedPlantId,
+                  targetChartPlantId,
                   selectedDay,
                   selectedMonth,
                   year,
-                  selectedSourceDeviceId,
+                  chartDeviceId,
                 ),
               )
             : [
                 buildChartEndpoint(
                   activeSegment,
-                  resolvedPlantId,
+                  targetChartPlantId,
                   selectedDay,
                   selectedMonth,
                   selectedYear,
-                  selectedSourceDeviceId,
+                  chartDeviceId,
                 ),
               ];
         const chartEndpoint = chartEndpoints[0];
@@ -279,6 +294,73 @@ export function useOverviewData({
           plants.find((item) => String(item.id) === String(resolvedPlantId)) ??
           selectedDevice ??
           {};
+        // Resolve target station ID for authentic Deye Cloud telemetry
+        const targetStationId =
+          plantInfo.deye_station_id ||
+          selectedDevice?.deye_station_id ||
+          plantInfo.plantsId ||
+          resolvedPlantId;
+
+        if (targetStationId) {
+          try {
+            const stationRes = await requestJson(
+              `${BASE_URL}/api/data/stations/${targetStationId}`,
+              headers,
+            );
+            if (stationRes?.ok && (stationRes?.json?.data || stationRes?.json)) {
+              stationDetail = stationRes.json?.data || stationRes.json;
+            }
+          } catch (_stErr) {
+            stationDetail = null;
+          }
+        }
+
+        // Merge devices from stationDetail (Deye Cloud / VPS API) with plant devices (matching Web)
+        const rawMergedDevices = [
+          ...(Array.isArray(stationDetail?.devices) ? stationDetail.devices : []),
+          ...(Array.isArray(selectedDevice?.devices) ? selectedDevice.devices : []),
+          ...(Array.isArray(plantInfo?.devices) ? plantInfo.devices : []),
+          ...(Array.isArray(latestPlantDevices) ? latestPlantDevices : []),
+        ];
+
+        const seenDevIds = new Set();
+        const mergedDevices = [];
+
+        // Always include DEYE_STATION_ gateway first in dropdown if targetStationId exists
+        if (targetStationId) {
+          const stationGatewayId = `DEYE_STATION_${targetStationId}`;
+          seenDevIds.add(stationGatewayId);
+          mergedDevices.push({
+            dataSourceId: stationGatewayId,
+            device_id: stationGatewayId,
+            sn: stationGatewayId,
+            name: "DEYE Station",
+            type: "Station Telemetry",
+          });
+        }
+
+        for (const dev of rawMergedDevices) {
+          const devId = String(dev?.device_id || dev?.sn || dev?.deviceId || dev?.dataSourceId || "").trim();
+          if (devId && !seenDevIds.has(devId)) {
+            seenDevIds.add(devId);
+            mergedDevices.push({
+              ...dev,
+              dataSourceId: devId,
+              device_id: devId,
+              sn: devId,
+            });
+          }
+        }
+
+        if (mergedDevices.length > 0) {
+          latestPlantDevices = mergedDevices;
+          plantDevicesRef.current = mergedDevices;
+          setPlantDevices((currentDevices) =>
+            areDeviceListsEqual(currentDevices, mergedDevices)
+              ? currentDevices
+              : mergedDevices,
+          );
+        }
         const backendDataSources = [
           ...latestResults.map((item) => item?.json).filter(Boolean),
           ...chartResults.map((item) => item?.json).filter(Boolean),
@@ -322,7 +404,7 @@ export function useOverviewData({
         const chartSeries = chartRequestSucceeded
           ? activeSegment === "lifetime"
             ? buildYearRangeChartSeries(chartResults, chartYearRange)
-            : mergeChartSeries(normalizeChartSeries(chartResult.json.data))
+            : mergeChartSeries(normalizeChartSeries(chartResult?.json?.data))
           : createEmptyChartSeries();
         setChartRequestState({
           key: chartSelectionKey,
@@ -355,12 +437,23 @@ export function useOverviewData({
           ),
         );
         const devicePowerValues = getDevicesAggregatePowerValues(sourceDevices);
+        const effectivePowerValues = hasAnyPowerValue(apiPowerValues)
+          ? mergePowerValues(apiPowerValues, devicePowerValues)
+          : devicePowerValues;
         const apiEnergyValues = getLatestEnergyValues(latestResults);
         const monitoringState = getMonitoringOnlineState(latestResults);
         const deviceMonitoringState = getDevicesMonitoringState(sourceDevices);
-        const isCurrentDemoPlant = isDemoPlant(plantInfo);
-        const effectiveMonitoringState = isCurrentDemoPlant
-          ? { isOnline: true, latestTimestamp: Date.now() }
+        const isStationOnline = stationDetail
+          ? (stationDetail.status === "Online" || stationDetail.isDeviceOnline === true)
+          : false;
+
+        const effectiveMonitoringState = stationDetail
+          ? {
+              isOnline: isStationOnline,
+              latestTimestamp: stationDetail.lastUpdateTime
+                ? new Date(stationDetail.lastUpdateTime).getTime()
+                : Date.now(),
+            }
           : monitoringState.isOnline || deviceMonitoringState.isOnline
             ? {
                 isOnline: true,
@@ -369,19 +462,92 @@ export function useOverviewData({
                   deviceMonitoringState.latestTimestamp,
               }
             : monitoringState;
-        const effectivePowerValues = hasAnyPowerValue(apiPowerValues)
-          ? apiPowerValues
-          : devicePowerValues;
-        const displayPowerValues = isCurrentDemoPlant
-          ? DEMO_POWER_VALUES
-          : effectiveMonitoringState.isOnline
-            ? effectivePowerValues
+
+                const isPlant =
+          !selectedSourceDeviceId || selectedSourceDeviceId === "plant";
+        const isDeyeStation = Boolean(
+          selectedSourceDeviceId &&
+            String(selectedSourceDeviceId).startsWith("DEYE_STATION_"),
+        );
+        const isStationGateway = isPlant || isDeyeStation;
+
+        // Compute authentic energy summary directly from Deye Cloud telemetry (only for station gateway)
+        const stationEnergySummary = isStationGateway ? (stationDetail?.energySummary || {}) : {};
+        const totalConsKwh = isStationGateway ? Number(stationEnergySummary.consumptionTodayKwh ?? stationDetail?.consumptionTodayKwh ?? 0) : 0;
+        const gridConsKwh = isStationGateway ? Number(stationEnergySummary.gridKwh ?? stationDetail?.gridKwh ?? 0) : 0;
+        const pvConsKwh = isStationGateway ? Number(Math.max(0, totalConsKwh - gridConsKwh).toFixed(2)) : 0;
+        const battConsKwh = isStationGateway ? Number(stationEnergySummary.batteryDischargeKwh ?? 0) : 0;
+
+        const authenticEnergy = {
+          totalKwh: totalConsKwh,
+          consumptionKwh: pvConsKwh,
+          gridKwh: gridConsKwh,
+          batteryKwh: battConsKwh,
+        };
+
+        const totalProdKwh = isStationGateway ? Number(stationEnergySummary.productionTodayKwh ?? stationDetail?.dailyProduction ?? 0) : 0;
+        const chargeProdKwh = isStationGateway ? Number(stationEnergySummary.batteryChargeKwh ?? 0) : 0;
+        const exportProdKwh = isStationGateway ? Number(stationEnergySummary.exportKwh ?? 0) : 0;
+
+        const authenticProductionFlow = {
+          pvGenerateKwh: totalProdKwh,
+          chargeKwh: chargeProdKwh,
+          exportKwh: exportProdKwh,
+          totalProductionKwh: totalProdKwh,
+        };
+
+        // For Plant Data ('plant'): accumulation of all sources in dropdown
+        // For Deye Station ('DEYE_STATION_...'): specifically telemetry from Deye Cloud
+        // For individual device: strictly 0 (no sub-meter parameters)
+        let displayPowerValues = ZERO_POWER_VALUES;
+        if (isDeyeStation) {
+          // Parameters taken directly from Deye Cloud
+          displayPowerValues = stationDetail
+            ? {
+                production: Number(stationDetail.production ?? stationDetail.pv ?? 0),
+                pv: Number(stationDetail.pv ?? stationDetail.production ?? 0),
+                grid: Number(stationDetail.grid ?? stationDetail.gridPower ?? 0),
+                battery: Number(stationDetail.battery ?? stationDetail.batteryPower ?? 0),
+                load: Number(stationDetail.load ?? stationDetail.loadPower ?? stationDetail.upsLoad ?? 0),
+                upsLoad: Number(stationDetail.upsLoad ?? stationDetail.load ?? 0),
+              }
             : ZERO_POWER_VALUES;
-        const displayEnergyValues = isCurrentDemoPlant
-          ? DEMO_ENERGY_VALUES
-          : effectiveMonitoringState.isOnline
-            ? apiEnergyValues
-            : ZERO_ENERGY_VALUES;
+        } else if (isPlant) {
+          // Accumulation of all sources in the dropdown:
+          // Base Deye station telemetry + any separate device telemetry
+          const nonDeyeDevices = sourceDevices.filter(
+            (d) => !String(d.dataSourceId || "").startsWith("DEYE_STATION_"),
+          );
+          const nonDeyePower = getDevicesAggregatePowerValues(nonDeyeDevices);
+
+          if (stationDetail) {
+            displayPowerValues = {
+              production: Number(stationDetail.production ?? stationDetail.pv ?? 0) + (Number(nonDeyePower.production) || 0),
+              pv: Number(stationDetail.pv ?? stationDetail.production ?? 0) + (Number(nonDeyePower.pv) || 0),
+              grid: Number(stationDetail.grid ?? stationDetail.gridPower ?? 0),
+              battery: Number(stationDetail.battery ?? stationDetail.batteryPower ?? 0),
+              load: Number(stationDetail.load ?? stationDetail.loadPower ?? stationDetail.upsLoad ?? 0) + (Number(nonDeyePower.load) || 0),
+              upsLoad: Number(stationDetail.upsLoad ?? stationDetail.load ?? 0),
+            };
+          } else {
+            displayPowerValues = effectiveMonitoringState.isOnline ? effectivePowerValues : ZERO_POWER_VALUES;
+          }
+        }
+
+        const displayEnergyValues = isStationGateway
+          ? (stationDetail
+              ? {
+                  energy: authenticEnergy,
+                  energyPercent: {
+                    pvPercent: authenticEnergy.totalKwh > 0 ? Math.min(100, Math.round((authenticEnergy.consumptionKwh / authenticEnergy.totalKwh) * 100)) : 0,
+                    gridPercent: authenticEnergy.totalKwh > 0 ? Math.min(100, Math.round((authenticEnergy.gridKwh / authenticEnergy.totalKwh) * 100)) : 0,
+                    batteryPercent: authenticEnergy.totalKwh > 0 ? Math.max(0, 100 - (authenticEnergy.consumptionKwh + authenticEnergy.gridKwh)) : 0,
+                  },
+                }
+              : effectiveMonitoringState.isOnline
+                ? apiEnergyValues
+                : ZERO_ENERGY_VALUES)
+          : ZERO_ENERGY_VALUES;
         setFetchedData((current) => {
           const currentChartSeries =
             current?.chartSelectionKey === chartSelectionKey
@@ -472,45 +638,28 @@ export function useOverviewData({
               selectedDevice?.productionToday,
               selectedDevice?.production,
             ),
-            production:
-              displayPowerValues.production ??
-              (effectiveMonitoringState.isOnline ? current?.production : 0) ??
-              plantInfo.production ??
-              selectedDevice?.production ??
-              0,
-            pv:
-              displayPowerValues.pv ??
-              (effectiveMonitoringState.isOnline ? current?.pv : 0) ??
-              plantInfo.pv ??
-              selectedDevice?.pv ??
-              0,
-            grid:
-              displayPowerValues.grid ??
-              (effectiveMonitoringState.isOnline ? current?.grid : 0) ??
-              plantInfo.grid ??
-              selectedDevice?.grid ??
-              0,
-            battery:
-              displayPowerValues.battery ??
-              (effectiveMonitoringState.isOnline ? current?.battery : 0) ??
-              plantInfo.battery ??
-              selectedDevice?.battery ??
-              0,
-            upsLoad:
-              displayPowerValues.upsLoad ??
-              (effectiveMonitoringState.isOnline ? current?.upsLoad : 0) ??
-              plantInfo.upsLoad ??
-              selectedDevice?.upsLoad ??
-              0,
-            load:
-              displayPowerValues.load ??
-              (effectiveMonitoringState.isOnline ? current?.load : 0) ??
-              plantInfo.load ??
-              selectedDevice?.load ??
-              0,
-            energy: displayEnergyValues.energy,
-            energyPercent: displayEnergyValues.energyPercent,
-            soc: effectiveMonitoringState.isOnline ? backendSocValue : null,
+            production: isStationGateway ? (displayPowerValues.production ?? 0) : 0,
+            pv: isStationGateway ? (displayPowerValues.pv ?? 0) : 0,
+            grid: isStationGateway ? (displayPowerValues.grid ?? 0) : 0,
+            battery: isStationGateway ? (displayPowerValues.battery ?? 0) : 0,
+            upsLoad: isStationGateway ? (displayPowerValues.upsLoad ?? 0) : 0,
+            load: isStationGateway ? (displayPowerValues.load ?? 0) : 0,
+            energy: isStationGateway ? displayEnergyValues.energy : ZERO_ENERGY_VALUES.energy,
+            energyPercent: isStationGateway ? displayEnergyValues.energyPercent : ZERO_ENERGY_VALUES.energyPercent,
+            soc: isStationGateway
+              ? (stationDetail?.batterySoc != null
+                  ? Number(stationDetail.batterySoc)
+                  : (stationDetail?.soc != null
+                      ? Number(stationDetail.soc)
+                      : (effectiveMonitoringState.isOnline ? backendSocValue : null)))
+              : null,
+            batterySoc: isStationGateway
+              ? (stationDetail?.batterySoc != null
+                  ? Number(stationDetail.batterySoc)
+                  : (stationDetail?.soc != null
+                      ? Number(stationDetail.soc)
+                      : (effectiveMonitoringState.isOnline ? backendSocValue : null)))
+              : null,
             selectedDataPercentages: effectiveMonitoringState.isOnline
               ? backendSelectedDataPercentages
               : {},
@@ -523,6 +672,41 @@ export function useOverviewData({
               selectedDevice?.status,
               "--",
             ),
+            capacity: pickNumber(
+              stationDetail?.capacity,
+              stationDetail?.installedCapacity,
+              plantInfo.capacity,
+              plantInfo.pv_capacity,
+              plantInfo.installed_capacity,
+              plantInfo.installedCapacity,
+              selectedDevice?.capacity,
+              selectedDevice?.pv_capacity,
+              selectedDevice?.installed_capacity,
+              selectedDevice?.installedCapacity,
+              current?.capacity,
+              0,
+            ),
+            dailyProduction: isStationGateway
+              ? pickNumber(
+                  stationEnergySummary.productionTodayKwh,
+                  stationDetail?.dailyProduction,
+                  stationDetail?.productionToday,
+                  plantInfo.dailyProduction,
+                  plantInfo.productionToday,
+                  selectedDevice?.dailyProduction,
+                  selectedDevice?.productionToday,
+                  0,
+                )
+              : 0,
+            productionFlow: isStationGateway
+              ? authenticProductionFlow
+              : {
+                  pvGenerateKwh: 0,
+                  chargeKwh: 0,
+                  exportKwh: 0,
+                  totalProductionKwh: 0,
+                },
+            energySummary: isStationGateway ? stationEnergySummary : {},
             chartSeries: nextChartSeries,
             chartSelectionKey,
           };

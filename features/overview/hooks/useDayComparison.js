@@ -105,13 +105,20 @@ export function useDayComparison({
           return;
         }
 
+        const comparisonDeviceId =
+          !selectedSourceDeviceId ||
+          selectedSourceDeviceId === "plant" ||
+          String(selectedSourceDeviceId).startsWith("DEYE_STATION_")
+            ? null
+            : selectedSourceDeviceId;
+
         const endpoint = buildChartEndpoint(
           "day",
           resolvedPlantId,
           prevDay,
           prevMonth,
           prevYear,
-          selectedSourceDeviceId,
+          comparisonDeviceId,
         );
 
         const response = await fetch(endpoint, {

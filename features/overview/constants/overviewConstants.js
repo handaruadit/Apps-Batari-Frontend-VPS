@@ -48,21 +48,21 @@ export const POWER_SERIES_CONFIG = [
     key: "production",
     labelKey: "pv",
     label: "PV",
-    color: "#1FB7FF",
+    color: "#0284C7",
     group: "consumption",
   },
   {
     key: "grid",
     labelKey: "grid",
     label: "Grid",
-    color: "#FF9300",
+    color: "#F59E0B",
     group: "consumption",
   },
   {
     key: "battery",
     labelKey: "battery",
     label: "Battery",
-    color: "#99E500",
+    color: "#10B981",
     group: "consumption",
   },
   {
@@ -80,21 +80,21 @@ export const ENERGY_SERIES_CONFIG = [
     key: "production",
     labelKey: "pv",
     label: "PV",
-    color: "#1FB7FF",
+    color: "#0284C7",
     group: "consumption",
   },
   {
     key: "grid",
     labelKey: "grid",
     label: "Grid",
-    color: "#FF9300",
+    color: "#F59E0B",
     group: "consumption",
   },
   {
     key: "battery",
     labelKey: "battery",
     label: "Battery",
-    color: "#99E500",
+    color: "#10B981",
     group: "consumption",
   },
   {
@@ -111,7 +111,7 @@ export const SOC_SERIES_CONFIG = {
   key: "soc",
   labelKey: "soc",
   label: "SoC",
-  color: "#1D4ED8",
+  color: "#6366F1",
   group: "battery",
 };
 
@@ -183,9 +183,9 @@ export const LOWER_POWER_FLOW_SOURCE_ROUTE = "local://power-flow/production";
 
 //===== (LOWER_POWER_FLOW_DUMMY_DATA) ======
 export const LOWER_POWER_FLOW_DUMMY_DATA = {
-  pvGenerateKwh: 3.45,
-  chargeKwh: 1.28,
-  exportKwh: 0.86,
+  pvGenerateKwh: 0,
+  chargeKwh: 0,
+  exportKwh: 0,
 };
 
 //===== (BUBBLE_POSITION_CONFIG) ======
@@ -613,30 +613,3 @@ export const PLANT_HEADER_BUTTON = {
   menuIconSize: 24,
 };
 
-//===== (DEMO_POWER_VALUES) ======
-export const DEMO_POWER_VALUES = {
-  production: 2.35,
-  pv: 2.35,
-  grid: 0.42,
-  battery: -0.28,
-  upsLoad: 0.86,
-  load: 1.54,
-  pvGenerate: 2.35,
-  export: 0.42,
-  charge: 0.28,
-};
-
-//===== (DEMO_ENERGY_VALUES) ======
-export const DEMO_ENERGY_VALUES = {
-  energy: {
-    consumptionKwh: 4.8,
-    batteryKwh: 1.4,
-    gridKwh: 0.9,
-    totalKwh: 7.1,
-  },
-  energyPercent: {
-    batteryPercent: 20,
-    consumptionPercent: 68,
-    gridPercent: 12,
-  },
-};

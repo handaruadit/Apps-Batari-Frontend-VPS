@@ -325,7 +325,8 @@ export function parseChartTimestamp(rawTimestamp) {
   }
 
   if (typeof rawTimestamp === "number") {
-    const numberDate = new Date(rawTimestamp);
+    const tsMs = rawTimestamp < 1e11 ? rawTimestamp * 1000 : rawTimestamp;
+    const numberDate = new Date(tsMs);
 
     return Number.isNaN(numberDate.getTime()) ? null : numberDate;
   }

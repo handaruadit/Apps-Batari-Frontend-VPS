@@ -10,6 +10,15 @@ const UPDATE_URL = "https://www.batarienergy.com/app-version.json";
 export async function checkAppUpdate() {
   try {
     const res = await fetch(UPDATE_URL);
+    if (!res.ok) {
+      return;
+    }
+
+    const contentType = res.headers.get("content-type");
+    if (contentType && !contentType.includes("application/json")) {
+      return;
+    }
+
     const data = await res.json();
 
     const currentBuild = Number(Application.nativeBuildVersion || 0);
@@ -32,7 +41,7 @@ export async function checkAppUpdate() {
       ],
       { cancelable: !data.forceUpdate },
     );
-  } catch (error) {
-    console.log("Gagal cek update:", error);
+  } catch {
+    // Abaikan secara aman jika endpoint update belum siap atau jaringan offline
   }
 }

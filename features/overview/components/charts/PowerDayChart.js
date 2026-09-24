@@ -128,6 +128,15 @@ export default function PowerDayChart({
     key === "soc" ? getSocY(value) : getPowerY(value);
   const timeTicks = getResponsiveChartTimeTicks(innerWidth);
 
+  //========== CURRENT TIME ==========
+  const now = currentTime || new Date();
+  const isSelectedToday =
+    now.getDate() === selectedDay &&
+    now.getMonth() + 1 === selectedMonth &&
+    now.getFullYear() === selectedYear;
+  const currentTimeX = getX(now.getTime());
+  const maxTimestamp = isSelectedToday ? now.getTime() + 10 * 60 * 1000 : endTimestamp;
+
   //========== DATA PROCESSING ==========
   const comparisonPaths =
     isComparisonActive && comparisonNormalizedData
@@ -146,19 +155,31 @@ export default function PowerDayChart({
             })),
         }))
       : [];
-  const paths = activeSeries.map((item) => ({
-    ...item,
-    points: (normalizedData[item.key] || [])
-      .filter(
-        (point) =>
-          point.timestamp >= startTimestamp && point.timestamp <= endTimestamp,
-      )
-      .map((point) => ({
+  const paths = activeSeries.map((item) => {
+    let rawPoints = (normalizedData[item.key] || []).filter(
+      (point) => point.timestamp >= startTimestamp && point.timestamp <= maxTimestamp,
+    );
+
+    // Adaptive zero line for PV if no data points today or offline station
+    if (rawPoints.length === 0 && item.key === "production") {
+      const nowTs = Math.min(now.getTime(), endTimestamp);
+      if (nowTs > startTimestamp) {
+        rawPoints = [
+          { timestamp: startTimestamp, value: 0 },
+          { timestamp: nowTs, value: 0 },
+        ];
+      }
+    }
+
+    return {
+      ...item,
+      points: rawPoints.map((point) => ({
         ...point,
         x: getX(point.timestamp),
         y: getSeriesY(item.key, point.value),
       })),
-  }));
+    };
+  });
   const selectedRows = selectedTimestamp === null
     ? []
     : activeSeries.map((item) => {
@@ -203,14 +224,6 @@ export default function PowerDayChart({
     : selectedMarkerX > chartWidth / 2
       ? Math.max(2, selectedMarkerX - TOOLTIP_WIDTH - 10)
       : Math.min(chartWidth - TOOLTIP_WIDTH - 2, selectedMarkerX + 10);
-
-  //========== CURRENT TIME ==========
-  const now = currentTime || new Date();
-  const isSelectedToday =
-    now.getDate() === selectedDay &&
-    now.getMonth() + 1 === selectedMonth &&
-    now.getFullYear() === selectedYear;
-  const currentTimeX = getX(now.getTime());
 
   //========== EVENT HANDLERS ==========
   const panResponder = useMemo(

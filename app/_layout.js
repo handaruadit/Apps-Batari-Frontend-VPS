@@ -1,7 +1,8 @@
-import { useContext, useEffect } from 'react';
-import { LogBox } from 'react-native';
+import { useContext, useEffect, useState } from 'react';
+import { LogBox, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import * as WebBrowser from 'expo-web-browser';
 
 import {
@@ -9,6 +10,7 @@ import {
   getUserInfo,
   getValidRememberedToken,
 } from '@/auth/token';
+import AnimatedSplashScreen from '@/components/AnimatedSplashScreen';
 import { AlertProvider } from '../context/AlertContext';
 import {
   AppSettingsProvider,
@@ -21,6 +23,7 @@ import {
 import '@/utils/showAlert';
 
 WebBrowser.maybeCompleteAuthSession();
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 LogBox.ignoreLogs([
   'expo-notifications',
@@ -53,6 +56,8 @@ function RootLayoutContent() {
 function SessionGate({ colors }) {
   const router = useRouter();
   const { setUser } = useContext(AuthContext);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [splashFinished, setSplashFinished] = useState(false);
 
   //===== (Session Check Effect) ======
   useEffect(() => {
@@ -72,15 +77,18 @@ function SessionGate({ colors }) {
 
           if (isMounted) {
             router.replace('/(home)/plant');
+            setSessionReady(true);
           }
         } else {
           if (isMounted) {
             router.replace('/(auth)/login');
+            setSessionReady(true);
           }
         }
       } catch {
         if (isMounted) {
           router.replace('/(auth)/login');
+          setSessionReady(true);
         }
       }
     };
@@ -94,19 +102,29 @@ function SessionGate({ colors }) {
 
   //===== (Render) ======
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.screen }}>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: 'fade',
-          contentStyle: { backgroundColor: colors.screen },
-        }}
-      >
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(main)" />
-        <Stack.Screen name="(home)" />
-        <Stack.Screen name="plant/[id]" />
-      </Stack>
-    </SafeAreaView>
+    <View style={{ flex: 1, backgroundColor: colors.screen }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.screen }}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation: 'fade',
+            contentStyle: { backgroundColor: colors.screen },
+          }}
+        >
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(main)" />
+          <Stack.Screen name="(home)" />
+          <Stack.Screen name="plant/[id]" />
+        </Stack>
+      </SafeAreaView>
+
+      {!splashFinished && (
+        <AnimatedSplashScreen
+          isReady={sessionReady}
+          onFinish={() => setSplashFinished(true)}
+        />
+      )}
+    </View>
   );
 }
+

@@ -43,11 +43,17 @@ export const getDefaultVisiblePowerSeries = () =>
 
 //===== (buildLowerPowerFlowData) ======
 export function buildLowerPowerFlowData(sourceData = {}) {
-  const pvGenerateKwh = Number(sourceData.pvGenerateKwh || 0);
+  const rawTotal = Number(sourceData.totalProductionKwh || sourceData.pvGenerateKwh || 0);
   const chargeKwh = Number(sourceData.chargeKwh || 0);
   const exportKwh = Number(sourceData.exportKwh || 0);
-  const totalProductionKwh = pvGenerateKwh + chargeKwh + exportKwh;
-  const hasTotal = totalProductionKwh !== 0;
+  const totalProductionKwh = Number.isFinite(rawTotal) && rawTotal > 0 ? rawTotal : 0;
+  const pvGenerateKwh = totalProductionKwh;
+  const hasTotal = totalProductionKwh > 0;
+
+  const chargePercent = hasTotal ? Math.min(100, Math.round((chargeKwh / totalProductionKwh) * 100)) : 0;
+  const exportPercent = hasTotal ? Math.min(100, Math.round((exportKwh / totalProductionKwh) * 100)) : 0;
+  const directPvPercent = hasTotal ? Math.max(0, 100 - chargePercent - exportPercent) : 0;
+  const pvGeneratePercent = hasTotal ? (directPvPercent > 0 ? directPvPercent : 100) : 0;
 
   return {
     sourceRoute: LOWER_POWER_FLOW_SOURCE_ROUTE,
@@ -58,11 +64,9 @@ export function buildLowerPowerFlowData(sourceData = {}) {
       totalProductionKwh,
     },
     productionFlowPercent: {
-      pvGeneratePercent: hasTotal
-        ? (pvGenerateKwh / totalProductionKwh) * 100
-        : 0,
-      chargePercent: hasTotal ? (chargeKwh / totalProductionKwh) * 100 : 0,
-      exportPercent: hasTotal ? (exportKwh / totalProductionKwh) * 100 : 0,
+      pvGeneratePercent,
+      chargePercent,
+      exportPercent,
     },
   };
 }
@@ -76,30 +80,41 @@ export function getSeriesTotalValue(series) {
 }
 
 //===== (buildProductionPowerFlowData) ======
-export function buildProductionPowerFlowData(plantData, useDemoData) {
-  if (plantData?.isDeviceOnline === false) {
+export function buildProductionPowerFlowData(plantData) {
+  if (plantData?.isDeviceOnline === false && !plantData?.productionFlow && !plantData?.energySummary) {
     return buildLowerPowerFlowData();
   }
 
-  if (useDemoData) {
-    return buildLowerPowerFlowData(LOWER_POWER_FLOW_DUMMY_DATA);
+  // 1. If authentic productionFlow is already populated, prioritize it directly
+  if (plantData?.productionFlow) {
+    return buildLowerPowerFlowData(plantData.productionFlow);
   }
 
-  const chartSeries = plantData?.chartSeries || {};
-  const pvGenerateKwh =
-    getSeriesTotalValue(chartSeries.pvGenerate) ||
-    Math.abs(Number(plantData?.pvGenerate ?? plantData?.load ?? 0));
-  const chargeKwh =
-    getSeriesTotalValue(chartSeries.charge) ||
-    Math.max(0, Number(plantData?.battery || 0));
-  const exportKwh =
-    getSeriesTotalValue(chartSeries.export) ||
-    Math.max(0, -Number(plantData?.grid || 0));
+  // 2. If authentic energySummary is available from Deye telemetry, compute exact values
+  const energySummary = plantData?.energySummary || {};
+  if (
+    energySummary.productionTodayKwh !== undefined ||
+    energySummary.batteryChargeKwh !== undefined ||
+    energySummary.exportKwh !== undefined
+  ) {
+    const totalProd = Number(energySummary.productionTodayKwh ?? plantData?.dailyProduction ?? 0);
+    const chargeKwh = Number(energySummary.batteryChargeKwh ?? 0);
+    const exportKwh = Number(energySummary.exportKwh ?? 0);
+    return buildLowerPowerFlowData({
+      pvGenerateKwh: totalProd,
+      chargeKwh,
+      exportKwh,
+      totalProductionKwh: totalProd,
+    });
+  }
 
+  // 3. Fallback using plant dailyProduction
+  const dailyProd = Number(plantData?.dailyProduction ?? plantData?.productionToday ?? 0);
   return buildLowerPowerFlowData({
-    pvGenerateKwh,
-    chargeKwh,
-    exportKwh,
+    pvGenerateKwh: dailyProd,
+    chargeKwh: 0,
+    exportKwh: 0,
+    totalProductionKwh: dailyProd,
   });
 }
 
