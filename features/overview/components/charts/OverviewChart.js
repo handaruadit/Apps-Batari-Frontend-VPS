@@ -8,6 +8,7 @@ import { shareDailyChartCsv } from "../../utils/csvExport";
 import {
   getSelectedDateText,
   hasChartData,
+  hasNonZeroChartData,
   normalizeDayPowerSeries,
 } from "../../utils/chartPresentation";
 import ChartEmptyState from "./ChartEmptyState";
@@ -38,8 +39,8 @@ export default function OverviewChart({
   const [isSavingCsv, setIsSavingCsv] = useState(false);
   const aggregateKeys = ENERGY_SERIES_CONFIG.map((item) => item.key);
   const hasData = period === "day"
-    ? hasChartData(normalizeDayPowerSeries(series))
-    : hasChartData(series, aggregateKeys);
+    ? hasNonZeroChartData(normalizeDayPowerSeries(series))
+    : hasNonZeroChartData(series, aggregateKeys);
 
   //========== EVENT HANDLERS ==========
   const handleSaveCsv = async () => {

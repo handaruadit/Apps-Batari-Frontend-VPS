@@ -472,11 +472,12 @@ export default function OverviewScreen() {
 
     fetchOverviewData();
 
+    // 30s polling cycle aligns with Deye OpenAPI best practices and Web BySense
     const interval = setInterval(() => {
       if (isMounted) {
         fetchOverviewData();
       }
-    }, 5000);
+    }, 30000);
 
     return () => {
       isMounted = false;

@@ -269,6 +269,17 @@ export function hasChartData(series, keys = DAY_SERIES_CONFIG.map((item) => item
   return keys.some((key) => Array.isArray(series?.[key]) && series[key].length);
 }
 
+
+export function hasNonZeroChartData(series, keys = DAY_SERIES_CONFIG.map((item) => item.key)) {
+  return keys.some((key) =>
+    Array.isArray(series?.[key]) &&
+    series[key].some((record) => {
+      const value = typeof record === "object" ? getApiNumber(record) : Number(record);
+      return Number.isFinite(value) && value !== 0;
+    }),
+  );
+}
+
 export function getLastChartTimestamp(series) {
   const timestamps = DAY_SERIES_CONFIG.flatMap((item) =>
     normalizeSeriesRows(series?.[item.key])

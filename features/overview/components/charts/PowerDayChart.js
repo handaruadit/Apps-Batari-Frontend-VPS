@@ -20,6 +20,7 @@ import {
   findNearestDataPoint,
   findNearestTimestamp,
   getDayTimeRange,
+  hasNonZeroChartData,
   normalizeDayPowerSeries,
 } from "../../utils/chartPresentation";
 import { calculateYAxisRange } from "../../utils/chartScale";
@@ -155,13 +156,17 @@ export default function PowerDayChart({
             })),
         }))
       : [];
+  // Check if any series has real telemetry data (non-empty data points)
+  const hasAnyRealData = hasNonZeroChartData(normalizedData);
   const paths = activeSeries.map((item) => {
     let rawPoints = (normalizedData[item.key] || []).filter(
       (point) => point.timestamp >= startTimestamp && point.timestamp <= maxTimestamp,
     );
 
-    // Adaptive zero line for PV if no data points today or offline station
-    if (rawPoints.length === 0 && item.key === "production") {
+    // Adaptive zero line for PV if no data points today — but only when
+    // the station has real telemetry on at least one other series.
+    // Stations with zero data across all series should show the empty state.
+    if (rawPoints.length === 0 && item.key === "production" && hasAnyRealData) {
       const nowTs = Math.min(now.getTime(), endTimestamp);
       if (nowTs > startTimestamp) {
         rawPoints = [

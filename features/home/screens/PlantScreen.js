@@ -217,6 +217,10 @@ export default function PlantScreen() {
         return;
       }
 
+      if (String(error?.message || "").includes("Too many requests")) {
+        return;
+      }
+
       Alert.alert(
         "Error",
         error.message || t("networkOrServerError"),

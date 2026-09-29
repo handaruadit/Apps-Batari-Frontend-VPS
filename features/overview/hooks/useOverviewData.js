@@ -1,4 +1,4 @@
-﻿//===== (Imports) ======
+//===== (Imports) ======
 import { clearAuth, getToken, isTokenValid } from '@/auth/token';
 import { BASE_URL } from '@/config/api';
 import { fetchPlantDevices } from '@/services/plantService';
@@ -180,31 +180,35 @@ export function useOverviewData({
         let latestPlantDevices = plantDevicesRef.current;
 
         try {
-          const deviceResult = await fetchPlantDevices(resolvedPlantId);
-          if (String(activePlantIdRef.current) !== String(requestPlantId)) {
-            return;
-          }
-          latestPlantDevices = normalizeDeviceList(deviceResult?.devices);
-          plantDevicesRef.current = latestPlantDevices;
-          setPlantDevices((currentDevices) =>
-            areDeviceListsEqual(currentDevices, latestPlantDevices)
-              ? currentDevices
-              : latestPlantDevices,
-          );
+          if (showLoading || latestPlantDevices.length === 0) {
+            const deviceResult = await fetchPlantDevices(resolvedPlantId);
+            if (String(activePlantIdRef.current) !== String(requestPlantId)) {
+              return;
+            }
+            latestPlantDevices = normalizeDeviceList(deviceResult?.devices);
+            plantDevicesRef.current = latestPlantDevices;
+            setPlantDevices((currentDevices) =>
+              areDeviceListsEqual(currentDevices, latestPlantDevices)
+                ? currentDevices
+                : latestPlantDevices,
+            );
 
-          if (
-            selectedDataSource !== "plant" &&
-            !latestPlantDevices.some(
-              (device) => String(device.dataSourceId) === selectedDataSource,
-            )
-          ) {
-            setSelectedDataSource("plant");
+            if (
+              selectedDataSource !== "plant" &&
+              !latestPlantDevices.some(
+                (device) => String(device.dataSourceId) === selectedDataSource,
+              )
+            ) {
+              setSelectedDataSource("plant");
+            }
           }
         } catch (error) {
-          console.warn(
-            "Failed to load plant devices:",
-            error?.message || error,
-          );
+          if (!String(error?.message || "").includes("Too many requests")) {
+            console.warn(
+              "Failed to load plant devices:",
+              error?.message || error,
+            );
+          }
         }
 
         const sourceDevices = selectedSourceDeviceId
@@ -220,9 +224,13 @@ export function useOverviewData({
             selectedSourceDeviceId,
           ),
         );
+        const isCurrentSelectedDevice =
+          Boolean(selectedDevice) &&
+          (String(selectedDevice.id) === String(resolvedPlantId) ||
+            String(selectedDevice.plantsId) === String(resolvedPlantId));
+
         const targetChartPlantId =
-          selectedDevice?.deye_station_id ||
-          selectedDevice?.plantsId ||
+          (isCurrentSelectedDevice && selectedDevice?.deye_station_id) ||
           resolvedPlantId;
 
         // For plant or Deye Station gateway, query station history (deviceId = null).
@@ -292,14 +300,13 @@ export function useOverviewData({
           : [];
         const plantInfo =
           plants.find((item) => String(item.id) === String(resolvedPlantId)) ??
-          selectedDevice ??
+          (isCurrentSelectedDevice ? selectedDevice : null) ??
           {};
         // Resolve target station ID for authentic Deye Cloud telemetry
         const targetStationId =
           plantInfo.deye_station_id ||
-          selectedDevice?.deye_station_id ||
-          plantInfo.plantsId ||
-          resolvedPlantId;
+          (isCurrentSelectedDevice ? selectedDevice?.deye_station_id : null) ||
+          (Number(resolvedPlantId) >= 100000 ? resolvedPlantId : null);
 
         if (targetStationId) {
           try {
@@ -398,14 +405,20 @@ export function useOverviewData({
           googleWeather = null;
         }
 
-        const chartRequestSucceeded = chartResults.some(
-          (item) => item?.ok && item?.json?.data != null,
+        const isPlantEmptyDevice = chartResults.some(
+          (item) =>
+            item?.status === 404 ||
+            String(item?.error || "").includes("No devices found"),
         );
-        const chartSeries = chartRequestSucceeded
-          ? activeSegment === "lifetime"
-            ? buildYearRangeChartSeries(chartResults, chartYearRange)
-            : mergeChartSeries(normalizeChartSeries(chartResult?.json?.data))
-          : createEmptyChartSeries();
+        const chartRequestSucceeded =
+          chartResults.some((item) => item?.ok && item?.json?.data != null) ||
+          isPlantEmptyDevice;
+        const chartSeries =
+          chartRequestSucceeded && !isPlantEmptyDevice
+            ? activeSegment === "lifetime"
+              ? buildYearRangeChartSeries(chartResults, chartYearRange)
+              : mergeChartSeries(normalizeChartSeries(chartResult?.json?.data))
+            : createEmptyChartSeries();
         setChartRequestState({
           key: chartSelectionKey,
           status: chartRequestSucceeded ? "ready" : "error",

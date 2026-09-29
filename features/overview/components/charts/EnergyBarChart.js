@@ -1,6 +1,6 @@
 //========== IMPORTS ==========
 import { useAppSettings } from "@/context/AppSettingsContext";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PanResponder, ScrollView, Text, View } from "react-native";
 import Svg, { Line, Rect, Text as SvgText } from "react-native-svg";
 import { ENERGY_SERIES_CONFIG } from "../../constants/overviewConstants";
@@ -98,6 +98,7 @@ export default function EnergyBarChart({
   );
   const chartRange = calculateYAxisRange(visibleValues);
   const [selectedIndex, setSelectedIndex] = useState(null);
+  const scrollOffsetRef = useRef(0);
 
   useEffect(() => {
     onTooltipChange?.(selectedIndex !== null);
@@ -119,11 +120,30 @@ export default function EnergyBarChart({
   const selectedMarkerX = selectedIndex === null
     ? null
     : pad.left + (selectedIndex + 0.5) * slotWidth;
-  const tooltipLeft = selectedMarkerX === null
-    ? 0
-    : selectedMarkerX > plotWidth / 2
-      ? Math.max(2, selectedMarkerX - TOOLTIP_WIDTH - 10)
-      : Math.min(plotWidth - TOOLTIP_WIDTH - 2, selectedMarkerX + 10);
+  // Position tooltip safely within the visible viewport so it never clips off-screen
+  const tooltipLeft = (() => {
+    if (selectedMarkerX === null) return 0;
+
+    const currentScrollOffset = needsHorizontalScroll ? (scrollOffsetRef.current || 0) : 0;
+    const visibleX = selectedMarkerX - currentScrollOffset;
+
+    // A tooltip on the right needs (10 + TOOLTIP_WIDTH) pixels of space.
+    // If placing it on the right would exceed the visible viewport (chartWidth - 8),
+    // OR if visibleX is past the middle of the chart, flip to the left.
+    const fitsOnRight = (visibleX + 10 + TOOLTIP_WIDTH) <= (chartWidth - 8);
+    const preferLeft = visibleX > (chartWidth / 2);
+    const flipToLeft = !fitsOnRight || preferLeft;
+
+    if (flipToLeft) {
+      const leftPos = selectedMarkerX - TOOLTIP_WIDTH - 10;
+      const minLeft = currentScrollOffset + 4;
+      return Math.max(minLeft, leftPos);
+    }
+
+    const rightPos = selectedMarkerX + 10;
+    const maxLeft = currentScrollOffset + chartWidth - TOOLTIP_WIDTH - 4;
+    return Math.min(maxLeft, rightPos);
+  })();
   const tickStep =
     segment === "month" ? (innerWidth < 280 ? 5 : 3) : segment === "year" ? 2 : 1;
   const visibleLabelIndexes = items
@@ -303,6 +323,10 @@ export default function EnergyBarChart({
           horizontal
           showsHorizontalScrollIndicator={false}
           style={{ width: chartWidth }}
+          onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.x; }}
+          onScrollEndDrag={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.x; }}
+          onMomentumScrollEnd={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.x; }}
+          scrollEventThrottle={16}
         >
           {chartCanvas}
         </ScrollView>
