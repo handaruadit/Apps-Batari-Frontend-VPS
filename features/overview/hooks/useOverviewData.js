@@ -279,9 +279,18 @@ export function useOverviewData({
           date: chartDate,
         });
 
-        const [plantResult, chartResult, ...latestResults] = await Promise.all([
+        // Pre-resolve target station ID to parallelize with plant & chart queries (zero waterfall)
+        const preTargetStationId =
+          (isCurrentSelectedDevice ? selectedDevice?.deye_station_id : null) ||
+          selectedDevice?.deye_station_id ||
+          (Number(resolvedPlantId) >= 100000 ? resolvedPlantId : null);
+
+        const [plantResult, chartResult, parallelStationRes, ...latestResults] = await Promise.all([
           requestJson(`${BASE_URL}/api/plant/`, headers),
           ...chartEndpoints.map((endpoint) => requestJson(endpoint, headers)),
+          preTargetStationId
+            ? requestJson(`${BASE_URL}/api/data/stations/${preTargetStationId}`, headers)
+            : Promise.resolve(null),
           ...latestRequests.map((item) => requestJson(item.endpoint, headers)),
         ]);
         if (String(activePlantIdRef.current) !== String(requestPlantId)) {
@@ -309,16 +318,26 @@ export function useOverviewData({
           (Number(resolvedPlantId) >= 100000 ? resolvedPlantId : null);
 
         if (targetStationId) {
-          try {
-            const stationRes = await requestJson(
-              `${BASE_URL}/api/data/stations/${targetStationId}`,
-              headers,
-            );
-            if (stationRes?.ok && (stationRes?.json?.data || stationRes?.json)) {
-              stationDetail = stationRes.json?.data || stationRes.json;
+          // If already pre-fetched in parallel, reuse instantly without waterfall delay
+          if (
+            preTargetStationId &&
+            String(preTargetStationId) === String(targetStationId) &&
+            parallelStationRes?.ok &&
+            (parallelStationRes?.json?.data || parallelStationRes?.json)
+          ) {
+            stationDetail = parallelStationRes.json?.data || parallelStationRes.json;
+          } else {
+            try {
+              const stationRes = await requestJson(
+                `${BASE_URL}/api/data/stations/${targetStationId}`,
+                headers,
+              );
+              if (stationRes?.ok && (stationRes?.json?.data || stationRes?.json)) {
+                stationDetail = stationRes.json?.data || stationRes.json;
+              }
+            } catch (_stErr) {
+              stationDetail = null;
             }
-          } catch (_stErr) {
-            stationDetail = null;
           }
         }
 
