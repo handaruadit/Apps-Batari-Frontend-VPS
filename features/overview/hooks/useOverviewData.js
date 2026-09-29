@@ -578,64 +578,68 @@ export function useOverviewData({
           }
         } else if (selectedDev) {
           // Specific hardware inverter telemetry from Deye Cloud
-          const devPower = Number(selectedDev.power || 0);
-          const devGrid = Number(selectedDev.gridPower || 0);
-          const devBattery = Number(selectedDev.batteryPower || 0);
-          const devLoad = Number(
-            selectedDev.consumptionPower ||
-              (devPower > 0 ? devPower * 0.75 : 0),
+          const devPower = Number(Number(selectedDev.power || 0).toFixed(2));
+          const devBattery = Number(Number(selectedDev.batteryPower || 0).toFixed(2));
+          // Load & Grid represent the actual plant/building load & grid interaction being served
+          const stationLoad = Number(
+            Number(
+              stationDetail?.loadPower ??
+                stationDetail?.load ??
+                stationDetail?.upsLoad ??
+                selectedDev.consumptionPower ??
+                0,
+            ).toFixed(2),
+          );
+          const stationGrid = Number(
+            Number(
+              stationDetail?.gridPower ??
+                stationDetail?.grid ??
+                selectedDev.gridPower ??
+                0,
+            ).toFixed(2),
           );
 
           displayPowerValues = {
             production: devPower,
             pv: devPower,
-            grid: devGrid,
+            grid: stationGrid,
             battery: devBattery,
-            load: devLoad,
-            upsLoad: devLoad,
+            load: stationLoad,
+            upsLoad: stationLoad,
           };
 
-          totalProdKwh = Number((selectedDev.dailyEnergy || 0).toFixed(2));
-          const devRawCons =
-            selectedDev.dailyConsumption ||
-            (selectedDev.consumptionPower
-              ? selectedDev.consumptionPower * 3.5
-              : 0);
+          totalProdKwh = Number(Number(selectedDev.dailyEnergy || 0).toFixed(2));
+          const stationEnergySummary = stationDetail?.energySummary || {};
           const devConsKwh = Number(
-            (devRawCons > 0
-              ? devRawCons
-              : totalProdKwh > 0
-                ? totalProdKwh * 1.25
-                : 0
+            Number(
+              stationEnergySummary.consumptionTodayKwh ??
+                stationDetail?.consumptionTodayKwh ??
+                0,
+            ).toFixed(2),
+          );
+          const devGridKwh = Number(
+            Number(
+              stationEnergySummary.gridKwh ??
+                stationDetail?.gridKwh ??
+                0,
             ).toFixed(2),
           );
           const devChargeKwh = Number(
             (
               selectedDev.dailyChargingEnergy ||
-              (selectedDev.batteryPower && selectedDev.batteryPower < 0
-                ? Math.abs(selectedDev.batteryPower) * 2.2
-                : 0) ||
+              (devBattery < 0 ? Math.abs(devBattery) * 2.2 : 0) ||
               0
             ).toFixed(2),
           );
           const devExportKwh = Number(
             (
               selectedDev.dailyGridFeedIn ||
-              (selectedDev.gridPower && selectedDev.gridPower < 0
-                ? Math.abs(selectedDev.gridPower) * 1.5
-                : 0) ||
+              (stationGrid < 0 ? Math.abs(stationGrid) * 0.5 : 0) ||
               0
             ).toFixed(2),
           );
           const devPvGenKwh = Number(
             Math.max(0, totalProdKwh - devChargeKwh - devExportKwh).toFixed(2),
-          );
-          const devGridKwh = Number(
-            (
-              (selectedDev.gridPower || 0) > 0
-                ? selectedDev.gridPower * 2.5
-                : Math.max(0, devConsKwh - devPvGenKwh)
-            ).toFixed(2),
           );
           const devPvConsKwh = Number(
             Math.max(0, devConsKwh - devGridKwh).toFixed(2),
@@ -643,9 +647,7 @@ export function useOverviewData({
           const devBattDischargeKwh = Number(
             (
               selectedDev.dailyDischargingEnergy ||
-              (selectedDev.batteryPower && selectedDev.batteryPower > 0
-                ? selectedDev.batteryPower * 1.5
-                : 0) ||
+              (devBattery > 0 ? devBattery * 1.5 : 0) ||
               0
             ).toFixed(2),
           );

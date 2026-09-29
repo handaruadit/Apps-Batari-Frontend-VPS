@@ -33,10 +33,14 @@ export function formatCompactNumber(value) {
   const number = Number(value);
 
   if (!Number.isFinite(number)) {
-    return "0";
+    return "0.00";
   }
 
-  return String(number);
+  if (Math.abs(number) < 0.005) {
+    return "0.00";
+  }
+
+  return number.toFixed(2);
 }
 
 //===== (formatKwValue) ======
