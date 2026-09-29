@@ -31,32 +31,34 @@ export default function AuthFormLayout({
 }) {
   const content = (
     <View style={scrollable ? styles.screenScrollable : styles.screen}>
-      {/* Brand Block with transparent box */}
-      <View style={styles.brandBlock}>
-        {showLogo ? (
-          <Image
-            source={require("@/assets/images/batari-energy-logo.webp")}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        ) : null}
-
-        <Text style={styles.title}>{title}</Text>
-        {subtitle ? (
-          <Text
-            style={[
-              styles.subtitle,
-              subtitleLineHeight ? { lineHeight: subtitleLineHeight } : undefined,
-            ]}
-          >
-            {subtitle}
-          </Text>
-        ) : null}
-      </View>
-
-      {/* Form Section with Rounded Card */}
+      {/* Form Section with Unified Rounded Card */}
       <View style={styles.formSection}>
-        <View style={styles.cardSurface}>{children}</View>
+        <View style={styles.cardSurface}>
+          {/* Header Block inside Card */}
+          <View style={styles.headerBlock}>
+            {showLogo ? (
+              <Image
+                source={require("@/assets/images/batari-energy-logo.webp")}
+                style={styles.logo}
+                resizeMode="contain"
+              />
+            ) : null}
+
+            <Text style={styles.title}>{title}</Text>
+            {subtitle ? (
+              <Text
+                style={[
+                  styles.subtitle,
+                  subtitleLineHeight ? { lineHeight: subtitleLineHeight } : undefined,
+                ]}
+              >
+                {subtitle}
+              </Text>
+            ) : null}
+          </View>
+
+          {children}
+        </View>
       </View>
 
       {/* Footer Tagline */}
@@ -178,50 +180,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.20)",
   },
-  brandBlock: {
+  headerBlock: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.35)",
-    borderRadius: 18,
-    paddingVertical: 14,
-    paddingHorizontal: 22,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.28)",
-    alignSelf: "center",
-    maxWidth: "94%",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 4,
+    marginBottom: 20,
   },
   logo: {
-    width: 265,
-    height: 101,
-    marginBottom: 4,
+    width: 220,
+    height: 84,
+    marginBottom: 8,
   },
   title: {
-    color: "#FFFFFF",
+    color: "#0F172A",
     fontFamily: AUTH_FONT,
     fontSize: 22,
     fontWeight: "700",
     textAlign: "center",
     letterSpacing: -0.3,
-    textShadowColor: "rgba(0, 0, 0, 0.45)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   subtitle: {
-    color: "rgba(255, 255, 255, 0.95)",
+    color: "#64748B",
     fontFamily: AUTH_FONT,
     fontSize: 13,
-    marginTop: 3,
+    marginTop: 4,
     textAlign: "center",
-    paddingHorizontal: 10,
-    textShadowColor: "rgba(0, 0, 0, 0.35)",
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    paddingHorizontal: 8,
+    lineHeight: 18,
   },
   formSection: {
     width: "100%",
@@ -231,23 +215,23 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 430,
     alignSelf: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor: "#FFFFFF",
     borderRadius: 24,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.12)",
+    paddingHorizontal: 22,
+    paddingTop: 24,
+    paddingBottom: 22,
     shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 8,
   },
   footerTagline: {
-    color: "rgba(255, 255, 255, 0.45)",
+    color: "rgba(255, 255, 255, 0.70)",
     fontFamily: AUTH_FONT,
     fontSize: 12,
     textAlign: "center",
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 20,
   },
   pressableWrapper: {

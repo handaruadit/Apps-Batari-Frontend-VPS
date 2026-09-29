@@ -29,6 +29,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StatusBar,
   Text,
   TextInput,
@@ -322,37 +323,42 @@ const LoginScreen = () => {
               style={styles.container}
               behavior={Platform.OS === "ios" ? "padding" : "height"}
             >
-              <Pressable
-                style={styles.screen}
-                onPress={() => {
-                  Keyboard.dismiss();
-                  setShowEmailOptions(false);
-                }}
+              <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
               >
-                <Animated.View
-                  style={{
-                    width: "100%",
-                    alignItems: "center",
-                    transform: [{ translateY: exitTranslateY }],
-                    opacity: exitOpacity,
+                <Pressable
+                  style={styles.pressableWrapper}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setShowEmailOptions(false);
                   }}
                 >
-                  {/* Brand Block with transparent box */}
-                  <View style={styles.brandBlock}>
-                  <Image
-                    source={require("@/assets/images/batari-energy-logo.webp")}
-                    style={styles.logoImage}
-                    resizeMode="contain"
-                  />
-                  <Text style={styles.welcome}>Welcome Back</Text>
-                  <Text style={styles.subtitle}>
-                    Sign in to your Batari Energy account
-                  </Text>
-                </View>
-
-                {/* Form Section with Rounded Card */}
-                <Animated.View style={[styles.formSection, animatedFormStyle]}>
-                  <View style={styles.formCard}>
+                  <Animated.View
+                    style={{
+                      width: "100%",
+                      alignItems: "center",
+                      transform: [{ translateY: exitTranslateY }],
+                      opacity: exitOpacity,
+                    }}
+                  >
+                    {/* Form Section with Unified Rounded Card */}
+                    <Animated.View style={[styles.formSection, animatedFormStyle]}>
+                      <View style={styles.formCard}>
+                        {/* Header Block inside Card */}
+                        <View style={styles.headerBlock}>
+                          <Image
+                            source={require("@/assets/images/batari-energy-logo.webp")}
+                            style={styles.logoImage}
+                            resizeMode="contain"
+                          />
+                          <Text style={styles.welcome}>Welcome Back</Text>
+                          <Text style={styles.subtitle}>
+                            Sign in to your Batari Energy account
+                          </Text>
+                        </View>
                     {/* Email Address */}
                     <Text style={styles.label}>Email Address</Text>
                     <Pressable onPress={(e) => e.stopPropagation()}>
@@ -566,12 +572,13 @@ const LoginScreen = () => {
                   </View>
                 </Animated.View>
 
-                {/* Footer Tagline */}
-                <Text style={styles.footerTagline}>
-                  Igniting Innovation, Empowering The Nation
-                </Text>
-                </Animated.View>
-              </Pressable>
+                    {/* Footer Tagline */}
+                    <Text style={styles.footerTagline}>
+                      Igniting Innovation, Empowering The Nation
+                    </Text>
+                  </Animated.View>
+                </Pressable>
+              </ScrollView>
             </KeyboardAvoidingView>
           </SafeAreaView>
         </ImageBackground>
