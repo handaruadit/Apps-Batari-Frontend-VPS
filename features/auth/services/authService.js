@@ -1,5 +1,5 @@
 //===== (Imports) ======
-import { BASE_URL } from "@/config/api";
+import { BASE_URL, FALLBACK_URL } from "@/config/api";
 import { parseJsonSafe } from "@/features/auth/utils/json";
 
 //===== (Constants) ======
@@ -20,30 +20,70 @@ export const AUTH_ENDPOINTS = {
 
 //===== (postJson) ======
 async function postJson(endpoint, payload) {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: JSON_HEADERS,
-    body: JSON.stringify(payload),
-  });
-  const data = await response.json();
-
-  return { response, data };
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    return { response, data };
+  } catch (err) {
+    if (FALLBACK_URL && endpoint.startsWith(BASE_URL) && BASE_URL !== FALLBACK_URL) {
+      const fallbackEndpoint = endpoint.replace(BASE_URL, FALLBACK_URL);
+      try {
+        const response = await fetch(fallbackEndpoint, {
+          method: "POST",
+          headers: JSON_HEADERS,
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        return { response, data };
+      } catch {
+        throw err;
+      }
+    }
+    throw err;
+  }
 }
 
 //===== (postJsonText) ======
 async function postJsonText(endpoint, payload) {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: JSON_HEADERS,
-    body: JSON.stringify(payload),
-  });
-  const responseText = await response.text();
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify(payload),
+    });
+    const responseText = await response.text();
 
-  return {
-    response,
-    responseText,
-    data: parseJsonSafe(responseText),
-  };
+    return {
+      response,
+      responseText,
+      data: parseJsonSafe(responseText),
+    };
+  } catch (err) {
+    if (FALLBACK_URL && endpoint.startsWith(BASE_URL) && BASE_URL !== FALLBACK_URL) {
+      const fallbackEndpoint = endpoint.replace(BASE_URL, FALLBACK_URL);
+      try {
+        const response = await fetch(fallbackEndpoint, {
+          method: "POST",
+          headers: JSON_HEADERS,
+          body: JSON.stringify(payload),
+        });
+        const responseText = await response.text();
+
+        return {
+          response,
+          responseText,
+          data: parseJsonSafe(responseText),
+        };
+      } catch {
+        throw err;
+      }
+    }
+    throw err;
+  }
 }
 
 //===== (login) ======
@@ -103,6 +143,30 @@ export async function googleLogin({ idToken, user: googleUser }) {
       message: data.message || "Gagal melakukan Google login pada server.",
     };
   } catch (error) {
+    if (FALLBACK_URL && BASE_URL !== FALLBACK_URL) {
+      try {
+        const fallbackEndpoint = `${FALLBACK_URL}/api/auth/google-login`;
+        const response = await fetch(fallbackEndpoint, {
+          method: "POST",
+          headers: JSON_HEADERS,
+          body: JSON.stringify({
+            idToken,
+            email: googleUser?.email,
+            name: googleUser?.name,
+            photo: googleUser?.photo,
+            user: googleUser,
+          }),
+        });
+        const data = await response.json();
+        if (response.ok && (data.token || data.tokens?.accessToken)) {
+          return {
+            success: true,
+            token: data.tokens?.accessToken || data.token,
+            user: data.user,
+          };
+        }
+      } catch {}
+    }
     return {
       success: false,
       message: error.message || "Gagal terhubung ke server backend.",

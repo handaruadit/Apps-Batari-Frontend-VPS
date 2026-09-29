@@ -1,5 +1,6 @@
 //===== (Imports) ======
 import { getToken } from '@/auth/token';
+import { BASE_URL, FALLBACK_URL } from '@/config/api';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildChartEndpoint } from '../utils/chartData';
 import {
@@ -121,14 +122,31 @@ export function useDayComparison({
           comparisonDeviceId,
         );
 
-        const response = await fetch(endpoint, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        let response;
+        try {
+          response = await fetch(endpoint, {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          });
+        } catch (fetchErr) {
+          if (FALLBACK_URL && endpoint.startsWith(BASE_URL) && BASE_URL !== FALLBACK_URL) {
+            const fallbackEndpoint = endpoint.replace(BASE_URL, FALLBACK_URL);
+            response = await fetch(fallbackEndpoint, {
+              method: "GET",
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+            });
+          } else {
+            throw fetchErr;
+          }
+        }
 
         if (requestId !== activeRequestRef.current) {
           return;

@@ -118,6 +118,8 @@ describe('LoginScreen', () => {
       id: 1,
       email: 'user@example.com',
     });
-    expect(router.replace).toHaveBeenCalledWith('/(home)/plant');
+    await waitFor(() => {
+      expect(router.replace).toHaveBeenCalledWith('/(home)/plant');
+    });
   });
 });

@@ -7,7 +7,8 @@ const DEFAULT_LOCAL_API_PORT = "3001";
 
 const CONFIG = {
   vps: {
-    BASE_URL: "http://89.116.33.75:3001",
+    BASE_URL: "https://bysense.batarienergy.com",
+    FALLBACK_URL: "http://89.116.33.75:3001",
   },
 };
 
@@ -68,6 +69,10 @@ const expoHostBaseUrl =
 
 //===== (API Configuration Exports) ======
 export const BASE_URL = expoHostBaseUrl || envBaseUrl || configuredBaseUrl;
+export const FALLBACK_URL =
+  trimTrailingSlash(process.env.EXPO_PUBLIC_API_FALLBACK_URL) ||
+  CONFIG[selectedEnvName]?.FALLBACK_URL ||
+  "http://89.116.33.75:3001";
 export const API_ENVIRONMENT = expoHostBaseUrl
   ? "expo-host"
   : envBaseUrl

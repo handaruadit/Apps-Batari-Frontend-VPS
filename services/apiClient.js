@@ -1,5 +1,5 @@
 import { clearAuth, getToken, isTokenValid } from "@/auth/token";
-import { BASE_URL } from "@/config/api";
+import { BASE_URL, FALLBACK_URL } from "@/config/api";
 
 //===== (createServiceError) ======
 export function createServiceError(message, code, status, body) {
@@ -82,15 +82,34 @@ export async function apiRequest(
         "Content-Type": "application/json",
       };
 
-  const response = await fetch(`${baseUrl}${path}`, {
-    method,
-    headers: {
-      ...headers,
-      ...customHeaders,
-    },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  });
-  const responseBody = await parseApiResponse(response);
+  const execute = async (targetBaseUrl) => {
+    const response = await fetch(`${targetBaseUrl}${path}`, {
+      method,
+      headers: {
+        ...headers,
+        ...customHeaders,
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    const responseBody = await parseApiResponse(response);
+    return { response, body: responseBody };
+  };
 
-  return { response, body: responseBody };
+  try {
+    return await execute(baseUrl);
+  } catch (primaryError) {
+    const fallback =
+      baseUrl === BASE_URL && FALLBACK_URL && FALLBACK_URL !== BASE_URL
+        ? FALLBACK_URL
+        : null;
+
+    if (fallback) {
+      try {
+        return await execute(fallback);
+      } catch {
+        throw primaryError;
+      }
+    }
+    throw primaryError;
+  }
 }

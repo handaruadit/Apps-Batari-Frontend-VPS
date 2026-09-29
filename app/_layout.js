@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from 'react';
 import { LogBox, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
+import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -32,28 +33,38 @@ LogBox.ignoreLogs([
 
 //===== (Layout) ======
 export default function Layout() {
+  const [fontsLoaded] = useFonts({
+    'Nunito': require('@/assets/fonts/Nunito-Regular.ttf'),
+    'Nunito-Regular': require('@/assets/fonts/Nunito-Regular.ttf'),
+    'Nunito-Medium': require('@/assets/fonts/Nunito-Medium.ttf'),
+    'Nunito-SemiBold': require('@/assets/fonts/Nunito-SemiBold.ttf'),
+    'Nunito-Bold': require('@/assets/fonts/Nunito-Bold.ttf'),
+    'Nunito-ExtraBold': require('@/assets/fonts/Nunito-ExtraBold.ttf'),
+    'Nunito-Black': require('@/assets/fonts/Nunito-Black.ttf'),
+  });
+
   return (
     <AppSettingsProvider>
-      <RootLayoutContent />
+      <RootLayoutContent fontsLoaded={fontsLoaded} />
     </AppSettingsProvider>
   );
 }
 
 //===== (RootLayoutContent) ======
-function RootLayoutContent() {
+function RootLayoutContent({ fontsLoaded }) {
   const { colors } = useAppSettings();
 
   return (
     <AlertProvider>
       <AuthProvider>
-        <SessionGate colors={colors} />
+        <SessionGate colors={colors} fontsLoaded={fontsLoaded} />
       </AuthProvider>
     </AlertProvider>
   );
 }
 
 //===== (SessionGate) ======
-function SessionGate({ colors }) {
+function SessionGate({ colors, fontsLoaded }) {
   const router = useRouter();
   const { setUser } = useContext(AuthContext);
   const [sessionReady, setSessionReady] = useState(false);
@@ -120,7 +131,7 @@ function SessionGate({ colors }) {
 
       {!splashFinished && (
         <AnimatedSplashScreen
-          isReady={sessionReady}
+          isReady={sessionReady && fontsLoaded}
           onFinish={() => setSplashFinished(true)}
         />
       )}

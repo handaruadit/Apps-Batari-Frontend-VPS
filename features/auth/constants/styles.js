@@ -15,8 +15,4 @@ export const AUTH_BORDER_COLOR = '#E2E8F0';
 export const AUTH_BORDER_FOCUS = '#18AEE6';
 export const AUTH_INPUT_BG = '#F8FAFC';
 
-export const AUTH_FONT = Platform.select({
-  android: 'sans-serif',
-  ios: 'System',
-  default: 'System',
-});
+export const AUTH_FONT = 'Nunito';

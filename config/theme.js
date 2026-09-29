@@ -2,11 +2,7 @@
 import { Platform } from "react-native";
 
 //===== (Typography Constants) ======
-export const appFont = Platform.select({
-  android: "sans-serif",
-  ios: "Helvetica Neue",
-  default: "System",
-});
+export const appFont = "Nunito";
 
 //===== (Color Constants) ======
 export const appColors = {

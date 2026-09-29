@@ -1,6 +1,6 @@
 //===== (Imports) ======
 import { clearAuth, getToken, isTokenValid } from '@/auth/token';
-import { BASE_URL } from '@/config/api';
+import { BASE_URL, FALLBACK_URL } from '@/config/api';
 import { fetchPlantDevices } from '@/services/plantService';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -133,12 +133,12 @@ export function useOverviewData({
 
   //===== (requestJson) ======
   const requestJson = useCallback(async (endpoint, headers) => {
-    try {
-      const response = await fetch(endpoint, { method: "GET", headers });
+    const doFetch = async (targetUrl) => {
+      const response = await fetch(targetUrl, { method: "GET", headers });
       const json = await response.json().catch(() => null);
 
       return {
-        endpoint,
+        endpoint: targetUrl,
         ok: response.ok,
         status: response.status,
         json,
@@ -146,7 +146,17 @@ export function useOverviewData({
           ? null
           : pickValue(json?.message, response.statusText, "Request failed"),
       };
+    };
+
+    try {
+      return await doFetch(endpoint);
     } catch (error) {
+      if (FALLBACK_URL && endpoint.startsWith(BASE_URL) && BASE_URL !== FALLBACK_URL) {
+        try {
+          const fallbackEndpoint = endpoint.replace(BASE_URL, FALLBACK_URL);
+          return await doFetch(fallbackEndpoint);
+        } catch {}
+      }
       return {
         endpoint,
         ok: false,
