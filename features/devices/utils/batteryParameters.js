@@ -335,6 +335,20 @@ export function getBatteryParameterRows(device, t) {
     });
   }
 
+  // Ekstraksi langsung properti baterai top-level dari telemetri Deye Cloud
+  if (device?.batteryPower !== undefined && device?.batteryPower !== null) {
+    pushBatteryParameter(rows, seenKeys, "power", Math.abs(Number(device.batteryPower)), t);
+  }
+  if (device?.batteryVoltage !== undefined && device?.batteryVoltage !== null) {
+    pushBatteryParameter(rows, seenKeys, "voltage", Number(device.batteryVoltage), t);
+  }
+  if (device?.batteryCurrent !== undefined && device?.batteryCurrent !== null) {
+    pushBatteryParameter(rows, seenKeys, "current", Math.abs(Number(device.batteryCurrent)), t);
+  }
+  if (device?.batterySoc !== undefined && device?.batterySoc !== null) {
+    pushBatteryParameter(rows, seenKeys, "soc", Number(device.batterySoc), t);
+  }
+
   [
     device?.latestData && !Array.isArray(device.latestData)
       ? device.latestData

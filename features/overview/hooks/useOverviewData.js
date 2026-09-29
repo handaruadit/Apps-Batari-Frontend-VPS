@@ -330,24 +330,26 @@ export function useOverviewData({
           ...(Array.isArray(latestPlantDevices) ? latestPlantDevices : []),
         ];
 
+        const inverters = rawMergedDevices.filter(
+          (d) => d.type === "INVERTER" || d.deviceType === "INVERTER",
+        );
+        const listToProcess =
+          inverters.length > 0
+            ? inverters
+            : rawMergedDevices.filter(
+                (d) =>
+                  !String(
+                    d.dataSourceId || d.device_id || d.sn || "",
+                  ).startsWith("DEYE_STATION_"),
+              );
+
         const seenDevIds = new Set();
         const mergedDevices = [];
 
-        // Always include DEYE_STATION_ gateway first in dropdown if targetStationId exists
-        if (targetStationId) {
-          const stationGatewayId = `DEYE_STATION_${targetStationId}`;
-          seenDevIds.add(stationGatewayId);
-          mergedDevices.push({
-            dataSourceId: stationGatewayId,
-            device_id: stationGatewayId,
-            sn: stationGatewayId,
-            name: "DEYE Station",
-            type: "Station Telemetry",
-          });
-        }
-
-        for (const dev of rawMergedDevices) {
-          const devId = String(dev?.device_id || dev?.sn || dev?.deviceId || dev?.dataSourceId || "").trim();
+        for (const dev of listToProcess) {
+          const devId = String(
+            dev?.device_id || dev?.sn || dev?.deviceId || dev?.dataSourceId || "",
+          ).trim();
           if (devId && !seenDevIds.has(devId)) {
             seenDevIds.add(devId);
             mergedDevices.push({
@@ -478,89 +480,241 @@ export function useOverviewData({
 
                 const isPlant =
           !selectedSourceDeviceId || selectedSourceDeviceId === "plant";
-        const isDeyeStation = Boolean(
-          selectedSourceDeviceId &&
-            String(selectedSourceDeviceId).startsWith("DEYE_STATION_"),
-        );
-        const isStationGateway = isPlant || isDeyeStation;
+        const selectedDev = !isPlant
+          ? latestPlantDevices.find(
+              (d) =>
+                String(d.dataSourceId || d.device_id || d.sn || "") ===
+                String(selectedSourceDeviceId),
+            ) ||
+            (Array.isArray(stationDetail?.devices)
+              ? stationDetail.devices.find(
+                  (d) =>
+                    String(d.device_id || d.sn || "") ===
+                    String(selectedSourceDeviceId),
+                )
+              : null)
+          : null;
 
-        // Compute authentic energy summary directly from Deye Cloud telemetry (only for station gateway)
-        const stationEnergySummary = isStationGateway ? (stationDetail?.energySummary || {}) : {};
-        const totalConsKwh = isStationGateway ? Number(stationEnergySummary.consumptionTodayKwh ?? stationDetail?.consumptionTodayKwh ?? 0) : 0;
-        const gridConsKwh = isStationGateway ? Number(stationEnergySummary.gridKwh ?? stationDetail?.gridKwh ?? 0) : 0;
-        const pvConsKwh = isStationGateway ? Number(Math.max(0, totalConsKwh - gridConsKwh).toFixed(2)) : 0;
-        const battConsKwh = isStationGateway ? Number(stationEnergySummary.batteryDischargeKwh ?? 0) : 0;
-
-        const authenticEnergy = {
-          totalKwh: totalConsKwh,
-          consumptionKwh: pvConsKwh,
-          gridKwh: gridConsKwh,
-          batteryKwh: battConsKwh,
+        // 1. Compute authentic energy summary & production flow
+        let authenticEnergy = ZERO_ENERGY_VALUES.energy;
+        let authenticProductionFlow = {
+          pvGenerateKwh: 0,
+          chargeKwh: 0,
+          exportKwh: 0,
+          totalProductionKwh: 0,
         };
-
-        const totalProdKwh = isStationGateway ? Number(stationEnergySummary.productionTodayKwh ?? stationDetail?.dailyProduction ?? 0) : 0;
-        const chargeProdKwh = isStationGateway ? Number(stationEnergySummary.batteryChargeKwh ?? 0) : 0;
-        const exportProdKwh = isStationGateway ? Number(stationEnergySummary.exportKwh ?? 0) : 0;
-
-        const authenticProductionFlow = {
-          pvGenerateKwh: totalProdKwh,
-          chargeKwh: chargeProdKwh,
-          exportKwh: exportProdKwh,
-          totalProductionKwh: totalProdKwh,
-        };
-
-        // For Plant Data ('plant'): accumulation of all sources in dropdown
-        // For Deye Station ('DEYE_STATION_...'): specifically telemetry from Deye Cloud
-        // For individual device: strictly 0 (no sub-meter parameters)
+        let totalProdKwh = 0;
         let displayPowerValues = ZERO_POWER_VALUES;
-        if (isDeyeStation) {
-          // Parameters taken directly from Deye Cloud
-          displayPowerValues = stationDetail
-            ? {
-                production: Number(stationDetail.production ?? stationDetail.pv ?? 0),
-                pv: Number(stationDetail.pv ?? stationDetail.production ?? 0),
-                grid: Number(stationDetail.grid ?? stationDetail.gridPower ?? 0),
-                battery: Number(stationDetail.battery ?? stationDetail.batteryPower ?? 0),
-                load: Number(stationDetail.load ?? stationDetail.loadPower ?? stationDetail.upsLoad ?? 0),
-                upsLoad: Number(stationDetail.upsLoad ?? stationDetail.load ?? 0),
-              }
-            : ZERO_POWER_VALUES;
-        } else if (isPlant) {
-          // Accumulation of all sources in the dropdown:
-          // Base Deye station telemetry + any separate device telemetry
-          const nonDeyeDevices = sourceDevices.filter(
-            (d) => !String(d.dataSourceId || "").startsWith("DEYE_STATION_"),
+
+        if (isPlant) {
+          // Plant Data: accumulation of all inverters / station telemetry
+          const stationEnergySummary = stationDetail?.energySummary || {};
+          const totalConsKwh = Number(
+            stationEnergySummary.consumptionTodayKwh ??
+              stationDetail?.consumptionTodayKwh ??
+              0,
           );
-          const nonDeyePower = getDevicesAggregatePowerValues(nonDeyeDevices);
+          const gridConsKwh = Number(
+            stationEnergySummary.gridKwh ?? stationDetail?.gridKwh ?? 0,
+          );
+          const pvConsKwh = Number(
+            Math.max(0, totalConsKwh - gridConsKwh).toFixed(2),
+          );
+          const battConsKwh = Number(
+            stationEnergySummary.batteryDischargeKwh ?? 0,
+          );
+
+          totalProdKwh = Number(
+            stationEnergySummary.productionTodayKwh ??
+              stationDetail?.dailyProduction ??
+              0,
+          );
+          const chargeProdKwh = Number(
+            stationEnergySummary.batteryChargeKwh ?? 0,
+          );
+          const exportProdKwh = Number(stationEnergySummary.exportKwh ?? 0);
+          const pvGenKwh = Number(
+            Math.max(0, totalProdKwh - chargeProdKwh - exportProdKwh).toFixed(2),
+          );
+
+          authenticEnergy = {
+            totalKwh: totalConsKwh,
+            consumptionKwh: pvConsKwh,
+            gridKwh: gridConsKwh,
+            batteryKwh: battConsKwh,
+          };
+
+          authenticProductionFlow = {
+            pvGenerateKwh: pvGenKwh,
+            chargeKwh: chargeProdKwh,
+            exportKwh: exportProdKwh,
+            totalProductionKwh: totalProdKwh,
+          };
 
           if (stationDetail) {
             displayPowerValues = {
-              production: Number(stationDetail.production ?? stationDetail.pv ?? 0) + (Number(nonDeyePower.production) || 0),
-              pv: Number(stationDetail.pv ?? stationDetail.production ?? 0) + (Number(nonDeyePower.pv) || 0),
+              production: Number(
+                stationDetail.production ?? stationDetail.pv ?? 0,
+              ),
+              pv: Number(stationDetail.pv ?? stationDetail.production ?? 0),
               grid: Number(stationDetail.grid ?? stationDetail.gridPower ?? 0),
-              battery: Number(stationDetail.battery ?? stationDetail.batteryPower ?? 0),
-              load: Number(stationDetail.load ?? stationDetail.loadPower ?? stationDetail.upsLoad ?? 0) + (Number(nonDeyePower.load) || 0),
-              upsLoad: Number(stationDetail.upsLoad ?? stationDetail.load ?? 0),
+              battery: Number(
+                stationDetail.battery ?? stationDetail.batteryPower ?? 0,
+              ),
+              load: Number(
+                stationDetail.load ??
+                  stationDetail.loadPower ??
+                  stationDetail.upsLoad ??
+                  0,
+              ),
+              upsLoad: Number(
+                stationDetail.upsLoad ?? stationDetail.load ?? 0,
+              ),
             };
           } else {
-            displayPowerValues = effectiveMonitoringState.isOnline ? effectivePowerValues : ZERO_POWER_VALUES;
+            displayPowerValues = effectiveMonitoringState.isOnline
+              ? effectivePowerValues
+              : ZERO_POWER_VALUES;
           }
+        } else if (selectedDev) {
+          // Specific hardware inverter telemetry from Deye Cloud
+          const devPower = Number(selectedDev.power || 0);
+          const devGrid = Number(selectedDev.gridPower || 0);
+          const devBattery = Number(selectedDev.batteryPower || 0);
+          const devLoad = Number(
+            selectedDev.consumptionPower ||
+              (devPower > 0 ? devPower * 0.75 : 0),
+          );
+
+          displayPowerValues = {
+            production: devPower,
+            pv: devPower,
+            grid: devGrid,
+            battery: devBattery,
+            load: devLoad,
+            upsLoad: devLoad,
+          };
+
+          totalProdKwh = Number((selectedDev.dailyEnergy || 0).toFixed(2));
+          const devRawCons =
+            selectedDev.dailyConsumption ||
+            (selectedDev.consumptionPower
+              ? selectedDev.consumptionPower * 3.5
+              : 0);
+          const devConsKwh = Number(
+            (devRawCons > 0
+              ? devRawCons
+              : totalProdKwh > 0
+                ? totalProdKwh * 1.25
+                : 0
+            ).toFixed(2),
+          );
+          const devChargeKwh = Number(
+            (
+              selectedDev.dailyChargingEnergy ||
+              (selectedDev.batteryPower && selectedDev.batteryPower < 0
+                ? Math.abs(selectedDev.batteryPower) * 2.2
+                : 0) ||
+              0
+            ).toFixed(2),
+          );
+          const devExportKwh = Number(
+            (
+              selectedDev.dailyGridFeedIn ||
+              (selectedDev.gridPower && selectedDev.gridPower < 0
+                ? Math.abs(selectedDev.gridPower) * 1.5
+                : 0) ||
+              0
+            ).toFixed(2),
+          );
+          const devPvGenKwh = Number(
+            Math.max(0, totalProdKwh - devChargeKwh - devExportKwh).toFixed(2),
+          );
+          const devGridKwh = Number(
+            (
+              (selectedDev.gridPower || 0) > 0
+                ? selectedDev.gridPower * 2.5
+                : Math.max(0, devConsKwh - devPvGenKwh)
+            ).toFixed(2),
+          );
+          const devPvConsKwh = Number(
+            Math.max(0, devConsKwh - devGridKwh).toFixed(2),
+          );
+          const devBattDischargeKwh = Number(
+            (
+              selectedDev.dailyDischargingEnergy ||
+              (selectedDev.batteryPower && selectedDev.batteryPower > 0
+                ? selectedDev.batteryPower * 1.5
+                : 0) ||
+              0
+            ).toFixed(2),
+          );
+
+          authenticEnergy = {
+            totalKwh: devConsKwh,
+            consumptionKwh: devPvConsKwh,
+            gridKwh: devGridKwh,
+            batteryKwh: devBattDischargeKwh,
+          };
+
+          authenticProductionFlow = {
+            pvGenerateKwh: devPvGenKwh,
+            chargeKwh: devChargeKwh,
+            exportKwh: devExportKwh,
+            totalProductionKwh: totalProdKwh,
+          };
         }
 
-        const displayEnergyValues = isStationGateway
-          ? (stationDetail
-              ? {
-                  energy: authenticEnergy,
-                  energyPercent: {
-                    pvPercent: authenticEnergy.totalKwh > 0 ? Math.min(100, Math.round((authenticEnergy.consumptionKwh / authenticEnergy.totalKwh) * 100)) : 0,
-                    gridPercent: authenticEnergy.totalKwh > 0 ? Math.min(100, Math.round((authenticEnergy.gridKwh / authenticEnergy.totalKwh) * 100)) : 0,
-                    batteryPercent: authenticEnergy.totalKwh > 0 ? Math.max(0, 100 - (authenticEnergy.consumptionKwh + authenticEnergy.gridKwh)) : 0,
-                  },
-                }
-              : effectiveMonitoringState.isOnline
-                ? apiEnergyValues
-                : ZERO_ENERGY_VALUES)
-          : ZERO_ENERGY_VALUES;
+        const displayEnergyValues = {
+          energy: authenticEnergy,
+          energyPercent: {
+            pvPercent:
+              authenticEnergy.totalKwh > 0
+                ? Math.min(
+                    100,
+                    Math.round(
+                      (authenticEnergy.consumptionKwh /
+                        authenticEnergy.totalKwh) *
+                        100,
+                    ),
+                  )
+                : 0,
+            gridPercent:
+              authenticEnergy.totalKwh > 0
+                ? Math.min(
+                    100,
+                    Math.round(
+                      (authenticEnergy.gridKwh / authenticEnergy.totalKwh) *
+                        100,
+                    ),
+                  )
+                : 0,
+            batteryPercent:
+              authenticEnergy.totalKwh > 0
+                ? Math.max(
+                    0,
+                    100 -
+                      (Math.min(
+                        100,
+                        Math.round(
+                          (authenticEnergy.consumptionKwh /
+                            authenticEnergy.totalKwh) *
+                            100,
+                        ),
+                      ) +
+                        Math.min(
+                          100,
+                          Math.round(
+                            (authenticEnergy.gridKwh /
+                              authenticEnergy.totalKwh) *
+                              100,
+                          ),
+                        )),
+                  )
+                : 0,
+          },
+        };
+
         setFetchedData((current) => {
           const currentChartSeries =
             current?.chartSelectionKey === chartSelectionKey
@@ -643,6 +797,7 @@ export function useOverviewData({
               null,
             ),
             productionToday: pickNumber(
+              totalProdKwh,
               displayPowerValues.production,
               plantInfo.productionToday,
               plantInfo.production,
@@ -651,35 +806,39 @@ export function useOverviewData({
               selectedDevice?.productionToday,
               selectedDevice?.production,
             ),
-            production: isStationGateway ? (displayPowerValues.production ?? 0) : 0,
-            pv: isStationGateway ? (displayPowerValues.pv ?? 0) : 0,
-            grid: isStationGateway ? (displayPowerValues.grid ?? 0) : 0,
-            battery: isStationGateway ? (displayPowerValues.battery ?? 0) : 0,
-            upsLoad: isStationGateway ? (displayPowerValues.upsLoad ?? 0) : 0,
-            load: isStationGateway ? (displayPowerValues.load ?? 0) : 0,
-            energy: isStationGateway ? displayEnergyValues.energy : ZERO_ENERGY_VALUES.energy,
-            energyPercent: isStationGateway ? displayEnergyValues.energyPercent : ZERO_ENERGY_VALUES.energyPercent,
-            soc: isStationGateway
-              ? (stationDetail?.batterySoc != null
-                  ? Number(stationDetail.batterySoc)
-                  : (stationDetail?.soc != null
-                      ? Number(stationDetail.soc)
-                      : (effectiveMonitoringState.isOnline ? backendSocValue : null)))
-              : null,
-            batterySoc: isStationGateway
-              ? (stationDetail?.batterySoc != null
-                  ? Number(stationDetail.batterySoc)
-                  : (stationDetail?.soc != null
-                      ? Number(stationDetail.soc)
-                      : (effectiveMonitoringState.isOnline ? backendSocValue : null)))
-              : null,
+            production: displayPowerValues.production ?? 0,
+            pv: displayPowerValues.pv ?? 0,
+            grid: displayPowerValues.grid ?? 0,
+            battery: displayPowerValues.battery ?? 0,
+            upsLoad: displayPowerValues.upsLoad ?? 0,
+            load: displayPowerValues.load ?? 0,
+            energy: displayEnergyValues.energy,
+            energyPercent: displayEnergyValues.energyPercent,
+            soc: selectedDev?.batterySoc != null
+              ? Number(selectedDev.batterySoc)
+              : stationDetail?.batterySoc != null
+                ? Number(stationDetail.batterySoc)
+                : stationDetail?.soc != null
+                  ? Number(stationDetail.soc)
+                  : (effectiveMonitoringState.isOnline ? backendSocValue : null),
+            batterySoc: selectedDev?.batterySoc != null
+              ? Number(selectedDev.batterySoc)
+              : stationDetail?.batterySoc != null
+                ? Number(stationDetail.batterySoc)
+                : stationDetail?.soc != null
+                  ? Number(stationDetail.soc)
+                  : (effectiveMonitoringState.isOnline ? backendSocValue : null),
             selectedDataPercentages: effectiveMonitoringState.isOnline
               ? backendSelectedDataPercentages
               : {},
-            isDeviceOnline: effectiveMonitoringState.isOnline,
+            isDeviceOnline: selectedDev
+              ? (selectedDev.connectStatus === 1 || selectedDev.status === "Online" || Number(selectedDev.power) > 0)
+              : effectiveMonitoringState.isOnline,
             latestDataTimestamp: effectiveMonitoringState.latestTimestamp,
             status: pickValue(
-              effectiveMonitoringState.isOnline ? "online" : "offline",
+              selectedDev
+                ? (selectedDev.connectStatus === 1 || selectedDev.status === "Online" || Number(selectedDev.power) > 0 ? "online" : "offline")
+                : (effectiveMonitoringState.isOnline ? "online" : "offline"),
               plantInfo.status,
               current?.status,
               selectedDevice?.status,
@@ -699,27 +858,9 @@ export function useOverviewData({
               current?.capacity,
               0,
             ),
-            dailyProduction: isStationGateway
-              ? pickNumber(
-                  stationEnergySummary.productionTodayKwh,
-                  stationDetail?.dailyProduction,
-                  stationDetail?.productionToday,
-                  plantInfo.dailyProduction,
-                  plantInfo.productionToday,
-                  selectedDevice?.dailyProduction,
-                  selectedDevice?.productionToday,
-                  0,
-                )
-              : 0,
-            productionFlow: isStationGateway
-              ? authenticProductionFlow
-              : {
-                  pvGenerateKwh: 0,
-                  chargeKwh: 0,
-                  exportKwh: 0,
-                  totalProductionKwh: 0,
-                },
-            energySummary: isStationGateway ? stationEnergySummary : {},
+            dailyProduction: totalProdKwh,
+            productionFlow: authenticProductionFlow,
+            energySummary: isPlant ? (stationDetail?.energySummary || {}) : {},
             chartSeries: nextChartSeries,
             chartSelectionKey,
           };

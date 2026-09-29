@@ -219,8 +219,21 @@ export default function PerangkatScreen() {
           ? result.devices
           : [];
 
+        const inverters = nextDevices.filter(
+          (d) => d.type === "INVERTER" || d.deviceType === "INVERTER",
+        );
+        const displayDevices =
+          inverters.length > 0
+            ? inverters
+            : nextDevices.filter(
+                (d) =>
+                  !String(
+                    d.device_id || d.sn || d.dataSourceId || "",
+                  ).startsWith("DEYE_STATION_"),
+              );
+
         setPlant(nextPlant);
-        setDevices(nextDevices);
+        setDevices(displayDevices);
         setCanUnlinkDevice(
           canCurrentUserUnlinkDevice(nextPlant, selectedDevice),
         );

@@ -168,6 +168,67 @@ export default function DeviceCard({
         </Text>
       </View>
 
+      {/* Inverter Performance Telemetry */}
+      <View
+        style={[
+          styles.parameterSection,
+          themeMode === "light" && {
+            borderTopColor: colors.bubbleBorder,
+          },
+        ]}
+      >
+        <Text style={[styles.parameterTitle, { color: colors.text }]}>
+          {t("inverterParameters") || "Inverter Parameters"}
+        </Text>
+        <View
+          style={[
+            styles.parameterRow,
+            themeMode === "light" && {
+              borderBottomColor: "rgba(8,174,234,0.14)",
+            },
+          ]}
+        >
+          <Text style={[styles.parameterType, { color: colors.text }]}>
+            {t("power") || "Power"}
+          </Text>
+          <Text style={[styles.parameterValue, { color: colors.accent }]}>
+            {Number(item.power != null ? item.power : 0).toFixed(2)} kW
+          </Text>
+        </View>
+        <View
+          style={[
+            styles.parameterRow,
+            themeMode === "light" && {
+              borderBottomColor: "rgba(8,174,234,0.14)",
+            },
+          ]}
+        >
+          <Text style={[styles.parameterType, { color: colors.text }]}>
+            {t("dailyProduction") || "Daily Yield"}
+          </Text>
+          <Text style={[styles.parameterValue, { color: colors.accent }]}>
+            {Number(item.dailyEnergy != null ? item.dailyEnergy : 0).toFixed(2)} kWh
+          </Text>
+        </View>
+        {item.totalEnergy != null && Number(item.totalEnergy) > 0 ? (
+          <View
+            style={[
+              styles.parameterRow,
+              themeMode === "light" && {
+                borderBottomColor: "rgba(8,174,234,0.14)",
+              },
+            ]}
+          >
+            <Text style={[styles.parameterType, { color: colors.text }]}>
+              {t("totalProduction") || "Total Yield"}
+            </Text>
+            <Text style={[styles.parameterValue, { color: colors.accent }]}>
+              {Number(item.totalEnergy).toFixed(2)} kWh
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
       <BatteryParameterList
         device={item}
         t={t}

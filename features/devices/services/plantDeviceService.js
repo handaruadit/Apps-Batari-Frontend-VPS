@@ -58,5 +58,37 @@ export async function fetchPlantDevices(plantId) {
     throwApiError(response, body, "Gagal mengambil data device.");
   }
 
-  return body?.data ?? { plant: null, devices: [] };
+  const plant = body?.data?.plant ?? null;
+  let devices = Array.isArray(body?.data?.devices) ? body.data.devices : [];
+
+  const inverters = devices.filter(
+    (d) => d.type === "INVERTER" || d.deviceType === "INVERTER",
+  );
+
+  // If no physical inverters found in plant_devices, fetch from station telemetry
+  const targetStationId =
+    plant?.deye_station_id ||
+    plant?.deyeStationId ||
+    (Number(plantId) >= 100000 ? plantId : null);
+
+  if (inverters.length === 0 && targetStationId) {
+    try {
+      const { response: stRes, body: stBody } = await apiRequest(
+        `/api/data/stations/${encodeURIComponent(targetStationId)}`,
+      );
+      const stationDevices = stBody?.data?.devices || stBody?.devices;
+      if (stRes.ok && Array.isArray(stationDevices) && stationDevices.length > 0) {
+        const deyeInverters = stationDevices.filter(
+          (d) => d.type === "INVERTER" || d.deviceType === "INVERTER",
+        );
+        if (deyeInverters.length > 0) {
+          devices = deyeInverters;
+        }
+      }
+    } catch (_err) {
+      // Fallback silently to existing devices
+    }
+  }
+
+  return { plant, devices };
 }

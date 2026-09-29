@@ -144,26 +144,44 @@ export default function OverviewScreen() {
   const todayMonth = todayParts.month;
   const todayYear = todayParts.year;
   //===== (Data Source Options) ======
-  const dataSourceOptions = useMemo(
-    () => [
-      { key: "plant", label: t("plantData") },
-      ...normalizeDeviceList(plantDevices).map((device) => ({
-        key: String(device.dataSourceId),
-        label: String(device.dataSourceId),
-      })),
-    ],
-    [plantDevices, t],
-  );
+  const dataSourceOptions = useMemo(() => {
+    const opts = [{ key: "plant", label: t("plantData") || "Plant Data" }];
+    const normDevices = normalizeDeviceList(plantDevices);
+    const inverters = normDevices.filter(
+      (d) => d.type === "INVERTER" || d.deviceType === "INVERTER",
+    );
+    const displayDevices =
+      inverters.length > 0
+        ? inverters
+        : normDevices.filter(
+            (d) =>
+              !String(
+                d.dataSourceId || d.device_id || d.sn || "",
+              ).startsWith("DEYE_STATION_"),
+          );
+
+    displayDevices.forEach((dev, idx) => {
+      const id = String(dev.dataSourceId || dev.device_id || dev.sn || "").trim();
+      if (id && !opts.some((o) => o.key === id)) {
+        const label =
+          dev.name ||
+          (inverters.length > 1
+            ? `${t("inverter") || "Inverter"} ${idx + 1} (${id})`
+            : `${t("inverter") || "Inverter"} (${id})`);
+        opts.push({
+          key: id,
+          label,
+        });
+      }
+    });
+    return opts;
+  }, [plantDevices, t]);
   const selectedDataSourceLabel =
     dataSourceOptions.find((item) => item.key === selectedDataSource)?.label ||
     t("plantData");
   //===== (Plant Presentation Data) ======
   const plantData = useMemo(() => {
     const isDeviceOnline = fetchedData?.isDeviceOnline === true;
-    const isStationGateway =
-      !selectedDataSource ||
-      selectedDataSource === "plant" ||
-      String(selectedDataSource).startsWith("DEYE_STATION_");
 
     return {
       plantName: pickValue(
@@ -171,16 +189,14 @@ export default function OverviewScreen() {
         selectedDevice?.name,
         "No Device Selected",
       ),
-      productionToday: isStationGateway
-        ? pickNumber(
-            fetchedData?.dailyProduction,
-            fetchedData?.productionToday,
-            isDeviceOnline ? fetchedData?.production : 0,
-            selectedDevice?.dailyProduction,
-            selectedDevice?.productionToday,
-            0,
-          )
-        : 0,
+      productionToday: pickNumber(
+        fetchedData?.dailyProduction,
+        fetchedData?.productionToday,
+        isDeviceOnline ? fetchedData?.production : 0,
+        selectedDevice?.dailyProduction,
+        selectedDevice?.productionToday,
+        0,
+      ),
       weather: pickValue(fetchedData?.weather, selectedDevice?.weather, null),
       weatherTemperature: pickFiniteNumber(
         fetchedData?.weatherTemperature,
@@ -231,25 +247,24 @@ export default function OverviewScreen() {
         selectedDevice?.updatedAt,
         null,
       ),
-      production: isStationGateway
-        ? pickNumber(
-            isDeviceOnline ? fetchedData?.production : 0,
-            isDeviceOnline ? selectedDevice?.production : 0,
-          )
-        : 0,
-      pv: isStationGateway ? pickNumber(isDeviceOnline ? fetchedData?.pv : 0) : 0,
-      grid: isStationGateway ? pickNumber(isDeviceOnline ? fetchedData?.grid : 0) : 0,
-      battery: isStationGateway ? pickNumber(isDeviceOnline ? fetchedData?.battery : 0) : 0,
-      upsLoad: isStationGateway ? pickNumber(isDeviceOnline ? fetchedData?.upsLoad : 0) : 0,
-      load: isStationGateway ? pickNumber(isDeviceOnline ? fetchedData?.load : 0) : 0,
-      energy: isStationGateway && isDeviceOnline
+      production: pickNumber(
+        isDeviceOnline ? fetchedData?.production : 0,
+        isDeviceOnline ? selectedDevice?.production : 0,
+        0,
+      ),
+      pv: pickNumber(isDeviceOnline ? fetchedData?.pv : 0, 0),
+      grid: pickNumber(isDeviceOnline ? fetchedData?.grid : 0, 0),
+      battery: pickNumber(isDeviceOnline ? fetchedData?.battery : 0, 0),
+      upsLoad: pickNumber(isDeviceOnline ? fetchedData?.upsLoad : 0, 0),
+      load: pickNumber(isDeviceOnline ? fetchedData?.load : 0, 0),
+      energy: isDeviceOnline
         ? (fetchedData?.energy ?? ZERO_ENERGY_VALUES.energy)
         : ZERO_ENERGY_VALUES.energy,
-      energyPercent: isStationGateway && isDeviceOnline
+      energyPercent: isDeviceOnline
         ? (fetchedData?.energyPercent ?? ZERO_ENERGY_VALUES.energyPercent)
         : ZERO_ENERGY_VALUES.energyPercent,
-      soc: isStationGateway && isDeviceOnline ? pickFiniteNumber(fetchedData?.soc) : null,
-      selectedDataPercentages: isStationGateway && isDeviceOnline
+      soc: isDeviceOnline ? pickFiniteNumber(fetchedData?.soc) : null,
+      selectedDataPercentages: isDeviceOnline
         ? (fetchedData?.selectedDataPercentages ?? {})
         : {},
       status: pickValue(fetchedData?.status, selectedDevice?.status, "--"),
@@ -264,24 +279,15 @@ export default function OverviewScreen() {
         selectedDevice?.installed_capacity,
         0,
       ),
-      productionFlow: isStationGateway
-        ? (fetchedData?.productionFlow ?? null)
-        : {
-            pvGenerateKwh: 0,
-            chargeKwh: 0,
-            exportKwh: 0,
-            totalProductionKwh: 0,
-          },
-      energySummary: isStationGateway ? (fetchedData?.energySummary ?? null) : {},
-      dailyProduction: isStationGateway
-        ? pickNumber(
-            fetchedData?.dailyProduction,
-            fetchedData?.productionToday,
-            selectedDevice?.dailyProduction,
-            selectedDevice?.productionToday,
-            0,
-          )
-        : 0,
+      productionFlow: fetchedData?.productionFlow ?? null,
+      energySummary: fetchedData?.energySummary ?? null,
+      dailyProduction: pickNumber(
+        fetchedData?.dailyProduction,
+        fetchedData?.productionToday,
+        selectedDevice?.dailyProduction,
+        selectedDevice?.productionToday,
+        0,
+      ),
     };
   }, [fetchedData, selectedDevice, selectedDataSource]);
   const isCurrentDemoPlant = isDemoPlant({ name: plantData.plantName });
