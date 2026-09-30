@@ -181,12 +181,6 @@ export const MENU_RIGHT_OFFSET = 24;
 //===== (LOWER_POWER_FLOW_SOURCE_ROUTE) ======
 export const LOWER_POWER_FLOW_SOURCE_ROUTE = "local://power-flow/production";
 
-//===== (LOWER_POWER_FLOW_DUMMY_DATA) ======
-export const LOWER_POWER_FLOW_DUMMY_DATA = {
-  pvGenerateKwh: 0,
-  chargeKwh: 0,
-  exportKwh: 0,
-};
 
 //===== (BUBBLE_POSITION_CONFIG) ======
 export const BUBBLE_POSITION_CONFIG = {

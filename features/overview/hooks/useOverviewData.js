@@ -6,8 +6,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import {
-  DEMO_ENERGY_VALUES,
-  DEMO_POWER_VALUES,
   POWER_LATEST_ENDPOINT_CONFIG,
   ZERO_ENERGY_VALUES,
   ZERO_POWER_VALUES,
