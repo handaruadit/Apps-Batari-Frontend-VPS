@@ -1,5 +1,6 @@
-//===== (Imports) ======
 import DeviceCard from "@/components/DeviceCard";
+import PlantCardSkeleton from "@/components/device-card/PlantCardSkeleton";
+import { getPlantConnectionStatus } from "@/components/device-card/helpers";
 import { AuthContext } from "@/context/AuthContext";
 import { useAppSettings } from "@/context/AppSettingsContext";
 import {
@@ -25,6 +26,7 @@ import {
   Animated,
   Easing,
   FlatList,
+  Image,
   RefreshControl,
   Text,
   TextInput,
@@ -35,8 +37,10 @@ import {
 //===== (PlantScreen) ======
 export default function PlantScreen() {
   const { colors, t, themeMode } = useAppSettings();
+  const isLight = themeMode === "light";
   const { setSelectedDevice } = useContext(AuthContext);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // "all" | "online" | "offline"
   const [plantList, setPlantList] = useState([]);
   const plantListRef = useRef([]);
   const flatListRef = useRef(null);
@@ -252,15 +256,32 @@ export default function PlantScreen() {
   //===== (Filtered Plants) ======
   const filteredDevices = useMemo(() => {
     return plantList.filter((item) => {
-      const keyword = search.toLowerCase();
+      // 1. Status Filter (All, Online, Offline)
+      if (statusFilter !== "all") {
+        const status = getPlantConnectionStatus(item);
+        const isOnline = Boolean(
+          status?.isOnline || status?.key === "online" || status?.statusKey === "online"
+        );
+        if (statusFilter === "online" && !isOnline) {
+          return false;
+        }
+        if (statusFilter === "offline" && isOnline) {
+          return false;
+        }
+      }
+
+      // 2. Keyword Search
+      if (!search.trim()) return true;
+      const keyword = search.trim().toLowerCase();
 
       return (
         item.name?.toLowerCase().includes(keyword) ||
-        item.system_type?.toLowerCase().includes(keyword) ||
-        item.location?.toLowerCase().includes(keyword)
+        item.location?.toLowerCase().includes(keyword) ||
+        item.city?.toLowerCase().includes(keyword) ||
+        item.province?.toLowerCase().includes(keyword)
       );
     });
-  }, [search, plantList]);
+  }, [search, plantList, statusFilter]);
 
   //===== (Sorted Plants) ======
   const sortedDevices = useMemo(() => {
@@ -356,6 +377,35 @@ export default function PlantScreen() {
     });
   };
 
+  const fleetStats = useMemo(() => {
+    let onlineCount = 0;
+    let offlineCount = 0;
+    let totalCap = 0;
+
+    for (const p of plantList) {
+      const status = getPlantConnectionStatus(p);
+      if (status?.isOnline || status?.key === "online" || status?.statusKey === "online") {
+        onlineCount++;
+      } else {
+        offlineCount++;
+      }
+      const cap = Number(p.pv_capacity ?? p.installed_capacity ?? p.capacity ?? 0);
+      if (!Number.isNaN(cap) && cap > 0) {
+        totalCap += cap;
+      }
+    }
+
+    return {
+      total: plantList.length,
+      online: onlineCount,
+      offline: offlineCount,
+      totalCapacity:
+        totalCap >= 1000
+          ? `${(totalCap / 1000).toFixed(1)} MWp`
+          : `${totalCap.toFixed(1)} kWp`,
+    };
+  }, [plantList]);
+
   const headerTranslateY = headerAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [-14, 0],
@@ -376,7 +426,40 @@ export default function PlantScreen() {
           }}
         >
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text }]}>Plant</Text>
+            <View style={styles.headerTextGroup}>
+              {/* Opsi 1: BySense Brand Header */}
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 3 }}>
+                <Image
+                  source={require("@/assets/images/app-icon-1024.png")}
+                  style={{
+                    width: 27,
+                    height: 27,
+                    borderRadius: 7,
+                    marginRight: 8,
+                  }}
+                  resizeMode="contain"
+                />
+                <Text
+                  style={[
+                    styles.title,
+                    {
+                      color: colors.text,
+                      fontSize: 22,
+                      letterSpacing: -0.4,
+                      lineHeight: 28,
+                    },
+                  ]}
+                >
+                  By<Text style={{ color: "#18AEE6" }}>Sense</Text>
+                </Text>
+              </View>
+
+              <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
+                {plantList.length > 0
+                  ? `${plantList.length} ${t("registeredStations") || "stasiun terdaftar"}`
+                  : t("monitoringFleet") || "Pemantauan Pembangkit"}
+              </Text>
+            </View>
 
             <TouchableOpacity
               style={[
@@ -397,6 +480,120 @@ export default function PlantScreen() {
             </TouchableOpacity>
           </View>
 
+          {plantList.length > 0 && (
+            <View
+              style={[
+                styles.fleetCard,
+                {
+                  backgroundColor: colors.bubble,
+                  borderColor: colors.bubbleBorder,
+                },
+              ]}
+            >
+              <View style={styles.fleetHeaderRow}>
+                <View style={styles.fleetTitleRow}>
+                  <Ionicons name="flash" size={14} color="#18AEE6" />
+                  <Text style={[styles.fleetTitleText, { color: colors.text }]}>
+                    {t("fleetOverview") || "Ringkasan Armada"}
+                  </Text>
+                </View>
+
+                <View style={styles.fleetPill}>
+                  <Text style={styles.fleetPillText}>
+                    {fleetStats.totalCapacity}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.fleetStatsRow}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setStatusFilter("all")}
+                  style={[
+                    styles.fleetStatItem,
+                    statusFilter === "all" && {
+                      backgroundColor: isLight
+                        ? "rgba(24, 174, 230, 0.12)"
+                        : "rgba(24, 174, 230, 0.18)",
+                      borderColor: "rgba(24, 174, 230, 0.35)",
+                    },
+                  ]}
+                >
+                  <Text style={[styles.fleetStatValue, { color: colors.text }]}>
+                    {fleetStats.total}
+                  </Text>
+                  <Text style={[styles.fleetStatLabel, { color: colors.textMuted }]}>
+                    {t("totalPlants") || "Total Unit"}
+                  </Text>
+                </TouchableOpacity>
+
+                <View
+                  style={[
+                    styles.fleetDivider,
+                    { backgroundColor: colors.bubbleBorder },
+                  ]}
+                />
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setStatusFilter("online")}
+                  style={[
+                    styles.fleetStatItem,
+                    statusFilter === "online" && {
+                      backgroundColor: isLight
+                        ? "rgba(22, 163, 74, 0.12)"
+                        : "rgba(22, 163, 74, 0.18)",
+                      borderColor: "rgba(22, 163, 74, 0.35)",
+                    },
+                  ]}
+                >
+                  <Text style={[styles.fleetStatValue, { color: "#16A34A" }]}>
+                    {fleetStats.online}
+                  </Text>
+                  <Text style={[styles.fleetStatLabel, { color: colors.textMuted }]}>
+                    {t("online") || "Online"}
+                  </Text>
+                </TouchableOpacity>
+
+                <View
+                  style={[
+                    styles.fleetDivider,
+                    { backgroundColor: colors.bubbleBorder },
+                  ]}
+                />
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setStatusFilter("offline")}
+                  style={[
+                    styles.fleetStatItem,
+                    statusFilter === "offline" && {
+                      backgroundColor: isLight
+                        ? "rgba(220, 38, 38, 0.12)"
+                        : "rgba(220, 38, 38, 0.18)",
+                      borderColor: "rgba(220, 38, 38, 0.35)",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.fleetStatValue,
+                      {
+                        color:
+                          fleetStats.offline > 0 ? "#DC2626" : colors.textMuted,
+                      },
+                    ]}
+                  >
+                    {fleetStats.offline}
+                  </Text>
+                  <Text style={[styles.fleetStatLabel, { color: colors.textMuted }]}>
+                    {t("offline") || "Offline"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           <View
             style={[
               styles.searchBox,
@@ -408,6 +605,12 @@ export default function PlantScreen() {
               },
             ]}
           >
+            <Ionicons
+              name="search-outline"
+              size={16}
+              color={colors.textMuted}
+              style={{ marginRight: 6 }}
+            />
             <TextInput
               placeholder={t("searchPlantPlaceholder")}
               placeholderTextColor={colors.textMuted}
@@ -431,22 +634,23 @@ export default function PlantScreen() {
               >
                 <Ionicons
                   name="close-circle"
-                  size={20}
+                  size={17}
                   color={colors.textMuted}
                 />
               </TouchableOpacity>
             )}
           </View>
+
+          {search.trim().length > 0 && (
+            <Text style={[styles.searchCountText, { color: colors.textMuted }]}>
+              {`${filteredDevices.length} ${t("plantsFound") || "stasiun ditemukan"}`}
+            </Text>
+          )}
         </Animated.View>
 
-      {isLoading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={[styles.loadingText, { color: colors.textMuted }]}>
-            {t("loadingPlants")}
-          </Text>
-        </View>
-      ) : (
+        {isLoading ? (
+          <PlantCardSkeleton count={3} />
+        ) : (
         <FlatList
           ref={flatListRef}
           data={sortedDevices}
@@ -494,41 +698,186 @@ export default function PlantScreen() {
           contentContainerStyle={{ paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 40, paddingHorizontal: 20 }}>
-              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: "rgba(24, 174, 230, 0.12)", alignItems: "center", justifyContent: "center", marginBottom: 16 }}>
-                <Ionicons name="sunny-outline" size={36} color="#18AEE6" />
-              </View>
-              <Text style={{ fontSize: 18, fontWeight: "700", color: colors.text, marginBottom: 8, textAlign: "center" }}>
-                {t("noPlantsRegistered")}
-              </Text>
-              <Text style={{ fontSize: 13, color: colors.textMuted, textAlign: "center", marginBottom: 20, paddingHorizontal: 20 }}>
-                {t("emptyPlants")}
-              </Text>
-
-              <TouchableOpacity
+            plantList.length > 0 ? (
+              <View
                 style={{
-                  backgroundColor: "#18AEE6",
-                  paddingVertical: 13,
-                  paddingHorizontal: 22,
-                  borderRadius: 14,
-                  flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "center",
-                  shadowColor: "#18AEE6",
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 8,
-                  elevation: 3,
+                  paddingVertical: 36,
+                  paddingHorizontal: 20,
                 }}
-                activeOpacity={0.85}
-                onPress={handleAddDevice}
               >
-                <Ionicons name="add" size={20} color="#FFFFFF" style={{ marginRight: 6 }} />
-                <Text style={{ color: "#FFFFFF", fontWeight: "700", fontSize: 15 }}>
-                  {t("addNewPlant")}
+                <View
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 28,
+                    backgroundColor:
+                      statusFilter === "offline"
+                        ? "rgba(22, 163, 74, 0.12)"
+                        : "rgba(24, 174, 230, 0.12)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 14,
+                  }}
+                >
+                  <Ionicons
+                    name={
+                      statusFilter === "offline"
+                        ? "checkmark-circle-outline"
+                        : "filter-outline"
+                    }
+                    size={30}
+                    color={statusFilter === "offline" ? "#16A34A" : "#18AEE6"}
+                  />
+                </View>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "700",
+                    color: colors.text,
+                    marginBottom: 6,
+                    textAlign: "center",
+                  }}
+                >
+                  {statusFilter === "offline"
+                    ? t("noOfflineStations")
+                    : statusFilter === "online"
+                      ? t("noOnlineStations")
+                      : t("noStationsFound")}
                 </Text>
-              </TouchableOpacity>
-            </View>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: colors.textMuted,
+                    textAlign: "center",
+                    marginBottom: 18,
+                    paddingHorizontal: 20,
+                  }}
+                >
+                  {statusFilter === "offline"
+                    ? t("allStationsOperatingNormally")
+                    : search.trim().length > 0
+                      ? `${t("noStationsMatchSearch")} "${search}".`
+                      : t("noStationsInFilter")}
+                </Text>
+
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: colors.bubble,
+                    borderWidth: 1,
+                    borderColor: colors.bubbleBorder,
+                    paddingVertical: 10,
+                    paddingHorizontal: 18,
+                    borderRadius: 12,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setStatusFilter("all");
+                    setSearch("");
+                  }}
+                >
+                  <Ionicons
+                    name="refresh-outline"
+                    size={16}
+                    color="#18AEE6"
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text
+                    style={{
+                      color: "#18AEE6",
+                      fontWeight: "600",
+                      fontSize: 13,
+                    }}
+                  >
+                    {t("showAllStations")}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View
+                style={{
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingVertical: 40,
+                  paddingHorizontal: 20,
+                }}
+              >
+                <View
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 32,
+                    backgroundColor: "rgba(24, 174, 230, 0.12)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  <Ionicons name="sunny-outline" size={36} color="#18AEE6" />
+                </View>
+                <Text
+                  style={{
+                    fontSize: 18,
+                    fontWeight: "700",
+                    color: colors.text,
+                    marginBottom: 8,
+                    textAlign: "center",
+                  }}
+                >
+                  {t("noPlantsRegistered")}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: colors.textMuted,
+                    textAlign: "center",
+                    marginBottom: 20,
+                    paddingHorizontal: 20,
+                  }}
+                >
+                  {t("emptyPlants")}
+                </Text>
+
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "#18AEE6",
+                    paddingVertical: 13,
+                    paddingHorizontal: 22,
+                    borderRadius: 14,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    shadowColor: "#18AEE6",
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    elevation: 3,
+                  }}
+                  activeOpacity={0.85}
+                  onPress={handleAddDevice}
+                >
+                  <Ionicons
+                    name="add"
+                    size={20}
+                    color="#FFFFFF"
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text
+                    style={{
+                      color: "#FFFFFF",
+                      fontWeight: "700",
+                      fontSize: 15,
+                    }}
+                  >
+                    {t("addNewPlant")}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )
           }
         />
       )}

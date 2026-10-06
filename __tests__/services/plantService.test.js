@@ -30,9 +30,14 @@ describe("plantService compatibility facade", () => {
   });
 
   it("returns the plant list from the existing response shape", async () => {
-    global.fetch.mockResolvedValue(
-      createResponse({ data: [{ id: 1, name: "Plant A" }] }),
-    );
+    global.fetch.mockImplementation((url) => {
+      if (String(url).includes("/api/data/stations")) {
+        return Promise.resolve(createResponse({ data: [] }));
+      }
+      return Promise.resolve(
+        createResponse({ data: [{ id: 1, name: "Plant A" }] }),
+      );
+    });
 
     await expect(fetchPlants()).resolves.toEqual([
       { id: 1, name: "Plant A" },

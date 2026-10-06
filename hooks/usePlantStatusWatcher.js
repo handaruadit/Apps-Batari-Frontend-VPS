@@ -3,6 +3,7 @@ import { getPlantConnectionStatus } from "@/components/device-card/helpers";
 import { useAppSettings } from "@/context/AppSettingsContext";
 import {
   getNotificationSettings,
+  registerForPushNotificationsAsync,
   requestNotificationPermissions,
   triggerLocalNotification,
 } from "@/services/notificationService";
@@ -16,9 +17,10 @@ export function usePlantStatusWatcher(plantList = []) {
   const previousBatteryAlertMap = useRef(new Map());
   const isInitialRun = useRef(true);
 
-  // Request notification permission once on mount
+  // Request notification permission & register push token once on mount
   useEffect(() => {
     requestNotificationPermissions();
+    registerForPushNotificationsAsync();
   }, []);
 
   useEffect(() => {

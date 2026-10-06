@@ -5,6 +5,7 @@ import {
   Linking,
   Modal,
   Pressable,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -25,7 +26,7 @@ export default function AboutModal({ visible, onClose, colors, t }) {
       onRequestClose={onClose}
     >
       <View style={styles.centerModalBackdrop}>
-        <Pressable style={styles.modalDismissArea} onPress={onClose} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
         <View
           style={[

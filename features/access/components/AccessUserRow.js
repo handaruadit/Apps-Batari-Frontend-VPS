@@ -26,9 +26,33 @@ export default function AccessUserRow({
           {user.phone || "-"}
         </Text>
       </View>
-      <Text style={[styles.roleText, { color: colors.accent }]}>
-        {actionLabel}
-      </Text>
+      <View
+        style={{
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+          borderRadius: 8,
+          backgroundColor:
+            actionLabel === "Owner"
+              ? "rgba(16, 185, 129, 0.12)"
+              : "rgba(24, 174, 230, 0.12)",
+          borderColor:
+            actionLabel === "Owner"
+              ? "rgba(16, 185, 129, 0.28)"
+              : "rgba(24, 174, 230, 0.28)",
+          borderWidth: 1,
+        }}
+      >
+        <Text
+          style={[
+            styles.roleText,
+            {
+              color: actionLabel === "Owner" ? "#10B981" : colors.accent,
+            },
+          ]}
+        >
+          {actionLabel}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 }

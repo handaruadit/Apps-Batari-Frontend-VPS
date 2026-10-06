@@ -1,7 +1,7 @@
 //========== IMPORTS ==========
 import { appColors } from "@/config/theme";
 import { useAppSettings } from "@/context/AppSettingsContext";
-import { useEffect, useMemo, useState } from "react";
+import React, { Fragment, useEffect, useMemo, useState } from "react";
 import { PanResponder, View } from "react-native";
 import Svg, { Circle, Line, Path, Text as SvgText } from "react-native-svg";
 import {
@@ -235,7 +235,12 @@ export default function PowerDayChart({
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_evt, gestureState) => {
+          return Math.abs(gestureState.dx) > 3 || Math.abs(gestureState.dy) < 6;
+        },
+        onPanResponderTerminationRequest: (_evt, gestureState) => {
+          return Math.abs(gestureState.dy) > Math.abs(gestureState.dx) * 1.25;
+        },
         onPanResponderGrant: (event) => {
           const progress = Math.min(
             Math.max(event.nativeEvent.locationX / innerWidth, 0),
@@ -397,27 +402,43 @@ export default function PowerDayChart({
           ))}
 
           {selectedMarkerX !== null && (
-            <Line
-              x1={selectedMarkerX}
-              y1={pad.top}
-              x2={selectedMarkerX}
-              y2={chartHeight - pad.bottom}
-              stroke={colors.accent}
-              strokeWidth={1.2}
-              strokeDasharray="4 4"
-            />
+            <>
+              <Line
+                x1={selectedMarkerX}
+                y1={pad.top}
+                x2={selectedMarkerX}
+                y2={chartHeight - pad.bottom}
+                stroke={colors.accent}
+                strokeWidth={1.5}
+                strokeDasharray="4 3"
+              />
+              <Circle
+                cx={selectedMarkerX}
+                cy={pad.top + 2}
+                r={3}
+                fill={colors.accent}
+              />
+            </>
           )}
           {selectedRows.map((row) =>
             row.point ? (
-              <Circle
-                key={`point-${row.key}`}
-                cx={getX(row.point.timestamp)}
-                cy={getSeriesY(row.key, row.point.value)}
-                r={3.5}
-                fill={row.color}
-                stroke={colors.bubble}
-                strokeWidth={1.5}
-              />
+              <Fragment key={`point-halo-${row.key}`}>
+                <Circle
+                  cx={getX(row.point.timestamp)}
+                  cy={getSeriesY(row.key, row.point.value)}
+                  r={7}
+                  fill={row.color}
+                  fillOpacity={0.22}
+                />
+                <Circle
+                  cx={getX(row.point.timestamp)}
+                  cy={getSeriesY(row.key, row.point.value)}
+                  r={3.8}
+                  fill={row.color}
+                  stroke={colors.bubble}
+                  strokeWidth={1.8}
+                />
+              </Fragment>
             ) : null,
           )}
         </Svg>

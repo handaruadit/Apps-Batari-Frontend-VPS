@@ -33,21 +33,9 @@ export default function MetricBlock({
     POWER_FLOW_SEGMENT_LABEL_CONFIG[segmentKey] ||
     POWER_FLOW_SEGMENT_LABEL_CONFIG.pv;
   const font = POWER_FLOW_FONT_SIZE[metricKey] || POWER_FLOW_FONT_SIZE.pv;
-  const Container = onPress ? Pressable : View;
 
-  return (
-    <Container
-      onPress={onPress}
-      style={[
-        styles.metricBlock,
-        {
-          width: scaleValue(POWER_FLOW_LAYOUT.metricBlockWidth, layoutScale),
-          height: scaleValue(POWER_FLOW_LAYOUT.metricBlockHeight, layoutScale),
-          transform: [{ scale: selected ? 1.08 : 1 }],
-        },
-        getActiveGlowStyle(color, selected),
-      ]}
-    >
+  const content = (
+    <>
       <View
         style={[
           styles.metricIcon,
@@ -120,22 +108,25 @@ export default function MetricBlock({
           style={[
             styles.metricValue,
             {
-              color,
-              fontSize: labelConfig.valueFontSize * fontScale,
+              color: textColor,
+              fontSize: font.valueFontSize * fontScale,
               lineHeight: font.valueLineHeight * fontScale,
             },
           ]}
           numberOfLines={1}
           adjustsFontSizeToFit
         >
-          {value}
+          {typeof value === "object" && value !== null ? value.number : value}
           <Text
             style={[
               styles.metricUnit,
-              { color, fontSize: labelConfig.unitFontSize * fontScale },
+              {
+                fontSize: font.unitFontSize * fontScale,
+                lineHeight: font.unitLineHeight * fontScale,
+              },
             ]}
           >
-            kWh
+            {typeof value === "object" && value !== null ? value.unit : " kWh"}
           </Text>
         </Text>
       </View>
@@ -144,9 +135,9 @@ export default function MetricBlock({
         style={[
           styles.metricPercent,
           {
-            color: textColor,
+            color: color,
             fontSize: labelConfig.percentFontSize * fontScale,
-            lineHeight: (labelConfig.percentFontSize + 4) * fontScale,
+            lineHeight: font.percentLineHeight * fontScale,
             transform: [
               { translateY: labelConfig.percentOffsetY * layoutScale },
             ],
@@ -163,6 +154,43 @@ export default function MetricBlock({
           {subtitle}
         </Text>
       )}
-    </Container>
+    </>
+  );
+
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        style={({ pressed }) => [
+          styles.metricBlock,
+          {
+            width: scaleValue(POWER_FLOW_LAYOUT.metricBlockWidth, layoutScale),
+            height: scaleValue(POWER_FLOW_LAYOUT.metricBlockHeight, layoutScale),
+            transform: [{ scale: selected ? 1.06 : pressed ? 0.95 : 1 }],
+            opacity: pressed ? 0.85 : 1,
+          },
+          getActiveGlowStyle(color, selected),
+        ]}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        styles.metricBlock,
+        {
+          width: scaleValue(POWER_FLOW_LAYOUT.metricBlockWidth, layoutScale),
+          height: scaleValue(POWER_FLOW_LAYOUT.metricBlockHeight, layoutScale),
+          transform: [{ scale: selected ? 1.06 : 1 }],
+        },
+        getActiveGlowStyle(color, selected),
+      ]}
+    >
+      {content}
+    </View>
   );
 }

@@ -78,15 +78,71 @@ export default function DeviceCard({
       ]}
     >
       <View style={styles.cardTopRow}>
-        <Text style={[styles.inverterTitle, { color: colors.text }]}>
-          {deviceTitle}
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+          <View
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 10,
+              backgroundColor: "rgba(24, 174, 230, 0.12)",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name="hardware-chip-outline" size={18} color="#18AEE6" />
+          </View>
+          <Text
+            style={[styles.inverterTitle, { color: colors.text, flex: 1 }]}
+            numberOfLines={1}
+          >
+            {deviceTitle}
+          </Text>
+        </View>
 
-        {canUnlinkDevice && (
-          <View style={styles.cardHeaderRight}>
+        <View style={styles.cardHeaderRight}>
+          {connectionLabel && (
+            <View
+              style={[
+                styles.statusBadge,
+                {
+                  backgroundColor:
+                    item.connectStatus === 1
+                      ? "rgba(22, 163, 74, 0.12)"
+                      : "rgba(220, 38, 38, 0.12)",
+                  borderColor:
+                    item.connectStatus === 1
+                      ? "rgba(22, 163, 74, 0.3)"
+                      : "rgba(220, 38, 38, 0.3)",
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.statusDot,
+                  {
+                    backgroundColor:
+                      item.connectStatus === 1 ? "#16A34A" : "#DC2626",
+                  },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.statusText,
+                  {
+                    color:
+                      item.connectStatus === 1 ? "#16A34A" : "#DC2626",
+                  },
+                ]}
+              >
+                {connectionLabel}
+              </Text>
+            </View>
+          )}
+
+          {canUnlinkDevice && (
             <TouchableOpacity
               onPress={() => onDelete(item.device_id)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
               <MaterialIcons
                 name="delete-outline"
@@ -94,8 +150,8 @@ export default function DeviceCard({
                 color="#EF4444"
               />
             </TouchableOpacity>
-          </View>
-        )}
+          )}
+        </View>
       </View>
 
       <View style={styles.infoBlock}>
@@ -141,15 +197,6 @@ export default function DeviceCard({
         </View>
       </View>
 
-      {connectionLabel && (
-        <View style={styles.infoBlock}>
-          <Text style={[styles.metricLabel, { color: colors.textMuted }]}>Status</Text>
-          <Text style={[styles.infoValue, { color: colors.text }]}>
-            {connectionLabel}
-          </Text>
-        </View>
-      )}
-
       <View style={styles.infoBlock}>
         <Text style={[styles.metricLabel, { color: colors.textMuted }]}>
           {t("address")}
@@ -168,7 +215,7 @@ export default function DeviceCard({
         </Text>
       </View>
 
-      {/* Inverter Performance Telemetry */}
+      {/* Inverter Performance Telemetry Tiles */}
       <View
         style={[
           styles.parameterSection,
@@ -180,53 +227,100 @@ export default function DeviceCard({
         <Text style={[styles.parameterTitle, { color: colors.text }]}>
           {t("inverterParameters") || "Inverter Parameters"}
         </Text>
-        <View
-          style={[
-            styles.parameterRow,
-            themeMode === "light" && {
-              borderBottomColor: "rgba(8,174,234,0.14)",
-            },
-          ]}
-        >
-          <Text style={[styles.parameterType, { color: colors.text }]}>
-            {t("power") || "Power"}
-          </Text>
-          <Text style={[styles.parameterValue, { color: colors.accent }]}>
-            {Number(item.power != null ? item.power : 0).toFixed(2)} kW
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.parameterRow,
-            themeMode === "light" && {
-              borderBottomColor: "rgba(8,174,234,0.14)",
-            },
-          ]}
-        >
-          <Text style={[styles.parameterType, { color: colors.text }]}>
-            {t("dailyProduction") || "Daily Yield"}
-          </Text>
-          <Text style={[styles.parameterValue, { color: colors.accent }]}>
-            {Number(item.dailyEnergy != null ? item.dailyEnergy : 0).toFixed(2)} kWh
-          </Text>
-        </View>
-        {item.totalEnergy != null && Number(item.totalEnergy) > 0 ? (
+
+        <View style={styles.telemetryGrid}>
+          {/* Active Power Tile */}
           <View
             style={[
-              styles.parameterRow,
-              themeMode === "light" && {
-                borderBottomColor: "rgba(8,174,234,0.14)",
+              styles.telemetryTile,
+              {
+                backgroundColor: colors.input || "rgba(255, 255, 255, 0.04)",
+                borderColor: colors.inputBorder || "rgba(255, 255, 255, 0.08)",
               },
             ]}
           >
-            <Text style={[styles.parameterType, { color: colors.text }]}>
-              {t("totalProduction") || "Total Yield"}
-            </Text>
-            <Text style={[styles.parameterValue, { color: colors.accent }]}>
-              {Number(item.totalEnergy).toFixed(2)} kWh
+            <View style={styles.telemetryTileHeader}>
+              <Ionicons name="flash" size={13} color="#18AEE6" />
+              <Text
+                style={[styles.telemetryTileLabel, { color: colors.textMuted }]}
+                numberOfLines={1}
+              >
+                {t("power") || "Daya Aktif"}
+              </Text>
+            </View>
+            <Text
+              style={[styles.telemetryTileValue, { color: colors.text }]}
+              numberOfLines={1}
+            >
+              {Number(item.power != null ? item.power : 0).toFixed(2)}{" "}
+              <Text style={{ fontSize: 11, fontWeight: "600", color: colors.textMuted }}>
+                kW
+              </Text>
             </Text>
           </View>
-        ) : null}
+
+          {/* Daily Yield Tile */}
+          <View
+            style={[
+              styles.telemetryTile,
+              {
+                backgroundColor: colors.input || "rgba(255, 255, 255, 0.04)",
+                borderColor: colors.inputBorder || "rgba(255, 255, 255, 0.08)",
+              },
+            ]}
+          >
+            <View style={styles.telemetryTileHeader}>
+              <Ionicons name="sunny" size={13} color="#F59E0B" />
+              <Text
+                style={[styles.telemetryTileLabel, { color: colors.textMuted }]}
+                numberOfLines={1}
+              >
+                {t("dailyProduction") || "Produksi Hari Ini"}
+              </Text>
+            </View>
+            <Text
+              style={[styles.telemetryTileValue, { color: colors.text }]}
+              numberOfLines={1}
+            >
+              {Number(item.dailyEnergy != null ? item.dailyEnergy : 0).toFixed(2)}{" "}
+              <Text style={{ fontSize: 11, fontWeight: "600", color: colors.textMuted }}>
+                kWh
+              </Text>
+            </Text>
+          </View>
+
+          {/* Total Yield Tile (if present) */}
+          {item.totalEnergy != null && Number(item.totalEnergy) > 0 ? (
+            <View
+              style={[
+                styles.telemetryTile,
+                {
+                  backgroundColor: colors.input || "rgba(255, 255, 255, 0.04)",
+                  borderColor: colors.inputBorder || "rgba(255, 255, 255, 0.08)",
+                },
+              ]}
+            >
+              <View style={styles.telemetryTileHeader}>
+                <Ionicons name="trending-up" size={13} color="#10B981" />
+                <Text
+                  style={[styles.telemetryTileLabel, { color: colors.textMuted }]}
+                  numberOfLines={1}
+                >
+                  {t("totalProduction") || "Total"}
+                </Text>
+              </View>
+              <Text
+                style={[styles.telemetryTileValue, { color: colors.text }]}
+                numberOfLines={1}
+              >
+                {Number(item.totalEnergy).toFixed(1)}{" "}
+                <Text style={{ fontSize: 11, fontWeight: "600", color: colors.textMuted }}>
+                  kWh
+                </Text>
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <BatteryParameterList

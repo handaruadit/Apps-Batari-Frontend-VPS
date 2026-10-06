@@ -1,19 +1,26 @@
 //========== IMPORTS ==========
 import { Ionicons } from "@expo/vector-icons";
-import { ActivityIndicator, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { formatLastDataTime } from "../../utils/chartFormat";
+import ChartSkeleton from "./ChartSkeleton";
 import styles from "./chart.styles";
 
 //========== COMPONENT ==========
-export default function ChartEmptyState({ colors, lastTimestamp, status, t }) {
+export default function ChartEmptyState({
+  colors,
+  isLightMode,
+  lastTimestamp,
+  status,
+  t,
+  width,
+}) {
   if (status === "loading") {
     return (
-      <View style={styles.state}>
-        <ActivityIndicator size="large" color={colors.accent} />
-        <Text style={[styles.stateTitle, { color: colors.text }]}> 
-          {t("loadingChart")}
-        </Text>
-      </View>
+      <ChartSkeleton
+        colors={colors}
+        isLightMode={isLightMode}
+        width={width}
+      />
     );
   }
 
@@ -22,15 +29,26 @@ export default function ChartEmptyState({ colors, lastTimestamp, status, t }) {
 
   return (
     <View style={styles.state}>
-      <Ionicons
-        name={isError ? "cloud-offline-outline" : "analytics-outline"}
-        size={30}
-        color={colors.textMuted}
-      />
-      <Text style={[styles.stateTitle, { color: colors.text }]}> 
+      <View
+        style={[
+          localStyles.iconCircle,
+          {
+            backgroundColor: isError
+              ? "rgba(239, 68, 68, 0.12)"
+              : "rgba(24, 174, 230, 0.12)",
+          },
+        ]}
+      >
+        <Ionicons
+          name={isError ? "cloud-offline-outline" : "analytics-outline"}
+          size={28}
+          color={isError ? "#EF4444" : "#18AEE6"}
+        />
+      </View>
+      <Text style={[styles.stateTitle, { color: colors.text }]}>
         {isError ? t("chartLoadError") : t("noHistoricalData")}
       </Text>
-      <Text style={[styles.stateBody, { color: colors.textSoft }]}> 
+      <Text style={[styles.stateBody, { color: colors.textMuted }]}>
         {isError ? t("chartTryAgain") : t("historicalDataHint")}
         {!isError && formattedTimestamp
           ? `\n${t("lastDataReceived")}: ${formattedTimestamp}`
@@ -39,3 +57,14 @@ export default function ChartEmptyState({ colors, lastTimestamp, status, t }) {
     </View>
   );
 }
+
+const localStyles = StyleSheet.create({
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+});

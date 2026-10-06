@@ -19,7 +19,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AuthContext } from "@/context/AuthContext";
 import { useAppSettings } from "@/context/AppSettingsContext";
 import DeviceCard from "@/features/devices/components/DeviceCard";
+import DeviceCardSkeleton from "@/features/devices/components/DeviceCardSkeleton";
 import styles from "@/features/devices/styles/deviceListStyles";
+import { Ionicons } from "@expo/vector-icons";
 import {
   fetchPlantDevices,
   normalizePlantAccessRole,
@@ -295,20 +297,7 @@ export default function PerangkatScreen() {
           </Text>
 
           {isLoading ? (
-            <View
-              style={[
-                styles.stateCard,
-                themeMode === "light" && {
-                  backgroundColor: colors.bubble,
-                  borderColor: colors.bubbleBorder,
-                },
-              ]}
-            >
-              <ActivityIndicator color={colors.accent} />
-              <Text style={[styles.stateText, { color: colors.textMuted }]}>
-                {t("loadingDevice")}
-              </Text>
-            </View>
+            <DeviceCardSkeleton count={2} />
           ) : errorMessage ? (
             <View
               style={[
@@ -327,14 +316,45 @@ export default function PerangkatScreen() {
             <View
               style={[
                 styles.stateCard,
+                styles.emptyContainer,
                 themeMode === "light" && {
                   backgroundColor: colors.bubble,
                   borderColor: colors.bubbleBorder,
                 },
               ]}
             >
-              <Text style={[styles.stateText, { color: colors.textMuted }]}>
-                {t("noDeviceConnected")}
+              <View style={styles.emptyIconCircle}>
+                <Ionicons
+                  name="hardware-chip-outline"
+                  size={30}
+                  color="#18AEE6"
+                />
+              </View>
+              <Text
+                style={[
+                  styles.stateText,
+                  {
+                    color: colors.text,
+                    fontWeight: "700",
+                    fontSize: 16,
+                    marginBottom: 4,
+                  },
+                ]}
+              >
+                {t("noDeviceConnected") || "Belum Ada Perangkat"}
+              </Text>
+              <Text
+                style={[
+                  styles.stateText,
+                  {
+                    color: colors.textMuted,
+                    fontSize: 13,
+                    textAlign: "center",
+                  },
+                ]}
+              >
+                {t("emptyDevicesHint") ||
+                  "Hubungkan datalogger atau inverter untuk memantau telemetri perangkat secara langsung."}
               </Text>
             </View>
           ) : (

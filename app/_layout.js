@@ -29,6 +29,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 LogBox.ignoreLogs([
   'expo-notifications',
   '`expo-notifications` functionality is not fully supported in Expo Go',
+  '[notification]',
 ]);
 
 //===== (Layout) ======

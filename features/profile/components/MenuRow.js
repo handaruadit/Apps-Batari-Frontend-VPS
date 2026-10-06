@@ -28,7 +28,7 @@ export default function MenuRow({
           style={[
             styles.rowTitle,
             { color: colors.text },
-            danger && { color: colors.textMuted },
+            danger && { color: "#EF4444", fontWeight: "600" },
           ]}
         >
           {title}

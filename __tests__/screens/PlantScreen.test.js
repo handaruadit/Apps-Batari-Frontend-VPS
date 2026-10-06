@@ -107,4 +107,29 @@ describe('PlantScreen', () => {
       expect(router.push).toHaveBeenCalledWith('/plant/7/overview'),
     );
   });
+
+  it('filters plants by status via fleet overview card', async () => {
+    fetchPlants.mockResolvedValue([
+      { id: 1, name: 'Plant Online A', status: 'Online', is_online: true },
+      { id: 2, name: 'Plant Offline B', status: 'Offline', is_online: false },
+    ]);
+    const screen = renderPlantScreen();
+    await waitFor(() => expect(screen.getByText('Plant Online A')).toBeTruthy());
+    expect(screen.getByText('Plant Offline B')).toBeTruthy();
+
+    // Filter Online
+    fireEvent.press(screen.getByText(/^online$/i));
+    expect(screen.getByText('Plant Online A')).toBeTruthy();
+    expect(screen.queryByText('Plant Offline B')).toBeNull();
+
+    // Filter Offline
+    fireEvent.press(screen.getByText(/^offline$/i));
+    expect(screen.queryByText('Plant Online A')).toBeNull();
+    expect(screen.getByText('Plant Offline B')).toBeTruthy();
+
+    // Filter All (Total Unit)
+    fireEvent.press(screen.getByText(/totalplants|total unit/i));
+    expect(screen.getByText('Plant Online A')).toBeTruthy();
+    expect(screen.getByText('Plant Offline B')).toBeTruthy();
+  });
 });

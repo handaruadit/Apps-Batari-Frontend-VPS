@@ -7,6 +7,7 @@ import {
   Alert,
   Modal,
   Pressable,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -62,7 +63,7 @@ export default function DeleteAccountModal({
       onRequestClose={onClose}
     >
       <View style={styles.centerModalBackdrop}>
-        <Pressable style={styles.modalDismissArea} onPress={onClose} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
         <View
           style={[

@@ -2,7 +2,7 @@
   "expo": {
     "name": "BySense",
     "slug": "Apps",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon-1024.png",
     "scheme": "bysense",
@@ -17,7 +17,7 @@
     },
     "android": {
       "package": "com.batarienergy.app",
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/images/adaptive-foreground-1024.png"

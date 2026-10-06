@@ -21,7 +21,7 @@ import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useContext, useEffect, useState } from "react";
-import { Alert, ScrollView, Text, View } from "react-native";
+import { Alert, Image, ScrollView, Text, View } from "react-native";
 
 //===== (ProfileScreen) ======
 export default function ProfileScreen() {
@@ -367,6 +367,26 @@ export default function ProfileScreen() {
             onPress={confirmLogout}
             colors={colors}
           />
+        </View>
+
+        {/* Opsi 3: BySense Mobile Branding Footer */}
+        <View style={{ alignItems: "center", justifyContent: "center", marginTop: 24, marginBottom: 12 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 3 }}>
+            <Image
+              source={require("@/assets/images/app-icon-1024.png")}
+              style={{ width: 18, height: 18, borderRadius: 5, marginRight: 6 }}
+              resizeMode="contain"
+            />
+            <Text style={{ fontSize: 13, fontFamily: "Nunito-Bold", color: colors.text }}>
+              By<Text style={{ color: "#18AEE6" }}>Sense</Text>
+            </Text>
+            <Text style={{ fontSize: 12, fontFamily: "Nunito-SemiBold", color: colors.textMuted, marginLeft: 6 }}>
+              v{Constants.expoConfig?.version || "1.0.3"}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 11, fontFamily: "Nunito-Regular", color: colors.textMuted }}>
+            Powered by Batari Energy
+          </Text>
         </View>
       </ScrollView>
 

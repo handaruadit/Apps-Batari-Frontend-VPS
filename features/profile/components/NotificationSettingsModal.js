@@ -1,4 +1,3 @@
-//===== (Imports) ======
 import {
   DEFAULT_NOTIF_SETTINGS,
   getNotificationSettings,
@@ -205,6 +204,8 @@ export default function NotificationSettingsModal({
                   thumbColor="#FFFFFF"
                 />
               </View>
+
+
             </ScrollView>
           )}
 

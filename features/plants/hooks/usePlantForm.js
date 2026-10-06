@@ -121,9 +121,7 @@ export default function usePlantForm(t) {
         systemType === "Sistem penyimpanan" ? batteryCapacityNumber || 0 : 0,
     };
 
-    if (currency) {
-      payload.currency = currency;
-    }
+    payload.currency = currency || "Rp";
 
     setIsSaving(true);
 
@@ -137,8 +135,8 @@ export default function usePlantForm(t) {
       Alert.alert(
         t("success"),
         isEditMode ? t("plantUpdated") : t("plantCreated"),
+        [{ text: "OK", onPress: () => router.back() }],
       );
-      router.back();
     } catch (error) {
       if (error.code === "AUTH_EXPIRED") {
         Alert.alert(

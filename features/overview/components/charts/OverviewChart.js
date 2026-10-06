@@ -35,7 +35,7 @@ export default function OverviewChart({
   series,
   ...chartProps
 }) {
-  const { colors, t } = useAppSettings();
+  const { colors, t, themeMode } = useAppSettings();
   const [isSavingCsv, setIsSavingCsv] = useState(false);
   const aggregateKeys = ENERGY_SERIES_CONFIG.map((item) => item.key);
   const hasData = period === "day"
@@ -67,9 +67,11 @@ export default function OverviewChart({
     return (
       <ChartEmptyState
         colors={colors}
+        isLightMode={themeMode === "light"}
         lastTimestamp={lastTimestamp}
         status={chartStatus}
         t={t}
+        width={chartProps.chartWidth}
       />
     );
   }

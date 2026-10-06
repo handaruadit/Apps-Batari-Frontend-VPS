@@ -3,6 +3,8 @@ import ConnectionStatus from "@/components/device-card/ConnectionStatus";
 import DeviceCardMenu from "@/components/device-card/DeviceCardMenu";
 import {
   formatCityProvince,
+  formatPlantCapacity,
+  formatPlantLivePower,
   getPlantConnectionStatus,
 } from "@/components/device-card/helpers";
 import { styles } from "@/components/device-card/styles";
@@ -87,6 +89,8 @@ export default function DeviceCard({
 
   const connectionStatus = getPlantConnectionStatus(device);
   const cityProvinceText = formatCityProvince(device);
+  const capacityText = formatPlantCapacity(device);
+  const livePowerText = formatPlantLivePower(device, connectionStatus);
 
   //===== (handleToggleMenu) ======
   const handleToggleMenu = () => {
@@ -232,7 +236,7 @@ export default function DeviceCard({
               )}
               <TouchableOpacity
                 onPress={handleToggleMenu}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
                 style={[
                   styles.cardHeaderIconBtn,
                   {
@@ -305,16 +309,43 @@ export default function DeviceCard({
         >
           {device.name}
         </Text>
-        <Text
-          style={[
-            styles.subtitle,
-            isLight && { color: colors.textMuted },
-          ]}
-          numberOfLines={1}
-        >
-          {cityProvinceText}
-        </Text>
-        <ConnectionStatus status={connectionStatus} pulseAnim={pulseAnim} />
+
+        <View style={styles.locationRow}>
+          <Ionicons
+            name="location-sharp"
+            size={12}
+            color={colors.textMuted}
+            style={{ marginRight: 2 }}
+          />
+          <Text
+            style={[
+              styles.subtitle,
+              isLight && { color: colors.textMuted },
+              { flex: 1 },
+            ]}
+            numberOfLines={1}
+          >
+            {cityProvinceText}
+          </Text>
+        </View>
+
+        <View style={styles.bottomRow}>
+          <ConnectionStatus status={connectionStatus} pulseAnim={pulseAnim} />
+          <View style={styles.metricsGroup}>
+            {livePowerText ? (
+              <View style={styles.powerBadge}>
+                <Ionicons name="flash" size={11} color="#10B981" />
+                <Text style={styles.powerBadgeText}>{livePowerText}</Text>
+              </View>
+            ) : null}
+            {capacityText ? (
+              <View style={styles.capacityBadge}>
+                <Ionicons name="sunny" size={11} color="#18AEE6" />
+                <Text style={styles.capacityBadgeText}>{capacityText}</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
       </TouchableOpacity>
       </Animated.View>
     </Animated.View>

@@ -34,15 +34,46 @@ function getLatestDataTimestamp(device) {
 
 //===== (getPlantConnectionStatus) ======
 export function getPlantConnectionStatus(device) {
+  const rawStatus = String(
+    device?.status || device?.connection_status || device?.connectionStatus || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  const isExplicitOffline =
+    rawStatus === "offline" ||
+    rawStatus === "all_offline" ||
+    device?.connectStatus === 0 ||
+    device?.connectStatus === 3;
+
+  if (isExplicitOffline) {
+    return {
+      key: "offline",
+      statusKey: "offline",
+      isOnline: false,
+      label: "Offline",
+      timestamp: getLatestDataTimestamp(device),
+    };
+  }
+
+  const isExplicitOnline =
+    rawStatus === "online" ||
+    rawStatus === "normal" ||
+    device?.connectStatus === 1 ||
+    device?.is_online === true;
+
   const latestTimestamp = getLatestDataTimestamp(device);
-  const isOnline =
+  const isRecentTimestamp =
     latestTimestamp > 0 && Date.now() - latestTimestamp <= ONLINE_THRESHOLD_MS;
+
+  const isOnline = isExplicitOnline || isRecentTimestamp;
 
   return {
     key: isOnline ? "online" : "offline",
+    statusKey: isOnline ? "online" : "offline",
     isOnline,
     label: isOnline ? "Online" : "Offline",
-    timestamp: latestTimestamp,
+    timestamp: latestTimestamp || (isOnline ? Date.now() : 0),
   };
 }
 
@@ -57,3 +88,35 @@ export function formatCityProvince(device) {
 
   return locationParts.length ? locationParts.join(", ") : "-";
 }
+
+//===== (formatPlantCapacity) ======
+export function formatPlantCapacity(device) {
+  const cap = Number(
+    device?.pv_capacity ?? device?.installed_capacity ?? device?.capacity ?? 0
+  );
+  if (!Number.isFinite(cap) || cap <= 0) {
+    return null;
+  }
+  if (cap >= 1000) {
+    return `${(cap / 1000).toFixed(2)} MWp`;
+  }
+  return `${Number(cap.toFixed(1))} kWp`;
+}
+
+//===== (formatPlantLivePower) ======
+export function formatPlantLivePower(device, connectionStatus) {
+  if (connectionStatus && !connectionStatus.isOnline) {
+    return null;
+  }
+  const statusStr = String(device?.status || device?.connectionStatus || "").toLowerCase();
+  if (statusStr === "offline" || statusStr === "all_offline") {
+    return null;
+  }
+  const rawVal = Number(device?.production ?? device?.pvKw ?? 0);
+  if (!Number.isFinite(rawVal) || rawVal <= 0) {
+    return null;
+  }
+  return `${rawVal.toFixed(1)} kW`;
+}
+
+

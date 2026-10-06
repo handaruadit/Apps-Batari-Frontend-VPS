@@ -1,6 +1,7 @@
-//===== (Imports) ======
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
+import { apiRequest } from "./apiClient";
 
 // Safe loader for expo-notifications to prevent crash in Expo Go on Android
 // (Remote push notifications native code was removed from Expo Go starting in SDK 53)
@@ -115,13 +116,12 @@ export async function triggerLocalNotification({
   delaySeconds = 0,
 }) {
   if (!Notifications?.scheduleNotificationAsync) {
-    console.warn("[notification] Notifications.scheduleNotificationAsync is not available");
     return false;
   }
   try {
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) {
-      console.warn("[notification] Notification permission not granted");
+      return false;
     }
     await setupNotificationChannel();
 
@@ -153,6 +153,66 @@ export async function triggerLocalNotification({
   }
 }
 
+//===== (registerForPushNotificationsAsync) ======
+export async function registerForPushNotificationsAsync() {
+  if (!Notifications?.getExpoPushTokenAsync) {
+    return null;
+  }
+
+  try {
+    const hasPermission = await requestNotificationPermissions();
+    if (!hasPermission) {
+      return null;
+    }
+    await setupNotificationChannel();
+
+    const projectId =
+      Constants?.expoConfig?.extra?.eas?.projectId ??
+      Constants?.easConfig?.projectId ??
+      "e255ea32-389f-4654-91bb-5817e7cef095";
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId,
+    });
+    const token = tokenData?.data;
+
+    if (token) {
+      await AsyncStorage.setItem("batari_expo_push_token", token);
+      try {
+        await apiRequest({
+          path: "/api/auth/push-token",
+          method: "POST",
+          body: {
+            pushToken: token,
+            platform: Platform.OS,
+          },
+        });
+      } catch {
+        // Retry later if not authenticated yet
+      }
+      return token;
+    }
+  } catch (err) {
+    console.warn("[push] Push token registration skipped:", err?.message);
+    return null;
+  }
+  return null;
+}
+
+//===== (sendBackendTestPush) ======
+export async function sendBackendTestPush({ language = "id", plantName = "Solar Plant Utama" } = {}) {
+  try {
+    const { body } = await apiRequest({
+      path: "/api/auth/test-push",
+      method: "POST",
+      body: { language, plantName },
+    });
+    return body || { success: true };
+  } catch (err) {
+    return { success: false, error: err?.message };
+  }
+}
+
 //===== (testStationNotification) ======
 export async function testStationNotification(
   mode = "offline",
@@ -160,6 +220,36 @@ export async function testStationNotification(
   language = null,
   delaySeconds = 0,
 ) {
+  // First attempt backend remote push dispatch
+  let backendDispatched = false;
+  try {
+    await registerForPushNotificationsAsync();
+    const backendRes = await sendBackendTestPush({
+      language: language || "id",
+      plantName,
+    });
+    if (backendRes?.success) {
+      backendDispatched = true;
+    }
+  } catch {
+    // Continue to local trigger
+  }
+
+  if (!Notifications?.scheduleNotificationAsync) {
+    return {
+      success: backendDispatched,
+      reason: "expo_go",
+    };
+  }
+
+  const hasPermission = await requestNotificationPermissions();
+  if (!hasPermission) {
+    return {
+      success: false,
+      reason: "permission_denied",
+    };
+  }
+
   let isEn = false;
   if (language) {
     isEn = language === "en";
@@ -173,7 +263,7 @@ export async function testStationNotification(
   }
   const isOffline = mode === "offline";
   const name = plantName || (isEn ? "Main Solar Station" : "Stasiun Surya Utama");
-  return triggerLocalNotification({
+  const ok = await triggerLocalNotification({
     title: isEn
       ? (isOffline ? `Station Offline: ${name}` : `Station Online: ${name}`)
       : (isOffline ? `Stasiun Offline: ${name}` : `Stasiun Online: ${name}`),
@@ -187,4 +277,12 @@ export async function testStationNotification(
     data: { type: isOffline ? "station_offline" : "station_online" },
     delaySeconds,
   });
+
+  if (ok || backendDispatched) {
+    return true;
+  }
+  return {
+    success: false,
+    reason: "unknown",
+  };
 }
