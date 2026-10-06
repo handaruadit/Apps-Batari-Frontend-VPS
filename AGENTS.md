@@ -46,6 +46,25 @@
 ## 6. Batasan Ketat Perubahan Kode (Strict Scope Boundary — Dilarang "Ngide" Tanpa Instruksi)
 - **DILARANG MENGUBAH / MENAMBAHKAN KODE ATAU FITUR DI LUAR INSTRUKSI EKSPLISIT USER**:
   - Agent TIDAK BOLEH berinisiatif sendiri ("ngide") mengubah konfigurasi, durasi/timer animasi (seperti splash screen, transisi UI), alur kerja navigasi, atau menambahkan kode/fitur yang tidak secara tegas diperintahkan oleh pengguna.
-  - Modifikasi kode harus dibatasi secara ketat HANYA pada bagian yang diminta atau dibutuhkan langsung untuk menyelesaikan masalah spesifik yang diadukan pengguna.
   - Jika agent menemukan potensi optimasi atau ide perbaikan di luar lingkup yang diminta, agent WAJIB menanyakannya atau memberikan rekomendasi secara tertulis terlebih dahulu, BUKAN langsung mengubah kode tanpa persetujuan eksplisit dari pengguna.
+
+## 7. Rekonsiliasi Stasiun Terhapus & Soft Deactivation (Opsi B)
+- **Prinsip Non-Destruktif (Soft Deactivation)**:
+  - Ketika sebuah stasiun dihapus atau dicabut dari akun penyedia pihak ketiga (seperti Deye Cloud), backend DILARANG MENGHAPUS PERMANEN (HARD DELETE) data dari tabel `plants` dan `deye_integrations`.
+  - Modul audit backend (`src/services/plantAuditSync.service.js`) secara otomatis memperbarui kolom status integrasi: `UPDATE deye_integrations SET enabled = false, updated_at = NOW() WHERE station_id = :id;`.
+- **Penyaringan Otomatis pada Query Backend**:
+  - Query daftar pembangkit di `src/services/plantCrud.service.js` (`getPlants`) menyaring stasiun aktif secara tegas dengan `WHERE (di.enabled IS NULL OR di.enabled = true)`.
+  - Pembangkit non-aktif otomatis disembunyikan dari aplikasi mobile dan web.
+- **Pemulihan Otomatis Saat Stasiun Kembali**:
+  - Jika stasiun tersebut di kemudian hari ditautkan kembali ke Deye Cloud, siklus audit otomatis mengembalikannya ke `enabled = true` tanpa perlu konfigurasi ulang.
+
+## 8. Standar Dokumen Laporan Eksekutif Portofolio Bulanan (PDF)
+- **Integritas Header & Footer Resmi Batari (Strict Untouched Geometry)**:
+  - Menggunakan citra letterhead resmi Batari dari berkas komisioning (`Dokumen Komisioning - Avirama.docx`).
+  - Posisi geometris header ($Y = -4\text{ mm}$, tinggi 46.8 mm) dan footer ($Y = 258.3\text{ mm}$, tinggi 38.7 mm) bersifat mutlak dan tidak boleh diubah/digeser.
+- **Pilihan Periode Historis**:
+  - Menyediakan dropdown pemilihan 12 bulan terakhir dengan kalkulasi Month-to-Date (MTD) untuk bulan berjalan vs Bulan Penuh Kalender untuk bulan lampau.
+- **Pengecualian Mutlak Stasiun Non-Aktif**:
+  - Pembangkit yang berstatus non-aktif (`enabled = false`, `is_active = false`, atau `deye_enabled = false`) mutlak dieliminasi dari laporan PDF bulanan (tidak dihitung dalam neraca energi 4 pilar maupun tabel inventaris).
+
 
