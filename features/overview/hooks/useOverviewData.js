@@ -544,11 +544,14 @@ export function useOverviewData({
           const gridConsKwh = Number(
             stationEnergySummary.gridKwh ?? stationDetail?.gridKwh ?? 0,
           );
-          const pvConsKwh = Number(
-            Math.max(0, totalConsKwh - gridConsKwh).toFixed(2),
-          );
           const battConsKwh = Number(
             stationEnergySummary.batteryDischargeKwh ?? 0,
+          );
+          const pvConsKwh = Number(
+            (stationEnergySummary.pvKwh != null
+              ? stationEnergySummary.pvKwh
+              : Math.max(0, totalConsKwh - gridConsKwh - battConsKwh)
+            ).toFixed(2),
           );
 
           totalProdKwh = Number(
@@ -638,45 +641,35 @@ export function useOverviewData({
           totalProdKwh = Number(Number(selectedDev.dailyEnergy || 0).toFixed(2));
           const stationEnergySummary = stationDetail?.energySummary || {};
           const devConsKwh = Number(
-            Number(
+            (
+              selectedDev.dailyConsumption ??
               stationEnergySummary.consumptionTodayKwh ??
-                stationDetail?.consumptionTodayKwh ??
-                0,
+              stationDetail?.consumptionTodayKwh ??
+              0
             ).toFixed(2),
           );
           const devGridKwh = Number(
-            Number(
+            (
+              selectedDev.dailyEnergyPurchased ??
               stationEnergySummary.gridKwh ??
-                stationDetail?.gridKwh ??
-                0,
+              stationDetail?.gridKwh ??
+              0
             ).toFixed(2),
           );
           const devChargeKwh = Number(
-            (
-              selectedDev.dailyChargingEnergy ||
-              (devBattery < 0 ? Math.abs(devBattery) * 2.2 : 0) ||
-              0
-            ).toFixed(2),
+            (selectedDev.dailyChargingEnergy ?? 0).toFixed(2),
           );
           const devExportKwh = Number(
-            (
-              selectedDev.dailyGridFeedIn ||
-              (stationGrid < 0 ? Math.abs(stationGrid) * 0.5 : 0) ||
-              0
-            ).toFixed(2),
+            (selectedDev.dailyGridFeedIn ?? 0).toFixed(2),
+          );
+          const devBattDischargeKwh = Number(
+            (selectedDev.dailyDischargingEnergy ?? 0).toFixed(2),
           );
           const devPvGenKwh = Number(
             Math.max(0, totalProdKwh - devChargeKwh - devExportKwh).toFixed(2),
           );
           const devPvConsKwh = Number(
-            Math.max(0, devConsKwh - devGridKwh).toFixed(2),
-          );
-          const devBattDischargeKwh = Number(
-            (
-              selectedDev.dailyDischargingEnergy ||
-              (devBattery > 0 ? devBattery * 1.5 : 0) ||
-              0
-            ).toFixed(2),
+            Math.max(0, devConsKwh - devGridKwh - devBattDischargeKwh).toFixed(2),
           );
 
           authenticEnergy = {
