@@ -89,7 +89,7 @@ export function buildDailyCsv({ series }) {
     "PV",
     "Grid",
     "Battery",
-    "PV Generate",
+    "Load Consumption",
   ];
   const csvRows = rows.map((row) =>
     [

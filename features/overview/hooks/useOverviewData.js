@@ -582,6 +582,20 @@ export function useOverviewData({
           };
 
           if (stationDetail) {
+            const stationRegular = Number(stationDetail.regularLoad ?? 0);
+            const stationUps = Number(
+              stationDetail.upsLoadPower ?? stationDetail.upsLoad ?? 0,
+            );
+            const stationTotal = Number(
+              stationDetail.loadPower ?? stationDetail.load ?? 0,
+            );
+            const resolvedStationLoad =
+              stationRegular > 0 && stationUps > 0
+                ? Number((stationRegular + stationUps).toFixed(2))
+                : stationTotal > 0
+                  ? stationTotal
+                  : Number((stationRegular + stationUps).toFixed(2));
+
             displayPowerValues = {
               production: Number(
                 stationDetail.production ?? stationDetail.pv ?? 0,
@@ -591,15 +605,8 @@ export function useOverviewData({
               battery: Number(
                 stationDetail.battery ?? stationDetail.batteryPower ?? 0,
               ),
-              load: Number(
-                stationDetail.load ??
-                  stationDetail.loadPower ??
-                  stationDetail.upsLoad ??
-                  0,
-              ),
-              upsLoad: Number(
-                stationDetail.upsLoad ?? stationDetail.load ?? 0,
-              ),
+              load: resolvedStationLoad,
+              upsLoad: stationUps > 0 ? stationUps : resolvedStationLoad,
             };
           } else {
             displayPowerValues = effectiveMonitoringState.isOnline
@@ -610,16 +617,27 @@ export function useOverviewData({
           // Specific hardware inverter telemetry from Deye Cloud
           const devPower = Number(Number(selectedDev.power || 0).toFixed(2));
           const devBattery = Number(Number(selectedDev.batteryPower || 0).toFixed(2));
-          // Load & Grid represent the actual plant/building load & grid interaction being served
-          const stationLoad = Number(
-            Number(
+
+          const devLoad = Number(selectedDev.loadPower ?? selectedDev.load ?? 0);
+          const devUps = Number(selectedDev.upsLoadPower ?? selectedDev.upsLoad ?? 0);
+          const devTotalCons = Number(selectedDev.consumptionPower ?? 0);
+
+          let resolvedDevLoad = 0;
+          if (devLoad > 0 && devUps > 0) {
+            resolvedDevLoad = Number((devLoad + devUps).toFixed(2));
+          } else if (devTotalCons > 0) {
+            resolvedDevLoad = devTotalCons;
+          } else if (devLoad > 0 || devUps > 0) {
+            resolvedDevLoad = Number((devLoad + devUps).toFixed(2));
+          } else {
+            resolvedDevLoad = Number(
               stationDetail?.loadPower ??
                 stationDetail?.load ??
                 stationDetail?.upsLoad ??
-                selectedDev.consumptionPower ??
                 0,
-            ).toFixed(2),
-          );
+            );
+          }
+
           const stationGrid = Number(
             Number(
               stationDetail?.gridPower ??
@@ -634,8 +652,8 @@ export function useOverviewData({
             pv: devPower,
             grid: stationGrid,
             battery: devBattery,
-            load: stationLoad,
-            upsLoad: stationLoad,
+            load: resolvedDevLoad,
+            upsLoad: devUps > 0 ? devUps : resolvedDevLoad,
           };
 
           totalProdKwh = Number(Number(selectedDev.dailyEnergy || 0).toFixed(2));

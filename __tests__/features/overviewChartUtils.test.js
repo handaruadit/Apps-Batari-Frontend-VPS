@@ -257,7 +257,7 @@ describe("overview aggregate periods", () => {
 });
 
 describe("overview Day CSV", () => {
-  test("exports PV Generate separately and preserves negative values", () => {
+  test("exports Load Consumption separately and preserves negative values", () => {
     const timestamp = "2026-08-12T08:00:00+07:00";
     const csv = buildDailyCsv({
       series: {
@@ -269,7 +269,7 @@ describe("overview Day CSV", () => {
       },
     });
 
-    expect(csv).toContain("Waktu,PV,Grid,Battery,PV Generate");
+    expect(csv).toContain("Waktu,PV,Grid,Battery,Load Consumption");
     expect(csv).toContain("08:00,2.10,-0.50,-0.70,3.40");
   });
 });
@@ -293,7 +293,7 @@ describe("overview chart legend", () => {
     expect(screen.queryByText("Load")).toBeNull();
     expect(screen.getByText("Grid")).toBeTruthy();
     expect(screen.getByText("Battery")).toBeTruthy();
-    expect(screen.getByText("PV Generate")).toBeTruthy();
+    expect(screen.getByText("Load Consumption")).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText("PV"));
     expect(onToggleSeries).toHaveBeenCalledWith("production");

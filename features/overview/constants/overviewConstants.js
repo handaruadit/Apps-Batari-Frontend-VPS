@@ -68,7 +68,7 @@ export const POWER_SERIES_CONFIG = [
   {
     key: "pvGenerate",
     labelKey: "pvGenerate",
-    label: "PV Generate",
+    label: "Load Consumption",
     color: "#EF4444",
     group: "production",
   },
@@ -100,7 +100,7 @@ export const ENERGY_SERIES_CONFIG = [
   {
     key: "pvGenerate",
     labelKey: "pvGenerate",
-    label: "PV Generate",
+    label: "Load Consumption",
     color: "#EF4444",
     group: "production",
   },
