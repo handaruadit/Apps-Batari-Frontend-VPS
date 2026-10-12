@@ -116,3 +116,15 @@ export const CURRENCY_OPTIONS = [
   "PEN",
 ];
 
+//===== (Azimuth Options) ======
+export const AZIMUTH_OPTIONS = [
+  "Selatan (0°)",
+  "Barat Daya (45°)",
+  "Barat (90°)",
+  "Barat Laut (135°)",
+  "Utara (180°)",
+  "Timur Laut (-135°)",
+  "Timur (-90°)",
+  "Tenggara (-45°)",
+];
+

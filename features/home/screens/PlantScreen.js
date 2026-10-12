@@ -145,6 +145,8 @@ export default function PlantScreen() {
         batteryCapacity:
           device.battery_capacity == null ? "" : String(device.battery_capacity),
         currency: device.currency || "",
+        tilt: device.tilt == null ? "" : String(device.tilt),
+        azimuth: device.azimuth == null ? "" : String(device.azimuth),
       },
     });
   };

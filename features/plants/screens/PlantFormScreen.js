@@ -17,6 +17,7 @@ import {
 } from "@/features/plants/components/PlantFormFields";
 import PlantSelectModal from "@/features/plants/components/PlantSelectModal";
 import {
+  AZIMUTH_OPTIONS,
   CURRENCY_OPTIONS,
   SYSTEM_TYPE_OPTIONS,
   TIMEZONE_OPTIONS,
@@ -30,11 +31,14 @@ export default function AddDeviceScreen() {
   const { colors, t } = useAppSettings();
   const {
     address,
+    azimuth,
+    azimuthModalVisible,
     batteryCapacity,
     city,
     currency,
     currencyModalVisible,
     handleSave,
+    handleSelectAzimuth,
     handleSelectCurrency,
     handleSelectSystemType,
     handleSelectTimezone,
@@ -46,6 +50,8 @@ export default function AddDeviceScreen() {
     name,
     province,
     setAddress,
+    setAzimuth,
+    setAzimuthModalVisible,
     setBatteryCapacity,
     setCity,
     setCurrencyModalVisible,
@@ -55,9 +61,11 @@ export default function AddDeviceScreen() {
     setName,
     setProvince,
     setSystemTypeModalVisible,
+    setTilt,
     setTimezoneModalVisible,
     systemType,
     systemTypeModalVisible,
+    tilt,
     timezone,
     timezoneModalVisible,
   } = usePlantForm(t);
@@ -227,6 +235,23 @@ export default function AddDeviceScreen() {
               />
             </>
           )}
+
+          <PlantTextField
+            label={t("Kemiringan Panel (°)") || "Kemiringan Panel (°)"}
+            colors={colors}
+            placeholder="12 (Standar)"
+            value={tilt}
+            onChangeText={setTilt}
+            keyboardType="numeric"
+          />
+
+          <PlantSelectField
+            label={t("Arah Hadap Panel") || "Arah Hadap Panel"}
+            colors={colors}
+            placeholder="Selatan (0°)"
+            value={azimuth}
+            onPress={() => setAzimuthModalVisible(true)}
+          />
         </View>
 
         <View
@@ -296,6 +321,15 @@ export default function AddDeviceScreen() {
         closeLabel={t("close")}
         colors={colors}
         showsVerticalScrollIndicator={false}
+      />
+      <PlantSelectModal
+        visible={azimuthModalVisible}
+        title="Pilih Arah Hadap Panel"
+        options={AZIMUTH_OPTIONS}
+        onSelect={handleSelectAzimuth}
+        onClose={() => setAzimuthModalVisible(false)}
+        closeLabel={t("close")}
+        colors={colors}
       />
     </View>
   );

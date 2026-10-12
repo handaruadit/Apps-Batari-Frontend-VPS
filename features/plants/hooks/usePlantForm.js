@@ -57,10 +57,24 @@ export default function usePlantForm(t) {
   const [currency, setCurrency] = useState(() =>
     getInitialText(params.currency),
   );
+  const [tilt, setTilt] = useState(() => getInitialText(params.tilt) || "12");
+  const [azimuth, setAzimuth] = useState(() => {
+    const raw = getInitialText(params.azimuth);
+    if (!raw || raw === "0") return "Selatan (0°)";
+    if (raw === "45") return "Barat Daya (45°)";
+    if (raw === "90") return "Barat (90°)";
+    if (raw === "135") return "Barat Laut (135°)";
+    if (raw === "180" || raw === "-180") return "Utara (180°)";
+    if (raw === "-135") return "Timur Laut (-135°)";
+    if (raw === "-90") return "Timur (-90°)";
+    if (raw === "-45") return "Tenggara (-45°)";
+    return raw;
+  });
 
   const [timezoneModalVisible, setTimezoneModalVisible] = useState(false);
   const [systemTypeModalVisible, setSystemTypeModalVisible] = useState(false);
   const [currencyModalVisible, setCurrencyModalVisible] = useState(false);
+  const [azimuthModalVisible, setAzimuthModalVisible] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   //===== (handleSave) ======
@@ -107,6 +121,22 @@ export default function usePlantForm(t) {
       return;
     }
 
+    const parseAzimuthValue = (azStr) => {
+      const s = String(azStr || "");
+      if (s.includes("0°") || s === "0") return 0;
+      if (s.includes("45°")) return 45;
+      if (s.includes("90°")) return 90;
+      if (s.includes("135°")) return 135;
+      if (s.includes("180°")) return 180;
+      if (s.includes("-135°")) return -135;
+      if (s.includes("-90°")) return -90;
+      if (s.includes("-45°")) return -45;
+      const num = parseFloat(s);
+      return Number.isFinite(num) ? num : 0;
+    };
+
+    const tiltNumber = tilt ? Number(tilt) : 12;
+
     const payload = {
       name: name.trim(),
       location: address.trim(),
@@ -119,6 +149,8 @@ export default function usePlantForm(t) {
       pv_capacity: installedCapacityNumber || 0,
       battery_capacity:
         systemType === "Sistem penyimpanan" ? batteryCapacityNumber || 0 : 0,
+      tilt: Number.isFinite(tiltNumber) ? tiltNumber : 12,
+      azimuth: parseAzimuthValue(azimuth),
     };
 
     payload.currency = currency || "Rp";
@@ -182,13 +214,22 @@ export default function usePlantForm(t) {
     setCurrencyModalVisible(false);
   };
 
+  //===== (handleSelectAzimuth) ======
+  const handleSelectAzimuth = (selectedAzimuth) => {
+    setAzimuth(selectedAzimuth);
+    setAzimuthModalVisible(false);
+  };
+
   return {
     address,
+    azimuth,
+    azimuthModalVisible,
     batteryCapacity,
     city,
     currency,
     currencyModalVisible,
     handleSave,
+    handleSelectAzimuth,
     handleSelectCurrency,
     handleSelectSystemType,
     handleSelectTimezone,
@@ -200,6 +241,8 @@ export default function usePlantForm(t) {
     name,
     province,
     setAddress,
+    setAzimuth,
+    setAzimuthModalVisible,
     setBatteryCapacity,
     setCity,
     setCurrencyModalVisible,
@@ -209,9 +252,11 @@ export default function usePlantForm(t) {
     setName,
     setProvince,
     setSystemTypeModalVisible,
+    setTilt,
     setTimezoneModalVisible,
     systemType,
     systemTypeModalVisible,
+    tilt,
     timezone,
     timezoneModalVisible,
   };
