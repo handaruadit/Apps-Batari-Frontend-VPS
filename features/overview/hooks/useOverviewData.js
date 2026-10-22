@@ -479,14 +479,17 @@ export function useOverviewData({
           : devicePowerValues;
         const apiEnergyValues = getLatestEnergyValues(latestResults);
         const monitoringState = getMonitoringOnlineState(latestResults);
-        const deviceMonitoringState = getDevicesMonitoringState(sourceDevices);
         const isStationOnline = stationDetail
           ? (stationDetail.status === "Online" || stationDetail.isDeviceOnline === true)
+          : false;
+        const isStationIncomplete = stationDetail
+          ? (stationDetail.status === "Incomplete" || stationDetail.connectStatus === 2)
           : false;
 
         const effectiveMonitoringState = stationDetail
           ? {
               isOnline: isStationOnline,
+              isIncomplete: isStationIncomplete,
               latestTimestamp: stationDetail.lastUpdateTime
                 ? new Date(stationDetail.lastUpdateTime).getTime()
                 : Date.now(),
@@ -494,6 +497,7 @@ export function useOverviewData({
           : monitoringState.isOnline || deviceMonitoringState.isOnline
             ? {
                 isOnline: true,
+                isIncomplete: false,
                 latestTimestamp:
                   monitoringState.latestTimestamp ??
                   deviceMonitoringState.latestTimestamp,
@@ -868,12 +872,18 @@ export function useOverviewData({
               : {},
             isDeviceOnline: selectedDev
               ? (selectedDev.connectStatus === 1 || selectedDev.status === "Online" || Number(selectedDev.power) > 0)
-              : effectiveMonitoringState.isOnline,
+              : (effectiveMonitoringState.isOnline || effectiveMonitoringState.isIncomplete),
             latestDataTimestamp: effectiveMonitoringState.latestTimestamp,
             status: pickValue(
               selectedDev
-                ? (selectedDev.connectStatus === 1 || selectedDev.status === "Online" || Number(selectedDev.power) > 0 ? "online" : "offline")
-                : (effectiveMonitoringState.isOnline ? "online" : "offline"),
+                ? (selectedDev.connectStatus === 1 || selectedDev.status === "Online" || Number(selectedDev.power) > 0
+                    ? "online"
+                    : (selectedDev.connectStatus === 2 || selectedDev.status === "Incomplete" ? "incomplete" : "offline"))
+                : (effectiveMonitoringState.isIncomplete || stationDetail?.status === "Incomplete" || plantInfo.status === "Incomplete"
+                    ? "incomplete"
+                    : effectiveMonitoringState.isOnline
+                      ? "online"
+                      : "offline"),
               plantInfo.status,
               current?.status,
               selectedDevice?.status,
