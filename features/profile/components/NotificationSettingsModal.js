@@ -2,7 +2,6 @@ import {
   DEFAULT_NOTIF_SETTINGS,
   getNotificationSettings,
   saveNotificationSettings,
-  testStationNotification,
 } from "@/services/notificationService";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
@@ -30,7 +29,6 @@ export default function NotificationSettingsModal({
   const [settings, setSettings] = useState(DEFAULT_NOTIF_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
 
   // Load saved settings
   useEffect(() => {
@@ -62,26 +60,6 @@ export default function NotificationSettingsModal({
       Alert.alert(t("failed"), t("notifSettingsFailed"));
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  // Trigger test notification
-  const handleTestNotification = async () => {
-    setIsTesting(true);
-    try {
-      await testStationNotification("offline", "Batari Demo Station", language);
-      Alert.alert(
-        language === "en"
-          ? "🔔 Station Offline Alert"
-          : "🔔 Peringatan Stasiun Offline",
-        language === "en"
-          ? "Station 'Batari Demo Station' has been disconnected from the network (Offline)."
-          : "Stasiun 'Batari Demo Station' telah terputus dari jaringan (Offline)."
-      );
-    } catch (e) {
-      Alert.alert(t("failed"), e?.message || "Test notification failed");
-    } finally {
-      setIsTesting(false);
     }
   };
 
@@ -227,48 +205,7 @@ export default function NotificationSettingsModal({
                 />
               </View>
 
-              {/* Test Notification Button */}
-              <TouchableOpacity
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  paddingVertical: 11,
-                  marginTop: 14,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: colors.accent,
-                  backgroundColor: "rgba(24, 174, 230, 0.08)",
-                }}
-                onPress={handleTestNotification}
-                disabled={isTesting}
-              >
-                {isTesting ? (
-                  <ActivityIndicator size="small" color={colors.accent} />
-                ) : (
-                  <>
-                    <Ionicons
-                      name="notifications-outline"
-                      size={17}
-                      color={colors.accent}
-                      style={{ marginRight: 8 }}
-                    />
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontFamily: "Nunito-Bold",
-                        color: colors.accent,
-                      }}
-                    >
-                      {language === "en"
-                        ? "Send Test Notification"
-                        : "Kirim Uji Coba Notifikasi"}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              <View style={{ marginBottom: 12 }} />
+              <View style={{ marginBottom: 8 }} />
             </ScrollView>
           )}
 
