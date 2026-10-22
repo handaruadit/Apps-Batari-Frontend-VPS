@@ -19,8 +19,8 @@ import { fetchUserProfile } from "@/services/userService";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
-import React, { useContext, useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useContext, useEffect, useState } from "react";
 import { Alert, Image, ScrollView, Text, View } from "react-native";
 
 //===== (ProfileScreen) ======
@@ -37,9 +37,15 @@ export default function ProfileScreen() {
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [cacheSize, setCacheSize] = useState("0 KB");
 
-  // Load user profile & real cache size on mount
+  // Refresh real cache size whenever Profile screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      getAppCacheSize().then(setCacheSize).catch(() => {});
+    }, [])
+  );
+
+  // Load user profile on mount
   useEffect(() => {
-    getAppCacheSize().then(setCacheSize).catch(() => {});
     const loadProfile = async () => {
       try {
         const storedUser = await getUserInfo();
