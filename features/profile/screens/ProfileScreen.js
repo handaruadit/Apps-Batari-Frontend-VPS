@@ -102,11 +102,9 @@ export default function ProfileScreen() {
   //===== (handleCheckForUpdate) ======
   const handleCheckForUpdate = () => {
     const appVersion = Constants.expoConfig?.version || "1.0.3";
-    const appBuild = Constants.expoConfig?.android?.versionCode;
-    const buildInfo = appBuild ? ` (Build ${appBuild})` : "";
     Alert.alert(
       t("checkForUpdate"),
-      `${t("latestVersionAlert")} (v${appVersion}${buildInfo} Stable).`,
+      `${t("latestVersionAlert")} (v${appVersion}).`,
     );
   };
 

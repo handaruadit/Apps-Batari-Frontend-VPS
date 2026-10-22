@@ -55,7 +55,7 @@ export default function AboutModal({ visible, onClose, colors, t }) {
             Batari Energy Mobile
           </Text>
           <Text style={[styles.aboutVersionBadge, { color: colors.accent }]}>
-            Version {Constants.expoConfig?.version || "1.0.3"} (Build {Constants.expoConfig?.android?.versionCode || "7"})
+            Version {Constants.expoConfig?.version || "1.0.3"}
           </Text>
 
           <Text style={[styles.aboutDescription, { color: colors.textMuted }]}>
