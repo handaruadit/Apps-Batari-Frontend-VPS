@@ -153,22 +153,26 @@ export function useDayComparison({
         }
 
         const json = await response.json().catch(() => null);
-        console.log("[useDayComparison] fetch response:", {
-          status: response.status,
-          ok: response.ok,
-          endpoint,
-          hasData: json?.data != null,
-          dataKeys: json?.data ? Object.keys(json.data) : null,
-        });
+        if (__DEV__) {
+          console.log("[useDayComparison] fetch response:", {
+            status: response.status,
+            ok: response.ok,
+            endpoint,
+            hasData: json?.data != null,
+            dataKeys: json?.data ? Object.keys(json.data) : null,
+          });
+        }
 
         if (response.ok && json?.data != null) {
           const shifted = processAndShift(json.data);
           const sampleKey = Object.keys(shifted)[0];
-          console.log("[useDayComparison] shifted data counts:", {
-            seriesCount: Object.keys(shifted).length,
-            sampleKey,
-            samplePointsCount: shifted[sampleKey]?.length,
-          });
+          if (__DEV__) {
+            console.log("[useDayComparison] shifted data counts:", {
+              seriesCount: Object.keys(shifted).length,
+              sampleKey,
+              samplePointsCount: shifted[sampleKey]?.length,
+            });
+          }
           cacheRef.current[cacheKey] = shifted;
           setComparisonSeries(shifted);
         } else {

@@ -257,7 +257,7 @@ export const translations = {
 
     // Profile & General
     clear: "Clear",
-    latestVersionAlert: "You are using the latest version (v1.0.0 Stable).",
+    latestVersionAlert: "You are already using the latest version",
     logoutConfirm: "Are you sure you want to log out of your account?",
     accessDenied: "Access Denied",
     noAddDataloggerPermission: "You do not have permission to add a datalogger.",
@@ -558,7 +558,7 @@ export const translations = {
 
     // Profile & General
     clear: "Bersihkan",
-    latestVersionAlert: "Aplikasi Anda sudah menggunakan versi terbaru (v1.0.0 Stable).",
+    latestVersionAlert: "Aplikasi Anda sudah menggunakan versi terbaru",
     logoutConfirm: "Apakah Anda yakin ingin keluar dari akun?",
     accessDenied: "Akses Ditolak",
     noAddDataloggerPermission: "Anda tidak memiliki izin menambah datalogger.",

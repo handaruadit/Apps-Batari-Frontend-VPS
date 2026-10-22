@@ -1,7 +1,7 @@
 {
   "name": "apps",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "scripts": {
     "prestart": "node scripts/ensure-local-api.js",
     "start": "expo start",

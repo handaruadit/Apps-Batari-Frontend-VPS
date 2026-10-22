@@ -12,6 +12,11 @@ try {
   // Gracefully fallback when expo-notifications is not supported in environment
 }
 
+// Check if running inside Expo Go client
+export const isExpoGo =
+  Constants?.appOwnership === "expo" ||
+  Constants?.executionEnvironment === "storeClient";
+
 //===== (Storage Key) ======
 const NOTIF_SETTINGS_KEY = "batari_notification_settings";
 
@@ -26,7 +31,7 @@ export const DEFAULT_NOTIF_SETTINGS = {
 //===== (Configure Foreground Notification) ======
 // Ensures notifications are shown in phone tray even when app is open
 try {
-  if (Notifications?.setNotificationHandler) {
+  if (Notifications?.setNotificationHandler && !(isExpoGo && Platform.OS === "android")) {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
         shouldShowAlert: true,
@@ -44,7 +49,13 @@ try {
 
 //===== (setupNotificationChannel) ======
 async function setupNotificationChannel() {
-  if (Platform.OS !== "android" || !Notifications?.setNotificationChannelAsync) return;
+  if (
+    Platform.OS !== "android" ||
+    (isExpoGo && Platform.OS === "android") ||
+    !Notifications?.setNotificationChannelAsync
+  ) {
+    return;
+  }
   try {
     const channelConfig = {
       name: "Station Status Alerts",
@@ -68,6 +79,9 @@ async function setupNotificationChannel() {
 
 //===== (requestNotificationPermissions) ======
 export async function requestNotificationPermissions() {
+  if (isExpoGo && Platform.OS === "android") {
+    return false;
+  }
   if (!Notifications?.getPermissionsAsync) return false;
   try {
     const { status: current } = await Notifications.getPermissionsAsync();
@@ -115,6 +129,9 @@ export async function triggerLocalNotification({
   data = {},
   delaySeconds = 0,
 }) {
+  if (isExpoGo && Platform.OS === "android") {
+    return false;
+  }
   if (!Notifications?.scheduleNotificationAsync) {
     return false;
   }
@@ -147,14 +164,17 @@ export async function triggerLocalNotification({
       trigger,
     });
     return true;
-  } catch (err) {
-    console.warn("[notification] Native trigger failed:", err?.message);
+  } catch {
     return false;
   }
 }
 
 //===== (registerForPushNotificationsAsync) ======
 export async function registerForPushNotificationsAsync() {
+  if (isExpoGo && Platform.OS === "android") {
+    return null;
+  }
+
   if (!Notifications?.getExpoPushTokenAsync) {
     return null;
   }
@@ -171,16 +191,21 @@ export async function registerForPushNotificationsAsync() {
       Constants?.easConfig?.projectId ??
       "e255ea32-389f-4654-91bb-5817e7cef095";
 
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId,
-    });
+    let tokenData = null;
+    try {
+      tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId,
+      });
+    } catch {
+      return null;
+    }
+
     const token = tokenData?.data;
 
     if (token) {
       await AsyncStorage.setItem("batari_expo_push_token", token);
       try {
-        await apiRequest({
-          path: "/api/auth/push-token",
+        await apiRequest("/api/auth/push-token", {
           method: "POST",
           body: {
             pushToken: token,
@@ -192,8 +217,7 @@ export async function registerForPushNotificationsAsync() {
       }
       return token;
     }
-  } catch (err) {
-    console.warn("[push] Push token registration skipped:", err?.message);
+  } catch {
     return null;
   }
   return null;
@@ -202,8 +226,7 @@ export async function registerForPushNotificationsAsync() {
 //===== (sendBackendTestPush) ======
 export async function sendBackendTestPush({ language = "id", plantName = "Solar Plant Utama" } = {}) {
   try {
-    const { body } = await apiRequest({
-      path: "/api/auth/test-push",
+    const { body } = await apiRequest("/api/auth/test-push", {
       method: "POST",
       body: { language, plantName },
     });
@@ -220,6 +243,13 @@ export async function testStationNotification(
   language = null,
   delaySeconds = 0,
 ) {
+  if (isExpoGo && Platform.OS === "android") {
+    return {
+      success: false,
+      reason: "expo_go",
+    };
+  }
+
   // First attempt backend remote push dispatch
   let backendDispatched = false;
   try {

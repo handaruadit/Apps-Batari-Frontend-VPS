@@ -210,13 +210,8 @@ export function useOverviewData({
               setSelectedDataSource("plant");
             }
           }
-        } catch (error) {
-          if (!String(error?.message || "").includes("Too many requests")) {
-            console.warn(
-              "Failed to load plant devices:",
-              error?.message || error,
-            );
-          }
+        } catch {
+          // Fallback silently if backend plant devices endpoint has transient error
         }
 
         const sourceDevices = selectedSourceDeviceId

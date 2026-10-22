@@ -1,5 +1,6 @@
 //===== (Imports) ======
 import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import React from "react";
 import {
   Linking,
@@ -54,7 +55,7 @@ export default function AboutModal({ visible, onClose, colors, t }) {
             Batari Energy Mobile
           </Text>
           <Text style={[styles.aboutVersionBadge, { color: colors.accent }]}>
-            Version 1.0.0 (Build 2026.09)
+            Version {Constants.expoConfig?.version || "1.0.3"} (Build {Constants.expoConfig?.android?.versionCode || "7"})
           </Text>
 
           <Text style={[styles.aboutDescription, { color: colors.textMuted }]}>

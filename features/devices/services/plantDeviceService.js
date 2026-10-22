@@ -55,7 +55,24 @@ export async function fetchPlantDevices(plantId) {
   );
 
   if (!response.ok) {
-    throwApiError(response, body, "Gagal mengambil data device.");
+    try {
+      const { response: stRes, body: stBody } = await apiRequest(
+        `/api/data/stations/${encodeURIComponent(plantId)}`,
+      );
+      const stationDevices = stBody?.data?.devices || stBody?.devices;
+      if (stRes.ok && Array.isArray(stationDevices) && stationDevices.length > 0) {
+        const inverters = stationDevices.filter(
+          (d) => d.type === "INVERTER" || d.deviceType === "INVERTER",
+        );
+        return {
+          plant: stBody?.data?.station || null,
+          devices: inverters.length > 0 ? inverters : stationDevices,
+        };
+      }
+    } catch {
+      // Fallback silently
+    }
+    return { plant: null, devices: [] };
   }
 
   const plant = body?.data?.plant ?? null;

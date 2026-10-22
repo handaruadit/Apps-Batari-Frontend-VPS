@@ -23,10 +23,6 @@
         "foregroundImage": "./assets/images/adaptive-foreground-1024.png"
       }
     },
-    "notification": {
-      "icon": "./assets/images/notification-icon.png",
-      "color": "#18AEE6"
-    },
     "web": {
       "output": "single",
       "favicon": "./assets/images/favicon.png"

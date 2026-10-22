@@ -2,6 +2,7 @@ import {
   DEFAULT_NOTIF_SETTINGS,
   getNotificationSettings,
   saveNotificationSettings,
+  testStationNotification,
 } from "@/services/notificationService";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
@@ -29,6 +30,7 @@ export default function NotificationSettingsModal({
   const [settings, setSettings] = useState(DEFAULT_NOTIF_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
 
   // Load saved settings
   useEffect(() => {
@@ -60,6 +62,49 @@ export default function NotificationSettingsModal({
       Alert.alert(t("failed"), t("notifSettingsFailed"));
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Trigger test notification
+  const handleTestNotification = async () => {
+    setIsTesting(true);
+    try {
+      const res = await testStationNotification("offline", "Batari Demo Station", language);
+      if (res === true || res?.success) {
+        Alert.alert(
+          language === "en" ? "Notification Triggered" : "Notifikasi Dipicu",
+          language === "en"
+            ? "A test notification was triggered. Check your notification tray."
+            : "Notifikasi uji coba berhasil dikirim. Periksa tray notifikasi HP Anda."
+        );
+      } else if (res?.reason === "permission_denied") {
+        Alert.alert(
+          language === "en" ? "Permission Denied" : "Izin Ditolak",
+          language === "en"
+            ? "Please enable notifications for BySense in your phone's system settings."
+            : "Silakan aktifkan izin notifikasi untuk BySense di pengaturan sistem HP Anda."
+        );
+      } else if (res?.reason === "expo_go") {
+        Alert.alert(
+          language === "en"
+            ? "🔔 [Simulation] Station Offline"
+            : "🔔 [Simulasi Notifikasi] Stasiun Offline",
+          language === "en"
+            ? "Station 'Batari Demo Station' has been disconnected from the network (Offline).\n\n(Note: Native system tray notification and FCM push are fully active on standalone APK builds. Expo Go on Android restricts notification tray access.)"
+            : "Stasiun 'Batari Demo Station' telah terputus dari jaringan (Offline).\n\n(Catatan: Notifikasi tray sistem HP dan push FCM aktif 100% pada file instalasi APK / rilis Play Store. Aplikasi Expo Go Android membatasi notifikasi tray.)"
+        );
+      } else {
+        Alert.alert(
+          language === "en" ? "Notice" : "Pemberitahuan",
+          language === "en"
+            ? "Notification request dispatched to server."
+            : "Pengiriman notifikasi telah diteruskan ke server."
+        );
+      }
+    } catch (e) {
+      Alert.alert(t("failed"), e?.message || "Test notification failed");
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -205,7 +250,71 @@ export default function NotificationSettingsModal({
                 />
               </View>
 
+              {/* Test Notification Button */}
+              <TouchableOpacity
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingVertical: 11,
+                  marginTop: 14,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: colors.accent,
+                  backgroundColor: "rgba(24, 174, 230, 0.08)",
+                }}
+                onPress={handleTestNotification}
+                disabled={isTesting}
+              >
+                {isTesting ? (
+                  <ActivityIndicator size="small" color={colors.accent} />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="notifications-outline"
+                      size={17}
+                      color={colors.accent}
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontFamily: "Nunito-Bold",
+                        color: colors.accent,
+                      }}
+                    >
+                      {language === "en"
+                        ? "Send Test Notification"
+                        : "Kirim Uji Coba Notifikasi"}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
 
+              {/* Informational Note */}
+              <View
+                style={{
+                  marginTop: 10,
+                  marginBottom: 6,
+                  padding: 10,
+                  borderRadius: 8,
+                  backgroundColor: colors.bubbleBorder ? `${colors.bubbleBorder}33` : "rgba(100,116,139,0.1)",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontFamily: "Nunito-Regular",
+                    color: colors.textMuted,
+                    lineHeight: 16,
+                  }}
+                >
+                  ℹ️{" "}
+                  {language === "en"
+                    ? "Remote push notifications operate via FCM in standalone APK / Play Store builds. Expo Go restricts remote notifications."
+                    : "Notifikasi push remote beroperasi via FCM pada build APK mandiri / Play Store. Aplikasi Expo Go membatasi notifikasi remote."}
+                </Text>
+              </View>
             </ScrollView>
           )}
 

@@ -101,9 +101,12 @@ export default function ProfileScreen() {
 
   //===== (handleCheckForUpdate) ======
   const handleCheckForUpdate = () => {
+    const appVersion = Constants.expoConfig?.version || "1.0.3";
+    const appBuild = Constants.expoConfig?.android?.versionCode;
+    const buildInfo = appBuild ? ` (Build ${appBuild})` : "";
     Alert.alert(
       t("checkForUpdate"),
-      t("latestVersionAlert"),
+      `${t("latestVersionAlert")} (v${appVersion}${buildInfo} Stable).`,
     );
   };
 
@@ -334,7 +337,7 @@ export default function ProfileScreen() {
                 color={colors.accent}
               />
             }
-            rightText={`v${Constants.expoConfig?.version || "1.0.2"}`}
+            rightText={`v${Constants.expoConfig?.version || "1.0.3"}`}
             showArrow={false}
             onPress={handleCheckForUpdate}
             colors={colors}
