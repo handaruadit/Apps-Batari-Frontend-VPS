@@ -85,4 +85,32 @@ describe('DeviceCard helpers', () => {
 
     expect(status).toMatchObject({ key: 'offline', isOnline: false });
   });
+
+  it('correctly identifies Incomplete status from connectStatus or status string', () => {
+    const status1 = getPlantConnectionStatus(
+      createDevice({
+        status: 'Incomplete',
+        latestDataStatusTimestamp: new Date(NOW - 2 * 60 * 1000).toISOString(),
+      }),
+    );
+    expect(status1).toMatchObject({
+      key: 'incomplete',
+      label: 'Incomplete',
+      color: '#EAB308',
+      isIncomplete: true,
+      isOnline: false,
+    });
+
+    const status2 = getPlantConnectionStatus(
+      createDevice({
+        connectStatus: 2,
+        latestDataStatusTimestamp: new Date(NOW - 2 * 60 * 1000).toISOString(),
+      }),
+    );
+    expect(status2).toMatchObject({
+      key: 'incomplete',
+      label: 'Incomplete',
+      isIncomplete: true,
+    });
+  });
 });

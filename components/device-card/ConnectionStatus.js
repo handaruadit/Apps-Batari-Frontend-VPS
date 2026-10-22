@@ -5,7 +5,13 @@ import { Animated, Text, View } from "react-native";
 
 //===== (ConnectionStatus Component) ======
 export default function ConnectionStatus({ status, pulseAnim }) {
-  const statusColor = status.isOnline ? "#16A34A" : "#DC2626";
+  const isOnline = Boolean(status?.isOnline);
+  const isIncomplete = status?.key === "incomplete" || Boolean(status?.isIncomplete);
+  const statusColor = isIncomplete
+    ? "#EAB308"
+    : isOnline
+      ? "#10B981"
+      : "#EF4444";
 
   return (
     <View style={styles.statusRow}>
@@ -18,8 +24,8 @@ export default function ConnectionStatus({ status, pulseAnim }) {
           marginRight: 6,
         }}
       >
-        {/* Breathing Aura Halo for Online status */}
-        {status.isOnline && pulseAnim ? (
+        {/* Breathing Aura Halo for Online and Incomplete status */}
+        {(isOnline || isIncomplete) && pulseAnim ? (
           <Animated.View
             pointerEvents="none"
             style={{

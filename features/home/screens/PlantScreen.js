@@ -40,7 +40,7 @@ export default function PlantScreen() {
   const isLight = themeMode === "light";
   const { setSelectedDevice } = useContext(AuthContext);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all"); // "all" | "online" | "offline"
+  const [statusFilter, setStatusFilter] = useState("all"); // "all" | "online" | "incomplete" | "offline"
   const [plantList, setPlantList] = useState([]);
   const plantListRef = useRef([]);
   const flatListRef = useRef(null);
@@ -258,16 +258,26 @@ export default function PlantScreen() {
   //===== (Filtered Plants) ======
   const filteredDevices = useMemo(() => {
     return plantList.filter((item) => {
-      // 1. Status Filter (All, Online, Offline)
+      // 1. Status Filter (All, Online, Incomplete, Offline)
       if (statusFilter !== "all") {
         const status = getPlantConnectionStatus(item);
         const isOnline = Boolean(
           status?.isOnline || status?.key === "online" || status?.statusKey === "online"
         );
+        const isIncomplete = Boolean(
+          status?.isIncomplete || status?.key === "incomplete" || status?.statusKey === "incomplete"
+        );
+        const isOffline = Boolean(
+          status?.key === "offline" || status?.statusKey === "offline" || (!isOnline && !isIncomplete)
+        );
+
         if (statusFilter === "online" && !isOnline) {
           return false;
         }
-        if (statusFilter === "offline" && isOnline) {
+        if (statusFilter === "incomplete" && !isIncomplete) {
+          return false;
+        }
+        if (statusFilter === "offline" && !isOffline) {
           return false;
         }
       }
@@ -381,12 +391,15 @@ export default function PlantScreen() {
 
   const fleetStats = useMemo(() => {
     let onlineCount = 0;
+    let incompleteCount = 0;
     let offlineCount = 0;
     let totalCap = 0;
 
     for (const p of plantList) {
       const status = getPlantConnectionStatus(p);
-      if (status?.isOnline || status?.key === "online" || status?.statusKey === "online") {
+      if (status?.key === "incomplete" || status?.isIncomplete) {
+        incompleteCount++;
+      } else if (status?.isOnline || status?.key === "online" || status?.statusKey === "online") {
         onlineCount++;
       } else {
         offlineCount++;
@@ -400,6 +413,7 @@ export default function PlantScreen() {
     return {
       total: plantList.length,
       online: onlineCount,
+      incomplete: incompleteCount,
       offline: offlineCount,
       totalCapacity:
         totalCap >= 1000
@@ -543,17 +557,45 @@ export default function PlantScreen() {
                     styles.fleetStatItem,
                     statusFilter === "online" && {
                       backgroundColor: isLight
-                        ? "rgba(22, 163, 74, 0.12)"
-                        : "rgba(22, 163, 74, 0.18)",
-                      borderColor: "rgba(22, 163, 74, 0.35)",
+                        ? "rgba(16, 185, 129, 0.12)"
+                        : "rgba(16, 185, 129, 0.18)",
+                      borderColor: "rgba(16, 185, 129, 0.35)",
                     },
                   ]}
                 >
-                  <Text style={[styles.fleetStatValue, { color: "#16A34A" }]}>
+                  <Text style={[styles.fleetStatValue, { color: "#10B981" }]}>
                     {fleetStats.online}
                   </Text>
                   <Text style={[styles.fleetStatLabel, { color: colors.textMuted }]}>
                     {t("online") || "Online"}
+                  </Text>
+                </TouchableOpacity>
+
+                <View
+                  style={[
+                    styles.fleetDivider,
+                    { backgroundColor: colors.bubbleBorder },
+                  ]}
+                />
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setStatusFilter("incomplete")}
+                  style={[
+                    styles.fleetStatItem,
+                    statusFilter === "incomplete" && {
+                      backgroundColor: isLight
+                        ? "rgba(234, 179, 8, 0.12)"
+                        : "rgba(234, 179, 8, 0.18)",
+                      borderColor: "rgba(234, 179, 8, 0.35)",
+                    },
+                  ]}
+                >
+                  <Text style={[styles.fleetStatValue, { color: "#EAB308" }]}>
+                    {fleetStats.incomplete}
+                  </Text>
+                  <Text style={[styles.fleetStatLabel, { color: colors.textMuted }]}>
+                    {t("incomplete") || "Incomplete"}
                   </Text>
                 </TouchableOpacity>
 
@@ -571,9 +613,9 @@ export default function PlantScreen() {
                     styles.fleetStatItem,
                     statusFilter === "offline" && {
                       backgroundColor: isLight
-                        ? "rgba(220, 38, 38, 0.12)"
-                        : "rgba(220, 38, 38, 0.18)",
-                      borderColor: "rgba(220, 38, 38, 0.35)",
+                        ? "rgba(239, 68, 68, 0.12)"
+                        : "rgba(239, 68, 68, 0.18)",
+                      borderColor: "rgba(239, 68, 68, 0.35)",
                     },
                   ]}
                 >
@@ -582,7 +624,7 @@ export default function PlantScreen() {
                       styles.fleetStatValue,
                       {
                         color:
-                          fleetStats.offline > 0 ? "#DC2626" : colors.textMuted,
+                          fleetStats.offline > 0 ? "#EF4444" : colors.textMuted,
                       },
                     ]}
                   >
@@ -744,9 +786,11 @@ export default function PlantScreen() {
                 >
                   {statusFilter === "offline"
                     ? t("noOfflineStations")
-                    : statusFilter === "online"
-                      ? t("noOnlineStations")
-                      : t("noStationsFound")}
+                    : statusFilter === "incomplete"
+                      ? t("noIncompleteStations")
+                      : statusFilter === "online"
+                        ? t("noOnlineStations")
+                        : t("noStationsFound")}
                 </Text>
                 <Text
                   style={{

@@ -83,6 +83,11 @@ export async function fetchPlants() {
       st.connectionStatus === "NORMAL" ||
       st.connectStatus === 1;
 
+    const isIncomplete =
+      st.status === "Incomplete" ||
+      st.connectionStatus === "NO_DEVICE" ||
+      st.connectStatus === 2;
+
     const latVal =
       Number(
         matchedDb?.latitude ??
@@ -103,6 +108,8 @@ export async function fetchPlants() {
         0
     );
 
+    const resolvedStatus = st.status || (isOnline ? "Online" : isIncomplete ? "Incomplete" : "Offline");
+
     return {
       ...st,
       id: matchedDb?.id ? matchedDb.id : (st.id || st.stationId),
@@ -121,11 +128,12 @@ export async function fetchPlants() {
       capacity: capVal,
       tilt: matchedDb?.tilt != null ? Number(matchedDb.tilt) : 12,
       azimuth: matchedDb?.azimuth != null ? Number(matchedDb.azimuth) : 0,
-      status: st.status || (isOnline ? "Online" : "Offline"),
-      connection_status: st.status || (isOnline ? "Online" : "Offline"),
+      status: resolvedStatus,
+      connection_status: resolvedStatus,
       is_online: isOnline,
-      production: st.status === "Offline" ? 0 : Number(st.production ?? st.pvKw ?? 0),
-      pvKw: st.status === "Offline" ? 0 : Number(st.production ?? st.pvKw ?? 0),
+      is_incomplete: isIncomplete,
+      production: resolvedStatus === "Offline" ? 0 : Number(st.production ?? st.pvKw ?? 0),
+      pvKw: resolvedStatus === "Offline" ? 0 : Number(st.production ?? st.pvKw ?? 0),
       dailyProduction: Number(st.dailyProduction ?? 0),
       accumulativeProduction: Number(st.accumulativeProduction ?? 0),
       role: isOwner ? "owner" : isEditor ? "editor" : "viewer",
@@ -135,7 +143,7 @@ export async function fetchPlants() {
       canDelete: matchedDb?.canDelete ?? isOwner,
       canAddDatalogger: matchedDb?.canAddDatalogger ?? isOwner,
       latest_data_at: st.lastUpdateTime || matchedDb?.latest_data_at,
-      latestDataStatusTimestamp: isOnline
+      latestDataStatusTimestamp: (isOnline || isIncomplete)
         ? Date.now()
         : (st.lastUpdateTime ? new Date(st.lastUpdateTime).getTime() : null),
     };

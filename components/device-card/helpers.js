@@ -40,6 +40,7 @@ export function getPlantConnectionStatus(device) {
     .trim()
     .toLowerCase();
 
+  // 1. Explicit Offline
   const isExplicitOffline =
     rawStatus === "offline" ||
     rawStatus === "all_offline" ||
@@ -51,11 +52,33 @@ export function getPlantConnectionStatus(device) {
       key: "offline",
       statusKey: "offline",
       isOnline: false,
+      isIncomplete: false,
       label: "Offline",
+      color: "#EF4444",
       timestamp: getLatestDataTimestamp(device),
     };
   }
 
+  // 2. Explicit Incomplete (Partial connection / NO_DEVICE)
+  const isExplicitIncomplete =
+    rawStatus === "incomplete" ||
+    rawStatus === "no_device" ||
+    device?.connectStatus === 2 ||
+    device?.status === 2;
+
+  if (isExplicitIncomplete) {
+    return {
+      key: "incomplete",
+      statusKey: "incomplete",
+      isOnline: false,
+      isIncomplete: true,
+      label: "Incomplete",
+      color: "#EAB308",
+      timestamp: getLatestDataTimestamp(device),
+    };
+  }
+
+  // 3. Explicit Online or Recent Timestamp
   const isExplicitOnline =
     rawStatus === "online" ||
     rawStatus === "normal" ||
@@ -72,7 +95,9 @@ export function getPlantConnectionStatus(device) {
     key: isOnline ? "online" : "offline",
     statusKey: isOnline ? "online" : "offline",
     isOnline,
+    isIncomplete: false,
     label: isOnline ? "Online" : "Offline",
+    color: isOnline ? "#10B981" : "#EF4444",
     timestamp: latestTimestamp || (isOnline ? Date.now() : 0),
   };
 }
@@ -105,7 +130,11 @@ export function formatPlantCapacity(device) {
 
 //===== (formatPlantLivePower) ======
 export function formatPlantLivePower(device, connectionStatus) {
-  if (connectionStatus && !connectionStatus.isOnline) {
+  if (
+    connectionStatus &&
+    !connectionStatus.isOnline &&
+    connectionStatus.key !== "incomplete"
+  ) {
     return null;
   }
   const statusStr = String(device?.status || device?.connectionStatus || "").toLowerCase();
